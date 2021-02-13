@@ -1,0 +1,48 @@
+import React from 'react';
+import {Button, Container, Link, Paper, Typography} from "@material-ui/core";
+import {useHistory} from "react-router-dom";
+
+const App = () => {
+
+    let history = useHistory();
+
+    const relative = (path: string) => () => {
+        history.push(path);
+    };
+
+    return (
+        <Container maxWidth="sm" className="App">
+            <Paper>
+                <Typography>
+                    <h2>Smart home controller</h2>
+                </Typography>
+                <ul>
+                    <li>
+                        <Button variant="contained" color="secondary" onClick={relative("/garage")}>
+                            Garage door
+                        </Button>
+                    </li>
+                    <li>
+                        <Button variant="contained" color="secondary" onClick={relative("/heater")}>
+                            Heater under floor
+                        </Button>
+                    </li>
+                    <li>
+                        <Button variant="contained" color="secondary">
+                            EV Charing
+                        </Button>
+                    </li>
+                    <li>
+                        <Link href="https://dehnes.com/stats/">
+                            <Button variant="contained" color="secondary">
+                                Temp's and Stats
+                            </Button>
+                        </Link>
+                    </li>
+                </ul>
+            </Paper>
+        </Container>
+    );
+};
+
+export default App;
