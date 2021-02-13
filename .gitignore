@@ -1,0 +1,7 @@
+.idea/
+smarthome-server.iml
+target/
+
+node_modules/
+logs/
+storage.properties
