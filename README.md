@@ -1,0 +1,2 @@
+# SmartHomeServer
+Smarthome backend
