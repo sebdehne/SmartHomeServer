@@ -44,7 +44,7 @@ class SerialConnection(
                 } catch (e: Exception) {
                     logger.error("", e)
                 }
-                Thread.sleep(1 * 1000) // 30 sec backoff TODO
+                Thread.sleep(30 * 1000)
             }
         }.start()
     }

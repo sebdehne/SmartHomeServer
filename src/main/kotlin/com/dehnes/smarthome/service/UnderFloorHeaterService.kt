@@ -52,7 +52,7 @@ class UnderFloorHeaterService(
                     logger.error("", e)
                 }
             }
-        }, 30, 30, TimeUnit.SECONDS) // TODO use 2 min
+        }, 2, 2, TimeUnit.MINUTES)
     }
 
     private fun tick() = if (runLock.tryLock()) {
