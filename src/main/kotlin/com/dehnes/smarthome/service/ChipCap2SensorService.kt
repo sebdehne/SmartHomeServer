@@ -9,6 +9,17 @@ import mu.KotlinLogging
 class ChipCap2SensorService(
     private val influxDBClient: InfluxDBClient
 ) {
+    companion object {
+        fun calcTemperature(packet: RfPacket) =
+            ((merge(packet.message[3], packet.message[2]) / 16384f * 165 - 40) * 100).toInt()
+
+        fun calcRelativeHumidity(packet: RfPacket) =
+            (merge(packet.message[1], packet.message[0]) / 16384f * 100 * 100).toInt()
+
+        fun getAdcValue(packet: RfPacket, pos: Int) = merge(packet.message[pos + 1], packet.message[pos])
+
+        fun calcVoltage(adcValue: Int) = ((102300 / adcValue) * 6) / 10
+    }
 
     private val logger = KotlinLogging.logger { }
 
@@ -30,12 +41,12 @@ class ChipCap2SensorService(
 
     fun handleIncoming(p: RfPacket): Boolean {
         val name = sensorRepo[p.remoteAddr] ?: return false
-        val tempValue = getTemperature(p)
+        val tempValue = calcTemperature(p)
         val temp: String = divideBy100(tempValue)
-        val humidity: String = divideBy100(getRelativeHumidity(p))
+        val humidity: String = divideBy100(calcRelativeHumidity(p))
         val light = getAdcValue(p, 4).toString()
         val batteryVolt: String = divideBy100(calcVoltage(getAdcValue(p, 6)))
-        val counter: String = java.lang.String.valueOf(p.message.get(8))
+        val counter = p.message[8].toString()
         logger.info("Relative humidity $humidity")
         logger.info("Temperature $temp")
         logger.info("Light $light")
@@ -58,15 +69,4 @@ class ChipCap2SensorService(
         return true
     }
 
-    private fun getAdcValue(packet: RfPacket, pos: Int) = merge(packet.message[pos + 1], packet.message[pos])
-
-    private fun calcVoltage(adcValue: Int): Int {
-        return 102300 / adcValue * 6 / 10
-    }
-
-    fun getTemperature(packet: RfPacket) =
-        ((merge(packet.message[3], packet.message[2]) / 16384f * 165 - 40) * 100).toInt()
-
-    fun getRelativeHumidity(packet: RfPacket) =
-        (merge(packet.message[1], packet.message[0]) / 16384f * 100 * 100).toInt()
 }

@@ -3,9 +3,9 @@ package com.dehnes.smarthome.math
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-fun merge(low: Byte, hi: Byte): Int {
-    val result = hi.toInt() shl 8
-    return result + low.toInt()
+fun merge(low: Int, hi: Int): Int {
+    val result = hi shl 8
+    return result + low
 }
 
 fun divideBy100(input: Int) = BigDecimal(input).divide(

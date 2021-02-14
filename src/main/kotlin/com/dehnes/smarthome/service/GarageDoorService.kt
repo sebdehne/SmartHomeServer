@@ -24,7 +24,7 @@ class GarageDoorService(
     private val dbType = "garage"
 
     fun sendOpenCommand() = try {
-        serialConnection.send(RfPacket(rfAddr, ByteArray(1) { 1 }))
+        serialConnection.send(RfPacket(rfAddr, intArrayOf(1)))
         true
     } catch (e: Exception) {
         logger.warn("Could not send Open command", e)
@@ -32,7 +32,7 @@ class GarageDoorService(
     }
 
     fun sendCloseCommand() = try {
-        serialConnection.send(RfPacket(rfAddr, ByteArray(1) { 2 }))
+        serialConnection.send(RfPacket(rfAddr, intArrayOf(2)))
         true
     } catch (e: Exception) {
         logger.warn("Could not send Close command", e)

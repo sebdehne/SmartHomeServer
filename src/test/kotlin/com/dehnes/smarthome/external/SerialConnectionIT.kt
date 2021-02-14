@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test
 import java.util.concurrent.Executors
 
 @Disabled("connects to external service")
-internal class SerialConnectionTest {
+internal class SerialConnectionIT {
 
     @Test
     fun test() {
@@ -19,15 +19,13 @@ internal class SerialConnectionTest {
 
         serialConnection.start()
 
-
         // communicate with heater
         Thread.sleep(1000)
-        serialConnection.send(RfPacket(27, ByteArray(1) { 1 }))
+        serialConnection.send(RfPacket(27, intArrayOf(1)))
         Thread.sleep(1000)
-        serialConnection.send(RfPacket(27, ByteArray(1) { 1 }))
+        serialConnection.send(RfPacket(27, intArrayOf(1)))
         Thread.sleep(1000)
-        serialConnection.send(RfPacket(27, ByteArray(1) { 1 }))
-
+        serialConnection.send(RfPacket(27, intArrayOf(1)))
 
         Thread.sleep(10000)
 

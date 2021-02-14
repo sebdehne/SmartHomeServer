@@ -117,7 +117,7 @@ class SerialConnection(
                     System.arraycopy(buf, 4, msg, 0, msgLen)
                     val p = RfPacket(
                         from,
-                        msg
+                        convert(msg)
                     )
                     compact(buf, 4 + msgLen, writePos)
                     if (dst == myAddr) {
@@ -164,6 +164,18 @@ class SerialConnection(
         }
     }
 
+    private fun convert(input: ByteArray): IntArray {
+        return if (input.isNotEmpty()) {
+            val a = IntArray(input.size)
+            for (i in input.indices) {
+                a[i] = input[i].toInt() and 0xFF
+            }
+            a
+        } else {
+            IntArray(0)
+        }
+    }
+
 }
 
 class Connection(
@@ -188,11 +200,13 @@ class Connection(
 
 }
 
-data class RfPacket(val remoteAddr: Int, val message: ByteArray) {
+data class RfPacket(val remoteAddr: Int, val message: IntArray) {
     fun toBytes(): ByteArray {
         val buf = ByteArray(message.size + 1)
         buf[0] = remoteAddr.toByte()
-        System.arraycopy(message, 0, buf, 1, message.size)
+        message.forEachIndexed { index, i ->
+            buf[index + 1] = i.toByte()
+        }
         return buf
     }
 }

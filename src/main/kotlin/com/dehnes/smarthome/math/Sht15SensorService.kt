@@ -25,9 +25,3 @@ object Sht15SensorService {
     }
 
 }
-
-fun main(args: Array<String>) {
-    val temp = Sht15SensorService.calcTemp(merge(120, 24))
-    println(temp)
-    println(Sht15SensorService.calcHum(merge(160.toByte(), 4), temp))
-}

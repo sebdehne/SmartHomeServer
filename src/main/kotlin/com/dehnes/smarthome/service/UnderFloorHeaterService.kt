@@ -170,7 +170,7 @@ class UnderFloorHeaterService(
         val temperature: Int = Sht15SensorService.getTemperature(p)
         val temp: String = divideBy100(temperature)
         val humidity: String = divideBy100(getRelativeHumidity(p, temperature))
-        val heaterStatus = p.message[4].toInt() == 1
+        val heaterStatus = p.message[4] == 1
 
         logger.info("Relative humidity $humidity")
         logger.info("Temperature $temp")
@@ -216,7 +216,7 @@ class UnderFloorHeaterService(
         msgListener = { rfPacket -> inMsg.offer(rfPacket) }
         try {
             repeat(5) {
-                serialConnection.send(RfPacket(rfAddr, ByteArray(1) { finalCommand.toByte() }))
+                serialConnection.send(RfPacket(rfAddr, intArrayOf(finalCommand)))
                 val response = inMsg.poll(500, TimeUnit.MILLISECONDS)
                 if (response != null) {
                     return response
