@@ -117,6 +117,7 @@ function reconnect() {
         if (json.type === WebsocketMessageType.rpcResponse) {
             let ongoingRPC = OngoingRPCsById.get(json.id);
             if (ongoingRPC) {
+                OngoingRPCsById.delete(json.id);
                 ongoingRPC.resolve(json.rpcResponse!!);
             }
         } else if (json.type === WebsocketMessageType.notify) {
