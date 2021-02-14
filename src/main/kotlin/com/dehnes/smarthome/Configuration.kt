@@ -7,6 +7,7 @@ import com.dehnes.smarthome.service.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Clock
+import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -17,13 +18,7 @@ class Configuration {
 
     fun init() {
 
-        val executorService = ThreadPoolExecutor(
-            0,
-            50,
-            60L,
-            TimeUnit.SECONDS,
-            LinkedBlockingQueue()
-        )
+        val executorService = Executors.newCachedThreadPool()
         val objectMapper = jacksonObjectMapper()
 
         val influxDBClient = InfluxDBClient(objectMapper, System.getProperty("DST_HOST"))
@@ -36,7 +31,7 @@ class Configuration {
         val garageDoorService = GarageDoorService(serialConnection, influxDBClient)
         val chipCap2SensorService = ChipCap2SensorService(influxDBClient)
 
-        val heaterService = UnderFloopHeaterService(
+        val heaterService = UnderFloorHeaterService(
             serialConnection,
             executorService,
             persistenceService,
@@ -49,7 +44,7 @@ class Configuration {
         serialConnection.listeners.add(chipCap2SensorService::handleIncoming)
 
         beans[SerialConnection::class] = serialConnection
-        beans[UnderFloopHeaterService::class] = heaterService
+        beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageDoorService::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
     }

@@ -11,24 +11,19 @@ const GarageDoor = () => {
     const [garageStatus, setGarageStatus] = useState<GarageStatus | null>(null);
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
+    const [currentSeconds, setCurrentSeconds] = useState(Date.now());
 
     useEffect(() => {
-        WebsocketService.rpc(new RpcRequest(RequestType.getGarageStatus, null, null))
-            .then(response => {
-                console.log("garage rpc:");
-                console.log(response);
+        setTimeout(() => setCurrentSeconds(Date.now()), 1000)
+    }, [currentSeconds])
 
-                setGarageStatus(response.garageStatus);
-            });
+    useEffect(() => {
+        WebsocketService.rpc(new RpcRequest(RequestType.getGarageStatus, null, null, null))
+            .then(response => setGarageStatus(response.garageStatus));
 
         const subId = WebsocketService.subscribe(
             RequestType.getGarageStatus,
-            (notify: Notify) => {
-                console.log("garage notify:");
-                console.log(notify);
-
-                setGarageStatus(notify.garageStatus);
-            }
+            (notify: Notify) => setGarageStatus(notify.garageStatus)
         )
 
         return () => WebsocketService.unsubscribe(subId);
@@ -38,6 +33,7 @@ const GarageDoor = () => {
         setSending(true);
         WebsocketService.rpc(new RpcRequest(
             cmd,
+            null,
             null,
             null
         )).then((response: RpcResponse) => {
@@ -61,12 +57,16 @@ const GarageDoor = () => {
                 <Typography>
                     <h2>Garage door controller</h2>
                 </Typography>
+                {garageStatus &&
                 <div>
                     <ul>
-                        <li>Door status: {garageStatus ? (garageStatus.doorIsOpen ? "open" : "closed") : "unknown"}</li>
-                        <li>Light status: {garageStatus ? (garageStatus.lightIsOn ? "on" : "off") : "unknown"}</li>
+                        <li>Door status: {garageStatus.doorIsOpen ? "open" : "closed"}</li>
+                        <li>Light status: {garageStatus.lightIsOn ? "on" : "off"}</li>
                     </ul>
+                    <p>Updated: {timeToDelta(currentSeconds, garageStatus.utcTimestampInMs)} ago</p>
                 </div>
+                }
+                {!garageStatus && <p>Status currently not available</p>}
 
                 <div>
                     <Button variant="contained" color="secondary" onClick={() => sendCmd(RequestType.openGarageDoor)}>
@@ -88,3 +88,14 @@ const GarageDoor = () => {
 };
 
 export default GarageDoor;
+
+export function timeToDelta(now: number, utcTimestampInMs: number): string {
+    const deltaInSeconds = (now - utcTimestampInMs) / 1000;
+    if (deltaInSeconds < 60) {
+        return `${Math.round(deltaInSeconds)} seconds`;
+    } else if (deltaInSeconds < 120) {
+        return "1 minute";
+    } else {
+        return `${Math.round(deltaInSeconds / 60) } minutes`;
+    }
+}

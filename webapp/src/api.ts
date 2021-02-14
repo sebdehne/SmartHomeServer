@@ -14,6 +14,8 @@ export enum RequestType {
     getGarageStatus = "getGarageStatus",
     openGarageDoor = "openGarageDoor",
     closeGarageDoor = "closeGarageDoor",
+    getUnderFloorHeaterStatus = "getUnderFloorHeaterStatus",
+    updateUnderFloorHeaterMode = "updateUnderFloorHeaterMode",
 
     subscribe = "subscribe",
     unsubscribe = "unsubscribe"
@@ -42,35 +44,44 @@ export class RpcRequest {
     public type: RequestType;
     public subscribe: Subscribe | null;
     public unsubscribe: Unsubscribe | null;
+    public updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode | null;
 
-    constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null) {
+    constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode | null) {
         this.type = type;
         this.subscribe = subscribe;
         this.unsubscribe = unsubscribe;
+        this.updateUnderFloorHeaterMode = updateUnderFloorHeaterMode;
     }
 }
 
 export class RpcResponse {
     public garageStatus: GarageStatus | null;
+    public underFloorHeaterStatus: UnderFloorHeaterStatus | null;
     public subscriptionCreated: boolean | null;
     public subscriptionRemoved: boolean | null;
     public garageCommandSendSuccess: boolean | null;
+    public updateUnderFloorHeaterModeSuccess: boolean | null;
 
-    public constructor(garageStatus: GarageStatus, subscriptionCreated: boolean, subscriptionRemoved: boolean, garageCommandSendSuccess: boolean) {
+    constructor(garageStatus: GarageStatus | null, underFloorHeaterStatus: UnderFloorHeaterStatus | null, subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageCommandSendSuccess: boolean | null, updateUnderFloorHeaterModeSuccess: boolean | null) {
         this.garageStatus = garageStatus;
+        this.underFloorHeaterStatus = underFloorHeaterStatus;
         this.subscriptionCreated = subscriptionCreated;
         this.subscriptionRemoved = subscriptionRemoved;
         this.garageCommandSendSuccess = garageCommandSendSuccess;
+        this.updateUnderFloorHeaterModeSuccess = updateUnderFloorHeaterModeSuccess;
     }
 }
 
 export class Notify {
     public subscriptionId: string;
     public garageStatus: GarageStatus | null;
+    public underFloorHeaterStatus: UnderFloorHeaterStatus | null;
 
-    public constructor(subscriptionId: string, garageStatus: GarageStatus | null) {
+
+    constructor(subscriptionId: string, garageStatus: GarageStatus | null, underFloorHeaterStatus: UnderFloorHeaterStatus | null) {
         this.subscriptionId = subscriptionId;
         this.garageStatus = garageStatus;
+        this.underFloorHeaterStatus = underFloorHeaterStatus;
     }
 }
 
@@ -95,4 +106,49 @@ export enum WebsocketMessageType {
     rpcRequest = "rpcRequest",
     rpcResponse = "rpcResponse",
     notify = "notify"
+}
+
+export enum UnderFloorHeaterMode {
+    permanentOn = "permanentOn",
+    permanentOff = "permanentOff",
+    constantTemperature = "constantTemperature"
+}
+
+export enum OnOff {
+    on = "on",
+    off = "off"
+}
+
+export class UnderFloorHeaterConstantTemperaturStatus {
+    public targetTemperatur: number;
+
+    constructor(targetTemperatur: number) {
+        this.targetTemperatur = targetTemperatur;
+    }
+}
+
+export class UnderFloorHeaterStatus {
+    public mode: UnderFloorHeaterMode;
+    public status: OnOff;
+    public currentTemperatur: number;
+    public constantTemperaturStatus: UnderFloorHeaterConstantTemperaturStatus;
+    public utcTimestampInMs: number;
+
+    constructor(mode: UnderFloorHeaterMode, status: OnOff, currentTemperatur: number, constantTemperaturStatus: UnderFloorHeaterConstantTemperaturStatus, utcTimestampInMs: number) {
+        this.mode = mode;
+        this.status = status;
+        this.currentTemperatur = currentTemperatur;
+        this.constantTemperaturStatus = constantTemperaturStatus;
+        this.utcTimestampInMs = utcTimestampInMs;
+    }
+}
+
+export class UpdateUnderFloorHeaterMode {
+    public newMode: UnderFloorHeaterMode;
+    public newTargetTemperatur: number;
+
+    constructor(newMode: UnderFloorHeaterMode, newTargetTemperatur: number) {
+        this.newMode = newMode;
+        this.newTargetTemperatur = newTargetTemperatur;
+    }
 }

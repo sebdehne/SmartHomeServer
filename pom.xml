@@ -68,7 +68,6 @@
                 <executions>
                     <execution>
                         <id>copy-webapp</id>
-                        <!-- here the phase you need -->
                         <phase>validate</phase>
                         <goals>
                             <goal>copy-resources</goal>
@@ -78,6 +77,7 @@
                             <resources>
                                 <resource>
                                     <directory>webapp/build</directory>
+                                    <filtering>true</filtering>
                                 </resource>
                             </resources>
                         </configuration>

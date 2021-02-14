@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.service
 
+import com.dehnes.smarthome.api.*
 import com.dehnes.smarthome.external.InfluxDBClient
 import com.dehnes.smarthome.external.RfPacket
 import com.dehnes.smarthome.external.SerialConnection
@@ -7,10 +8,7 @@ import com.dehnes.smarthome.math.Sht15SensorService
 import com.dehnes.smarthome.math.Sht15SensorService.getRelativeHumidity
 import com.dehnes.smarthome.math.divideBy100
 import mu.KotlinLogging
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 
@@ -18,7 +16,7 @@ private const val TARGET_TEMP_KEY = "HeatingControllerService.targetTemp"
 private const val HEATER_STATUS_KEY = "HeatingControllerService.heaterTarget"
 private const val OPERATING_MODE = "HeatingControllerService.operatingMode"
 
-class UnderFloopHeaterService(
+class UnderFloorHeaterService(
     private val serialConnection: SerialConnection,
     private val executorService: ExecutorService,
     private val persistenceService: PersistenceService,
@@ -36,35 +34,50 @@ class UnderFloopHeaterService(
     private val timer = Executors.newSingleThreadScheduledExecutor()
     private val failedAttempts = AtomicInteger(0)
 
-    private var lastSwitchedTimestamp: Long = 0
+    private var lastTick: Long = 0
     private var msgListener: ((RfPacket) -> Unit)? = null
+
+    val listeners = ConcurrentHashMap<String, (UnderFloorHeaterStatus) -> Unit>()
+
+    @Volatile
+    private var lastStatus: UnderFloorHeaterStatus? = null
 
     fun start() {
         timer.scheduleAtFixedRate({
             executorService.submit {
-                if (runLock.tryLock()) {
-                    try {
-                        tick()
-                    } catch (e: Exception) {
-                        logger.error("", e)
-                    } finally {
-                        runLock.unlock()
-                    }
+                try {
+                    tick()
+                } catch (e: Exception) {
+                    logger.error("", e)
                 }
             }
-        }, 2, 2, TimeUnit.MINUTES)
+        }, 30, 30, TimeUnit.SECONDS) // TODO use 2 min
     }
 
-    private fun tick(): Boolean {
+    private fun tick() = if (runLock.tryLock()) {
+        try {
+            tickLocked()
+        } finally {
+            runLock.unlock()
+        }
+    } else {
+        false
+    }
+
+    private fun tickLocked(): Boolean {
         val currentMode: Mode = getCurrentMode()
         logger.info("Current mode: $currentMode")
+
+        if (lastTick > System.currentTimeMillis() - 10000) {
+            return true
+        }
+        lastTick = System.currentTimeMillis();
 
         // request measurement
         val rfPacket: RfPacket? = executeCommand(commandReadStatus)
         // TODO ignore values too unrealistic / remember last values in memory -
         recordLocalValues(currentMode, failedAttempts.get())
-        val temperatureAndHeaterStatus = rfPacket?.let { recordRfValues(it) } ?: return false
-
+        val temperatureAndHeaterStatus = rfPacket?.let { parsePacket(it, true) } ?: return false
 
         // evaluate state
         when (currentMode) {
@@ -77,25 +90,49 @@ class UnderFloopHeaterService(
                 if (energyPriceOK && temperatureAndHeaterStatus.temp < targetTemperature) {
                     logger.info("Setting heater to on")
                     persistenceService[HEATER_STATUS_KEY] = "on"
-                    lastSwitchedTimestamp = System.currentTimeMillis()
                 } else {
                     logger.info(
                         "Setting heater to off. energyPriceOK={}",
                         energyPriceOK
                     )
                     persistenceService[HEATER_STATUS_KEY] = "off"
-                    lastSwitchedTimestamp = System.currentTimeMillis()
                 }
             }
         }
 
+        var heaterStatus = temperatureAndHeaterStatus.heaterIsOn
+
         // bring the heater to the desired state
-        if (temperatureAndHeaterStatus.heaterIsOn && "off" == getConfiguredHeaterTarget()) {
-            return executeCommand(commandSwitchOffHeater) != null
+        val executionResult = if (temperatureAndHeaterStatus.heaterIsOn && "off" == getConfiguredHeaterTarget()) {
+            executeCommand(commandSwitchOffHeater)?.let {
+                heaterStatus = parsePacket(it, false).heaterIsOn
+                true
+            } ?: false
         } else if (!temperatureAndHeaterStatus.heaterIsOn && "on" == getConfiguredHeaterTarget()) {
-            return executeCommand(commandSwitchOnHeater) != null
+            executeCommand(commandSwitchOnHeater)?.let {
+                heaterStatus = parsePacket(it, false).heaterIsOn
+                true
+            } ?: false
+        } else {
+            true
         }
-        return true
+
+        lastStatus = UnderFloorHeaterStatus(
+            UnderFloorHeaterMode.values().first { it.mode == currentMode },
+            if (heaterStatus) OnOff.on else OnOff.off,
+            temperatureAndHeaterStatus.temp,
+            UnderFloorHeaterConstantTemperaturStatus(getTargetTemperature())
+        )
+
+        listeners.forEach {
+            try {
+                it.value(lastStatus!!)
+            } catch (e: Exception) {
+                logger.error("", e)
+            }
+        }
+
+        return executionResult
     }
 
     fun onRfMessage(rfPacket: RfPacket) {
@@ -105,11 +142,23 @@ class UnderFloopHeaterService(
 
         msgListener?.let {
             it(rfPacket)
+        } ?: run {
+            logger.info { "Could not use packet because no listener: $rfPacket" }
         }
     }
 
-    private fun recordRfValues(
-        p: RfPacket
+    fun getCurrentState() = lastStatus
+
+    fun update(updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode): Boolean {
+        check(updateUnderFloorHeaterMode.newTargetTemperatur in 1000..5000)
+        setTargetTemperature(updateUnderFloorHeaterMode.newTargetTemperatur)
+        setCurrentMode(updateUnderFloorHeaterMode.newMode.mode)
+        return tick()
+    }
+
+    private fun parsePacket(
+        p: RfPacket,
+        record: Boolean
     ): TemperatureAndHeaterStatus {
         val temperature: Int = Sht15SensorService.getTemperature(p)
         val temp: String = divideBy100(temperature)
@@ -120,15 +169,17 @@ class UnderFloopHeaterService(
         logger.info("Temperature $temp")
         logger.info("Heater on? $heaterStatus")
 
-        influxDBClient.recordSensorData(
-            "sensor",
-            listOf(
-                "temperature" to temp,
-                "humidity" to humidity,
-                "heater_status" to (if (heaterStatus) 1 else 0).toString(),
-            ),
-            "room" to "heating_controller"
-        )
+        if (record) {
+            influxDBClient.recordSensorData(
+                "sensor",
+                listOf(
+                    "temperature" to temp,
+                    "humidity" to humidity,
+                    "heater_status" to (if (heaterStatus) 1 else 0).toString(),
+                ),
+                "room" to "heating_controller"
+            )
+        }
 
         return TemperatureAndHeaterStatus(temperature, heaterStatus)
     }
@@ -178,8 +229,15 @@ class UnderFloopHeaterService(
     private fun getTargetTemperature() =
         Integer.valueOf(persistenceService[TARGET_TEMP_KEY, (25 * 100).toString()])
 
-    private fun getConfiguredHeaterTarget() = persistenceService[HEATER_STATUS_KEY, "off"]!!
+    private fun setTargetTemperature(t: Int) {
+        persistenceService[TARGET_TEMP_KEY] = t.toString()
+    }
 
+    private fun setCurrentMode(m: Mode) {
+        persistenceService[OPERATING_MODE] = m.name
+    }
+
+    private fun getConfiguredHeaterTarget() = persistenceService[HEATER_STATUS_KEY, "off"]!!
 
 }
 

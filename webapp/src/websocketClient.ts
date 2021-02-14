@@ -29,7 +29,7 @@ function subscribe(type: RequestType, onNotify: (notify: Notify) => void) {
 
     SubscriptionsById.set(subscriptionId, new Subscription(type, onNotify));
 
-    rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null)).then(response => {
+    rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null, null)).then(response => {
         // OK
     });
 
@@ -43,7 +43,7 @@ function unsubscribe(subscriptionId: string) {
         return;
     }
 
-    rpc(new RpcRequest(RequestType.unsubscribe, null, new Unsubscribe(subscriptionId))).then(response => {
+    rpc(new RpcRequest(RequestType.unsubscribe, null, new Unsubscribe(subscriptionId), null)).then(response => {
         SubscriptionsById.delete(subscriptionId);
     });
 
@@ -90,13 +90,17 @@ function setConnectionStatusChanged(newState: ConnectionStatus) {
 
 function reconnect() {
     setConnectionStatusChanged(ConnectionStatus.connecting);
-    // @ts-ignore TODO
-    ws = new WebSocket(process.env.REACT_APP_WEBSOCKET_ENDPOINT);
+    // @ts-ignore
+    const urlTemplate: string = process.env.REACT_APP_WEBSOCKET_ENDPOINT;
+    const wsUrl = urlTemplate.replace("HOST", window.location.host);
+    console.log("Connecting to: " + wsUrl);
+
+    ws = new WebSocket(wsUrl);
     ws.onopen = function () {
         setConnectionStatusChanged(ConnectionStatus.connected);
         // re-subscribe
         SubscriptionsById.forEach((sub, key) => {
-            rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null)).then(response => {
+            rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null, null)).then(response => {
                 // OK
             });
         })
@@ -147,6 +151,7 @@ const WebsocketService = {
     monitorConnectionStatus: (fn: (connectionStatis: ConnectionStatus) => void) => {
         const id = uuidv4();
         ConnectionStatusSubscriptionsById.set(id, fn);
+        fn(connectionStatus);
         return () => {
             ConnectionStatusSubscriptionsById.delete(id);
         };

@@ -3,6 +3,7 @@ package com.dehnes.smarthome.api
 import com.dehnes.smarthome.api.RequestType.*
 import com.dehnes.smarthome.configuration
 import com.dehnes.smarthome.service.GarageDoorService
+import com.dehnes.smarthome.service.UnderFloorHeaterService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
@@ -18,6 +19,7 @@ class WebSocketServer {
     private val objectMapper = configuration.getBean<ObjectMapper>(ObjectMapper::class)
     private val logger = KotlinLogging.logger { }
     private val garageDoorService = configuration.getBean<GarageDoorService>(GarageDoorService::class)
+    private val underFloopHeaterService = configuration.getBean<UnderFloorHeaterService>(UnderFloorHeaterService::class)
     private val subscriptions = mutableMapOf<String, Subscription<*>>()
 
     @OnOpen
@@ -35,6 +37,8 @@ class WebSocketServer {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            updateUnderFloorHeaterMode -> RpcResponse(updateUnderFloorHeaterModeSuccess = underFloopHeaterService.update(rpcRequest.updateUnderFloorHeaterMode!!))
+            getUnderFloorHeaterStatus -> RpcResponse(underFloorHeaterStatus = underFloopHeaterService.getCurrentState())
             openGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendCloseCommand())
             closeGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendCloseCommand())
             getGarageStatus -> RpcResponse(garageStatus = garageDoorService.getCurrentState())
@@ -42,33 +46,39 @@ class WebSocketServer {
                 val subscribe = rpcRequest.subscribe!!
                 val subscriptionId = subscribe.subscriptionId
 
-                val sub = when(subscribe.type) {
+                val sub = when (subscribe.type) {
                     getGarageStatus -> GarageStatusSubscription(subscriptionId, argSession).apply {
                         garageDoorService.listeners[subscriptionId] = this::onEvent
+                    }
+                    getUnderFloorHeaterStatus -> UnderFloorHeaterSubscription(subscriptionId, argSession).apply {
+                        underFloopHeaterService.listeners[subscriptionId] = this::onEvent
                     }
                     else -> error("Not supported subscription ${subscribe.type}")
                 }
 
                 subscriptions.put(subscriptionId, sub)?.close()
-                logger.info { "New subscribeGarageStatus id=$subscriptionId" }
+                logger.info { "New subscription id=$subscriptionId type=${subscribe.type}" }
                 RpcResponse(subscriptionCreated = true)
             }
             unsubscribe -> {
                 val subscriptionId = rpcRequest.unsubscribe!!.subscriptionId
-                subscriptions[subscriptionId]!!.close()
-                Notify(subscriptionId, garageDoorService.getCurrentState())
-                logger.info { "Removed subscribeGarageStatus id=$subscriptionId" }
+                subscriptions.remove(subscriptionId)?.close()
+                logger.info { "Removed subscription id=$subscriptionId" }
                 RpcResponse(subscriptionRemoved = true)
             }
         }
 
-        argSession.basicRemote.sendText(objectMapper.writeValueAsString(WebsocketMessage(
-            websocketMessage.id,
-            WebsocketMessageType.rpcResponse,
-            null,
-            response,
-            null
-        )))
+        argSession.basicRemote.sendText(
+            objectMapper.writeValueAsString(
+                WebsocketMessage(
+                    websocketMessage.id,
+                    WebsocketMessageType.rpcResponse,
+                    null,
+                    response,
+                    null
+                )
+            )
+        )
     }
 
     @OnClose
@@ -87,17 +97,41 @@ class WebSocketServer {
         sess: Session
     ) : Subscription<GarageStatus>(subscriptionId, sess) {
         override fun onEvent(e: GarageStatus) {
-            sess.basicRemote.sendText(objectMapper.writeValueAsString(
-                WebsocketMessage(
-                    UUID.randomUUID().toString(),
-                    WebsocketMessageType.notify,
-                    notify = Notify(subscriptionId, e)
+            sess.basicRemote.sendText(
+                objectMapper.writeValueAsString(
+                    WebsocketMessage(
+                        UUID.randomUUID().toString(),
+                        WebsocketMessageType.notify,
+                        notify = Notify(subscriptionId, e, null)
+                    )
                 )
-            ))
+            )
         }
 
         override fun close() {
             garageDoorService.listeners.remove(subscriptionId)
+            subscriptions.remove(subscriptionId)
+        }
+    }
+
+    inner class UnderFloorHeaterSubscription(
+        subscriptionId: String,
+        sess: Session
+    ) : Subscription<UnderFloorHeaterStatus>(subscriptionId, sess) {
+        override fun onEvent(e: UnderFloorHeaterStatus) {
+            sess.basicRemote.sendText(
+                objectMapper.writeValueAsString(
+                    WebsocketMessage(
+                        UUID.randomUUID().toString(),
+                        WebsocketMessageType.notify,
+                        notify = Notify(subscriptionId, null, e)
+                    )
+                )
+            )
+        }
+
+        override fun close() {
+            underFloopHeaterService.listeners.remove(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }

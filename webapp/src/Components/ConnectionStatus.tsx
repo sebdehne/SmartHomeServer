@@ -9,7 +9,7 @@ const ConnectionStatusComponent = () => {
             setStatus(status);
         }), []);
 
-    return <p>Websocket status: {status}</p>
+    return <p>Server connection: {status}</p>
 };
 
 export default ConnectionStatusComponent;

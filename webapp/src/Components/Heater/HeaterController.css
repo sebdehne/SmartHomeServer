@@ -1,0 +1,16 @@
+.TargetTempButtonsContainer {
+    display: flex;
+    flex-direction: column;
+}
+.TargetTempButtonsContainer > button {
+    width: 40px;
+}
+.TargetTempButtonsContainer > div {
+    width: 40px;
+}
+.Buttons {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-evenly;
+}

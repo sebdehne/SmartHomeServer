@@ -19,7 +19,7 @@ fun main() {
 
     val server = Server()
     val connector = ServerConnector(server)
-    connector.port = 8080
+    connector.port = 9090
     server.addConnector(connector)
 
     val context = ServletContextHandler(ServletContextHandler.SESSIONS)
