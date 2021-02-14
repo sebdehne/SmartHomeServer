@@ -1,10 +1,12 @@
 package com.dehnes.smarthome.utils
 
+import mu.KotlinLogging
 import javax.servlet.http.HttpServlet
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
 class StaticFilesServlet : HttpServlet() {
+    val logger = KotlinLogging.logger {  }
     override fun doGet(req: HttpServletRequest, resp: HttpServletResponse) {
 
         val resourceName = pathToResource(req.pathInfo)
@@ -17,6 +19,8 @@ class StaticFilesServlet : HttpServlet() {
                 inputStream.copyTo(resp.outputStream)
             }
         }
+
+        logger.info { "GET pathInfo=${req.pathInfo} status=${resp.status}" }
     }
 }
 
@@ -27,17 +31,22 @@ val allowedDirs = listOf(
     listOf("static", "js")
 )
 val defaultFile = "index.html"
+val contextPath = "smarthome"
 
 fun pathToResource(path: String): String? {
 
-    val pathNoFrontSlash = if (path.startsWith("/")) {
+    val pathNoFrontSlash = (if (path.startsWith("/")) {
         path.substring(1)
-    } else path
+    } else path).let { if (it.endsWith("/")) it.substring(0, it.length - 1) else it }
 
     var resultResource = mutableListOf<String>()
     if (pathNoFrontSlash.isNotEmpty()) {
         val pathParts = pathNoFrontSlash.split("/")
         pathParts.forEachIndexed { index, s ->
+            if (s == contextPath) {
+                return@forEachIndexed
+            }
+
             if (index + 1 >= pathParts.size) {
                 if (s.matches(fileNamePattern)) {
                     resultResource.add(s)

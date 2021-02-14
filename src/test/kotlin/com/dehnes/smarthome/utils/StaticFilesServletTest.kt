@@ -7,6 +7,9 @@ internal class PathMapperTest {
 
     @Test
     fun test() {
+        assertEquals("index.html", pathToResource("/smarthome/"))
+        assertEquals("static/css/css.css", pathToResource("/smarthome/static/css/css.css"))
+
         assertEquals("file.js", pathToResource("/file.js"))
         assertEquals("index.html", pathToResource("/"))
         assertEquals("index.html", pathToResource("/garage"))
