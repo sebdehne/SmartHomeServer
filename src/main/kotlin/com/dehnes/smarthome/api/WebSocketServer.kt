@@ -39,7 +39,7 @@ class WebSocketServer {
         val response: RpcResponse = when (rpcRequest.type) {
             updateUnderFloorHeaterMode -> RpcResponse(updateUnderFloorHeaterModeSuccess = underFloopHeaterService.update(rpcRequest.updateUnderFloorHeaterMode!!))
             getUnderFloorHeaterStatus -> RpcResponse(underFloorHeaterStatus = underFloopHeaterService.getCurrentState())
-            openGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendCloseCommand())
+            openGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendOpenCommand())
             closeGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendCloseCommand())
             getGarageStatus -> RpcResponse(garageStatus = garageDoorService.getCurrentState())
             subscribe -> {
