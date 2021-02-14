@@ -1,10 +1,10 @@
 # SmartHomeServer
 Smarthome backend and frontend
 
-###Frontend:
+### Frontend:
 - React frontend
 - material UI styring
 
-###Backend:
+### Backend:
 - pure Kotlin - no Spring
 - Jetty / WebSockets
