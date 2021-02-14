@@ -12,7 +12,7 @@ ReactDOM.render(
     <React.StrictMode>
         <CssBaseline/>
 
-        <Router>
+        <Router basename={process.env.REACT_APP_BASENAME}>
             <Switch>
                 <Route exact path="/">
                     <App/>

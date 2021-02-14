@@ -34,7 +34,7 @@ const HeaterController = () => {
                 let heaterStatus = response.underFloorHeaterStatus!!;
                 setUnderFloorHeaterStatus(heaterStatus);
                 if (heaterStatus) {
-                    setTargetTemperatur(Math.round(heaterStatus.constantTemperaturStatus.targetTemperatur) / 100);
+                    setTargetTemperatur(Math.round(heaterStatus.constantTemperatureStatus.targetTemperature) / 100);
                 }
             });
 
@@ -44,7 +44,7 @@ const HeaterController = () => {
                 let heaterStatus = notify.underFloorHeaterStatus;
                 setUnderFloorHeaterStatus(heaterStatus);
                 if (heaterStatus) {
-                    setTargetTemperatur(Math.round(heaterStatus.constantTemperaturStatus.targetTemperatur) / 100);
+                    setTargetTemperatur(Math.round(heaterStatus.constantTemperatureStatus.targetTemperature) / 100);
                 }
             }
         )
@@ -60,7 +60,8 @@ const HeaterController = () => {
             null,
             new UpdateUnderFloorHeaterMode(
                 underFloorHeaterMode,
-                targetTemperatur * 100
+                targetTemperatur * 100,
+                null
             )
         )).then((response: RpcResponse) => {
             setCmdResult(response.updateUnderFloorHeaterModeSuccess);
@@ -88,7 +89,8 @@ const HeaterController = () => {
                     <ul>
                         <li>Current status: {underFloorHeaterStatus.status}</li>
                         <li>Current mode: {underFloorHeaterStatus.mode}</li>
-                        <li>Current temperature: {underFloorHeaterStatus.currentTemperatur / 100}&deg;C</li>
+                        <li>Current temperature: {underFloorHeaterStatus.currentTemperature / 100}&deg;C</li>
+                        <li>Current energy price too expensive: {underFloorHeaterStatus.constantTemperatureStatus.energyPriceCurrentlyTooExpensive ? 'Yes' : 'No'}</li>
                     </ul>
                 </div>
                 }

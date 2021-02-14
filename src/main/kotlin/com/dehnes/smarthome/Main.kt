@@ -23,7 +23,9 @@ fun main() {
     server.addConnector(connector)
 
     val context = ServletContextHandler(ServletContextHandler.SESSIONS)
-    context.contextPath = "/"
+    context.contextPath = System.getProperty("CONTEXTPATH", "/").apply {
+        logger.info { "Using contextPath=$this" }
+    }
     server.handler = context
 
     context.addServlet(ServletHolder(StaticFilesServlet()), "/*")

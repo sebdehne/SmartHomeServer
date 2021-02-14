@@ -120,35 +120,42 @@ export enum OnOff {
 }
 
 export class UnderFloorHeaterConstantTemperaturStatus {
-    public targetTemperatur: number;
+    public targetTemperature: number;
+    public mostExpensiveHoursToSkip: number;
+    public energyPriceCurrentlyTooExpensive: boolean;
 
-    constructor(targetTemperatur: number) {
-        this.targetTemperatur = targetTemperatur;
+    constructor(targetTemperature: number, mostExpensiveHoursToSkip: number, energyPriceCurrentlyTooExpensive: boolean) {
+        this.targetTemperature = targetTemperature;
+        this.mostExpensiveHoursToSkip = mostExpensiveHoursToSkip;
+        this.energyPriceCurrentlyTooExpensive = energyPriceCurrentlyTooExpensive;
     }
 }
 
 export class UnderFloorHeaterStatus {
     public mode: UnderFloorHeaterMode;
     public status: OnOff;
-    public currentTemperatur: number;
-    public constantTemperaturStatus: UnderFloorHeaterConstantTemperaturStatus;
+    public currentTemperature: number;
+    public constantTemperatureStatus: UnderFloorHeaterConstantTemperaturStatus;
     public utcTimestampInMs: number;
 
-    constructor(mode: UnderFloorHeaterMode, status: OnOff, currentTemperatur: number, constantTemperaturStatus: UnderFloorHeaterConstantTemperaturStatus, utcTimestampInMs: number) {
+    public constructor(mode: UnderFloorHeaterMode, status: OnOff, currentTemperature: number, constantTemperatureStatus: UnderFloorHeaterConstantTemperaturStatus, utcTimestampInMs: number) {
         this.mode = mode;
         this.status = status;
-        this.currentTemperatur = currentTemperatur;
-        this.constantTemperaturStatus = constantTemperaturStatus;
+        this.currentTemperature = currentTemperature;
+        this.constantTemperatureStatus = constantTemperatureStatus;
         this.utcTimestampInMs = utcTimestampInMs;
     }
 }
 
 export class UpdateUnderFloorHeaterMode {
     public newMode: UnderFloorHeaterMode;
-    public newTargetTemperatur: number;
+    public newTargetTemperature: number | null;
+    public newMostExpensiveHoursToSkip: number | null;
 
-    constructor(newMode: UnderFloorHeaterMode, newTargetTemperatur: number) {
+
+    public constructor(newMode: UnderFloorHeaterMode, newTargetTemperature: number | null, newMostExpensiveHoursToSkip: number | null) {
         this.newMode = newMode;
-        this.newTargetTemperatur = newTargetTemperatur;
+        this.newTargetTemperature = newTargetTemperature;
+        this.newMostExpensiveHoursToSkip = newMostExpensiveHoursToSkip;
     }
 }

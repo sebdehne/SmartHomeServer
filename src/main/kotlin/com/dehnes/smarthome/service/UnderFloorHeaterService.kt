@@ -15,6 +15,7 @@ import java.util.concurrent.locks.ReentrantLock
 private const val TARGET_TEMP_KEY = "HeatingControllerService.targetTemp"
 private const val HEATER_STATUS_KEY = "HeatingControllerService.heaterTarget"
 private const val OPERATING_MODE = "HeatingControllerService.operatingMode"
+private const val MOSTEXPENSIVEHOURSTOSKIP_KEY = "HeatingControllerService.mostExpensiveHoursToSkip"
 
 class UnderFloorHeaterService(
     private val serialConnection: SerialConnection,
@@ -71,13 +72,14 @@ class UnderFloorHeaterService(
         if (lastTick > System.currentTimeMillis() - 10000) {
             return true
         }
-        lastTick = System.currentTimeMillis();
+        lastTick = System.currentTimeMillis()
 
         // request measurement
         val rfPacket: RfPacket? = executeCommand(commandReadStatus)
         // TODO ignore values too unrealistic / remember last values in memory -
         recordLocalValues(currentMode, failedAttempts.get())
         val temperatureAndHeaterStatus = rfPacket?.let { parsePacket(it, true) } ?: return false
+        var energyPriceCurrentlyTooExpensive = false
 
         // evaluate state
         when (currentMode) {
@@ -86,15 +88,14 @@ class UnderFloorHeaterService(
             Mode.MANUAL -> {
                 val targetTemperature = getTargetTemperature()
                 logger.info("Evaluating target temperature now: $targetTemperature")
-                val energyPriceOK: Boolean = tibberService.isEnergyPriceOK(24 - 7)
-                if (energyPriceOK && temperatureAndHeaterStatus.temp < targetTemperature) {
+                energyPriceCurrentlyTooExpensive = !tibberService.isEnergyPriceOK(24 - getMostExpensiveHoursToSkip())
+                if (!energyPriceCurrentlyTooExpensive && temperatureAndHeaterStatus.temp < targetTemperature) {
                     logger.info("Setting heater to on")
                     persistenceService[HEATER_STATUS_KEY] = "on"
                 } else {
-                    logger.info(
-                        "Setting heater to off. energyPriceOK={}",
-                        energyPriceOK
-                    )
+                    logger.info {
+                        "Setting heater to off. energyPriceCurrentlyTooExpensive=$energyPriceCurrentlyTooExpensive"
+                    }
                     persistenceService[HEATER_STATUS_KEY] = "off"
                 }
             }
@@ -121,7 +122,7 @@ class UnderFloorHeaterService(
             UnderFloorHeaterMode.values().first { it.mode == currentMode },
             if (heaterStatus) OnOff.on else OnOff.off,
             temperatureAndHeaterStatus.temp,
-            UnderFloorHeaterConstantTemperaturStatus(getTargetTemperature())
+            UnderFloorHeaterConstantTemperaturStatus(getTargetTemperature(), getMostExpensiveHoursToSkip(), energyPriceCurrentlyTooExpensive)
         )
 
         listeners.forEach {
@@ -150,8 +151,14 @@ class UnderFloorHeaterService(
     fun getCurrentState() = lastStatus
 
     fun update(updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode): Boolean {
-        check(updateUnderFloorHeaterMode.newTargetTemperatur in 1000..5000)
-        setTargetTemperature(updateUnderFloorHeaterMode.newTargetTemperatur)
+        if (updateUnderFloorHeaterMode.newTargetTemperature != null) {
+            check(updateUnderFloorHeaterMode.newTargetTemperature in 1000..5000)
+            setTargetTemperature(updateUnderFloorHeaterMode.newTargetTemperature)
+        }
+        if (updateUnderFloorHeaterMode.newMostExpensiveHoursToSkip != null) {
+            check(updateUnderFloorHeaterMode.newTargetTemperature in 0..24)
+            setMostExpensiveHoursToSkip(updateUnderFloorHeaterMode.newMostExpensiveHoursToSkip)
+        }
         setCurrentMode(updateUnderFloorHeaterMode.newMode.mode)
         return tick()
     }
@@ -226,6 +233,10 @@ class UnderFloorHeaterService(
         persistenceService[OPERATING_MODE, Mode.OFF.name]!!
     )
 
+    private fun setCurrentMode(m: Mode) {
+        persistenceService[OPERATING_MODE] = m.name
+    }
+
     private fun getTargetTemperature() =
         Integer.valueOf(persistenceService[TARGET_TEMP_KEY, (25 * 100).toString()])
 
@@ -233,9 +244,13 @@ class UnderFloorHeaterService(
         persistenceService[TARGET_TEMP_KEY] = t.toString()
     }
 
-    private fun setCurrentMode(m: Mode) {
-        persistenceService[OPERATING_MODE] = m.name
+    private fun getMostExpensiveHoursToSkip() =
+        Integer.valueOf(persistenceService[MOSTEXPENSIVEHOURSTOSKIP_KEY, 7.toString()])
+
+    private fun setMostExpensiveHoursToSkip(t: Int) {
+        persistenceService[MOSTEXPENSIVEHOURSTOSKIP_KEY] = t.toString()
     }
+
 
     private fun getConfiguredHeaterTarget() = persistenceService[HEATER_STATUS_KEY, "off"]!!
 

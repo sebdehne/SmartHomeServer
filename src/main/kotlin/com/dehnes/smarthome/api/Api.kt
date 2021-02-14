@@ -80,19 +80,22 @@ enum class OnOff {
 }
 
 data class UnderFloorHeaterConstantTemperaturStatus(
-    val targetTemperatur: Int
+    val targetTemperature: Int,
+    val mostExpensiveHoursToSkip: Int,
+    val energyPriceCurrentlyTooExpensive: Boolean,
 )
 
 data class UnderFloorHeaterStatus(
     val mode: UnderFloorHeaterMode,
     val status: OnOff,
-    val currentTemperatur: Int,
-    val constantTemperaturStatus: UnderFloorHeaterConstantTemperaturStatus,
+    val currentTemperature: Int,
+    val constantTemperatureStatus: UnderFloorHeaterConstantTemperaturStatus,
     val utcTimestampInMs: Long = Instant.now().toEpochMilli()
 )
 
 data class UpdateUnderFloorHeaterMode(
     val newMode: UnderFloorHeaterMode,
-    val newTargetTemperatur: Int
+    val newTargetTemperature: Int?,
+    val newMostExpensiveHoursToSkip: Int?
 )
 
