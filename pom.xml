@@ -14,7 +14,7 @@
         <maven.compiler.source>15</maven.compiler.source>
         <maven.compiler.target>15</maven.compiler.target>
         <kotlin.version>1.4.30</kotlin.version>
-        <jetty.version>9.4.3.v20170317</jetty.version>
+        <jetty.version>9.4.36.v20210114</jetty.version>
         <httpclient.version>4.5.13</httpclient.version>
     </properties>
 
@@ -210,14 +210,14 @@
         </dependency>
         <dependency>
             <groupId>io.github.microutils</groupId>
-            <artifactId>kotlin-logging</artifactId>
-            <version>1.12.0</version>
+            <artifactId>kotlin-logging-jvm</artifactId>
+            <version>2.0.4</version>
         </dependency>
         <!-- To write basic javax.websocket against -->
         <dependency>
             <groupId>javax.websocket</groupId>
             <artifactId>javax.websocket-api</artifactId>
-            <version>1.0</version>
+            <version>1.1</version>
         </dependency>
         <!-- To run javax.websocket in embedded server -->
         <dependency>
