@@ -1,11 +1,13 @@
 package com.dehnes.smarthome.api
 
+import com.dehnes.smarthome.api.RequestType.*
 import com.dehnes.smarthome.configuration
 import com.dehnes.smarthome.service.GarageDoorService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
 import java.io.Closeable
+import java.util.*
 import javax.websocket.*
 import javax.websocket.server.ServerEndpoint
 
@@ -25,27 +27,48 @@ class WebSocketServer {
 
     @OnMessage
     fun onWebSocketText(argSession: Session, argMessage: String) {
-        val apiRequest: ApiRequest = objectMapper.readValue(argMessage)
+        val websocketMessage: WebsocketMessage = objectMapper.readValue(argMessage)
 
-        val response: Any? = when (apiRequest.type) {
-            RequestType.getGarageStatus -> garageDoorService.getCurrentState()
-            RequestType.subscribeGarageStatus -> {
-                val subscriptionId = apiRequest.subscriptionId!!
-                val sub = GarageStatusSubscription(subscriptionId, argSession)
-                garageDoorService.listeners[subscriptionId] = sub::onEvent
+        if (websocketMessage.type != WebsocketMessageType.rpcRequest) {
+            return
+        }
+
+        val rpcRequest = websocketMessage.rpcRequest!!
+        val response: RpcResponse = when (rpcRequest.type) {
+            openGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendCloseCommand())
+            closeGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendCloseCommand())
+            getGarageStatus -> RpcResponse(garageStatus = garageDoorService.getCurrentState())
+            subscribe -> {
+                val subscribe = rpcRequest.subscribe!!
+                val subscriptionId = subscribe.subscriptionId
+
+                val sub = when(subscribe.type) {
+                    getGarageStatus -> GarageStatusSubscription(subscriptionId, argSession).apply {
+                        garageDoorService.listeners[subscriptionId] = this::onEvent
+                    }
+                    else -> error("Not supported subscription ${subscribe.type}")
+                }
+
                 subscriptions.put(subscriptionId, sub)?.close()
-                Notify(subscriptionId, garageDoorService.getCurrentState())
                 logger.info { "New subscribeGarageStatus id=$subscriptionId" }
+                RpcResponse(subscriptionCreated = true)
             }
-            RequestType.unsubscribeGarageStatus -> {
-                val subscriptionId = apiRequest.subscriptionId!!
+            unsubscribe -> {
+                val subscriptionId = rpcRequest.unsubscribe!!.subscriptionId
                 subscriptions[subscriptionId]!!.close()
                 Notify(subscriptionId, garageDoorService.getCurrentState())
                 logger.info { "Removed subscribeGarageStatus id=$subscriptionId" }
+                RpcResponse(subscriptionRemoved = true)
             }
         }
 
-        argSession.basicRemote.sendText(objectMapper.writeValueAsString(ApiResponse(response)))
+        argSession.basicRemote.sendText(objectMapper.writeValueAsString(WebsocketMessage(
+            websocketMessage.id,
+            WebsocketMessageType.rpcResponse,
+            null,
+            response,
+            null
+        )))
     }
 
     @OnClose
@@ -64,7 +87,13 @@ class WebSocketServer {
         sess: Session
     ) : Subscription<GarageStatus>(subscriptionId, sess) {
         override fun onEvent(e: GarageStatus) {
-            sess.basicRemote.sendText(objectMapper.writeValueAsString(Notify(subscriptionId, e)))
+            sess.basicRemote.sendText(objectMapper.writeValueAsString(
+                WebsocketMessage(
+                    UUID.randomUUID().toString(),
+                    WebsocketMessageType.notify,
+                    notify = Notify(subscriptionId, e)
+                )
+            ))
         }
 
         override fun close() {
