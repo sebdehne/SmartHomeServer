@@ -34,6 +34,7 @@ class TibberService(
                 ),
                 "service" to "Tibber"
             )
+            logger.info { "Recorded price=$price to influxDB" }
             true
         } ?: false
     }
