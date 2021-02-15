@@ -28,15 +28,17 @@ const HeaterController = () => {
         setTimeout(() => setCurrentSeconds(Date.now()), 1000)
     }, [currentSeconds])
 
-    const onNewStatus = (heaterStatus: UnderFloorHeaterStatus) => {
-        setUnderFloorHeaterStatus(heaterStatus);
-        if (heaterStatus) {
-            setTargetTemperatur(Math.round(heaterStatus.constantTemperatureStatus.targetTemperature) / 100);
+    const onNewStatus = (heaterStatus: UnderFloorHeaterStatus | null) => {
+        if (heaterStatus != null) {
+            setUnderFloorHeaterStatus(heaterStatus);
+            if (heaterStatus) {
+                setTargetTemperatur(Math.round(heaterStatus.constantTemperatureStatus.targetTemperature) / 100);
+            }
         }
     }
 
     useEffect(() => {
-        WebsocketService.rpc(new RpcRequest(RequestType.getUnderFloorHeaterStatus, null, null, null))
+        WebsocketService.rpc(new RpcRequest(RequestType.getUnderFloorHeaterStatus, null, null, null, null))
             .then(response => onNewStatus(response.underFloorHeaterStatus!!));
 
         const subId = WebsocketService.subscribe(
@@ -57,15 +59,17 @@ const HeaterController = () => {
                 underFloorHeaterMode,
                 targetTemperatur * 100,
                 null
-            )
+            ),
+            null
         )).then((response: RpcResponse) => {
             setCmdResult(response.updateUnderFloorHeaterModeSuccess);
+            onNewStatus(response.underFloorHeaterStatus)
             setTimeout(() => {
                 setCmdResult(null);
             }, 2000);
 
             // refresh
-            WebsocketService.rpc(new RpcRequest(RequestType.getUnderFloorHeaterStatus, null, null, null))
+            WebsocketService.rpc(new RpcRequest(RequestType.getUnderFloorHeaterStatus, null, null, null, null))
                 .then(response => onNewStatus(response.underFloorHeaterStatus!!));
 
         }).finally(() => setSending(false));

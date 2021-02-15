@@ -47,11 +47,7 @@ class ChipCap2SensorService(
         val light = getAdcValue(p, 4).toString()
         val batteryVolt: String = divideBy100(calcVoltage(getAdcValue(p, 6)))
         val counter = p.message[8].toString()
-        logger.info("Relative humidity $humidity")
-        logger.info("Temperature $temp")
-        logger.info("Light $light")
-        logger.info("Counter $counter")
-        logger.info("Battery $batteryVolt")
+        logger.info("humidity=$humidity temperature=$temp light=$light counter=$counter batteryVolt=$batteryVolt")
         if (tempValue > -4000 && tempValue < 8000) {
             // TODO better detection for outOfRange values
             // record received data in db

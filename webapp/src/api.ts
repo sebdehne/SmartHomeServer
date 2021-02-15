@@ -1,19 +1,29 @@
 export class GarageStatus {
     public lightIsOn: boolean;
-    public doorIsOpen: boolean;
+    public doorStatus: DoorStatus;
+    public autoCloseAfter: number | null;
     public utcTimestampInMs: number;
 
-    public constructor(lightIsOn: boolean, doorIsOpen: boolean, utcTimestampInMs: number) {
+    public constructor(lightIsOn: boolean, doorStatus: DoorStatus, autoCloseAfter: number | null, utcTimestampInMs: number) {
         this.lightIsOn = lightIsOn;
-        this.doorIsOpen = doorIsOpen;
+        this.doorStatus = doorStatus;
+        this.autoCloseAfter = autoCloseAfter;
         this.utcTimestampInMs = utcTimestampInMs;
     }
+}
+
+export enum DoorStatus {
+    doorClosed = "doorClosed",
+    doorOpen = "doorOpen",
+    doorClosing = "doorClosing",
+    doorOpening = "doorOpening"
 }
 
 export enum RequestType {
     getGarageStatus = "getGarageStatus",
     openGarageDoor = "openGarageDoor",
     closeGarageDoor = "closeGarageDoor",
+    garageDoorExtendAutoClose = "garageDoorExtendAutoClose",
     getUnderFloorHeaterStatus = "getUnderFloorHeaterStatus",
     updateUnderFloorHeaterMode = "updateUnderFloorHeaterMode",
 
@@ -45,12 +55,14 @@ export class RpcRequest {
     public subscribe: Subscribe | null;
     public unsubscribe: Unsubscribe | null;
     public updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode | null;
+    public garageDoorChangeAutoCloseDeltaInSeconds: number | null;
 
-    constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode | null) {
+    public constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode | null, garageDoorChangeAutoCloseDeltaInSeconds: number | null) {
         this.type = type;
         this.subscribe = subscribe;
         this.unsubscribe = unsubscribe;
         this.updateUnderFloorHeaterMode = updateUnderFloorHeaterMode;
+        this.garageDoorChangeAutoCloseDeltaInSeconds = garageDoorChangeAutoCloseDeltaInSeconds;
     }
 }
 

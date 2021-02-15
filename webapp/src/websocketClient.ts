@@ -29,7 +29,7 @@ function subscribe(type: RequestType, onNotify: (notify: Notify) => void) {
 
     SubscriptionsById.set(subscriptionId, new Subscription(type, onNotify));
 
-    rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null, null)).then(response => {
+    rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null, null, null)).then(response => {
         // OK
     });
 
@@ -43,7 +43,7 @@ function unsubscribe(subscriptionId: string) {
         return;
     }
 
-    rpc(new RpcRequest(RequestType.unsubscribe, null, new Unsubscribe(subscriptionId), null)).then(response => {
+    rpc(new RpcRequest(RequestType.unsubscribe, null, new Unsubscribe(subscriptionId), null, null)).then(response => {
         SubscriptionsById.delete(subscriptionId);
     });
 
@@ -100,7 +100,7 @@ function reconnect() {
         setConnectionStatusChanged(ConnectionStatus.connected);
         // re-subscribe
         SubscriptionsById.forEach((sub, key) => {
-            rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null, null)).then(response => {
+            rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null, null, null)).then(response => {
                 // OK
             });
         })

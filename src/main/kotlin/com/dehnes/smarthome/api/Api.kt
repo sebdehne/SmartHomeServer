@@ -21,7 +21,8 @@ data class RpcRequest(
     val type: RequestType,
     val subscribe: Subscribe?,
     val unsubscribe: Unsubscribe?,
-    val updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode?
+    val updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode?,
+    val garageDoorChangeAutoCloseDeltaInSeconds: Long?
 )
 
 data class Subscribe(
@@ -52,6 +53,7 @@ enum class RequestType {
     getGarageStatus,
     openGarageDoor,
     closeGarageDoor,
+    garageDoorExtendAutoClose,
 
     getUnderFloorHeaterStatus,
     updateUnderFloorHeaterMode,
@@ -62,9 +64,19 @@ enum class RequestType {
 
 data class GarageStatus(
     val lightIsOn: Boolean,
-    val doorIsOpen: Boolean,
+    val doorStatus: DoorStatus,
+    val autoCloseAfter: Long?,
     val utcTimestampInMs: Long = Instant.now().toEpochMilli()
 )
+
+enum class DoorStatus(
+    val influxDbValue: Int
+){
+    doorClosed(0),
+    doorOpen(1),
+    doorClosing(2),
+    doorOpening(3)
+}
 
 enum class UnderFloorHeaterMode(
     val mode: Mode

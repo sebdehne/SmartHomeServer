@@ -37,10 +37,36 @@ class WebSocketServer {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
-            updateUnderFloorHeaterMode -> RpcResponse(updateUnderFloorHeaterModeSuccess = underFloopHeaterService.update(rpcRequest.updateUnderFloorHeaterMode!!))
+            garageDoorExtendAutoClose -> {
+                garageDoorService.updateAutoCloseAfter(rpcRequest.garageDoorChangeAutoCloseDeltaInSeconds!!)
+                RpcResponse(
+                    garageStatus = garageDoorService.getCurrentState()
+                )
+            }
+            updateUnderFloorHeaterMode -> {
+                val update =
+                    underFloopHeaterService.update(rpcRequest.updateUnderFloorHeaterMode!!)
+                RpcResponse(
+                    updateUnderFloorHeaterModeSuccess = update,
+                    underFloorHeaterStatus = underFloopHeaterService.getCurrentState()
+                )
+            }
             getUnderFloorHeaterStatus -> RpcResponse(underFloorHeaterStatus = underFloopHeaterService.getCurrentState())
-            openGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendOpenCommand())
-            closeGarageDoor -> RpcResponse(garageCommandSendSuccess = garageDoorService.sendCloseCommand())
+            openGarageDoor -> {
+                val sendCommand = garageDoorService.sendCommand(true)
+                RpcResponse(
+                    garageCommandSendSuccess = sendCommand,
+                    garageStatus = garageDoorService.getCurrentState()
+                )
+            }
+            closeGarageDoor -> {
+                val sendCommand = garageDoorService.sendCommand(false)
+                RpcResponse(
+                    garageCommandSendSuccess = sendCommand,
+                    garageStatus = garageDoorService.getCurrentState()
+
+                )
+            }
             getGarageStatus -> RpcResponse(garageStatus = garageDoorService.getCurrentState())
             subscribe -> {
                 val subscribe = rpcRequest.subscribe!!
