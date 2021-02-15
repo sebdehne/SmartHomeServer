@@ -31,8 +31,12 @@ fun main() {
     context.addServlet(ServletHolder(StaticFilesServlet()), "/*")
 
     try {
-        val wscontainer = WebSocketServerContainerInitializer.configureContext(context)
-        wscontainer.addEndpoint(WebSocketServer::class.java)
+        WebSocketServerContainerInitializer.configure(
+            context
+        ) { servletContext, serverContainer ->
+            serverContainer.addEndpoint(WebSocketServer::class.java)
+            serverContainer.policy.idleTimeout = 3600 * 1000
+        }
         server.start()
         server.join()
     } catch (t: Throwable) {
