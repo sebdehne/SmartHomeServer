@@ -62,9 +62,8 @@ class TibberService(
         ensureCacheLoaded()
 
         val now = Instant.now(clock)
-        val today = now.atZone(ZoneId.systemDefault()).toLocalDate()
 
-        return priceCache.firstOrNull { price: Price -> price.isValidForDay(today) }?.price
+        return priceCache.firstOrNull { price: Price -> price.isValidFor(now) }?.price
     }
 
     private fun ensureCacheLoaded() {
