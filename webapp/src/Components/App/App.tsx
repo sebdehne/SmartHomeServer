@@ -33,7 +33,7 @@ const App = () => {
                         </Button>
                     </li>
                     <li>
-                        <Link href="https://dehnes.com/stats/">
+                        <Link href="https://dehnes.com/stats/d/000000007/current">
                             <Button variant="contained" color="secondary">
                                 Temp's and Stats
                             </Button>
