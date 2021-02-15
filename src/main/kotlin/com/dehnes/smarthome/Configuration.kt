@@ -8,9 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Clock
 import java.util.concurrent.Executors
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
 
 class Configuration {
@@ -23,7 +20,6 @@ class Configuration {
 
         val influxDBClient = InfluxDBClient(objectMapper, System.getProperty("DST_HOST"))
         val persistenceService = PersistenceService()
-        val tibberPriceClient = TibberPriceClient(objectMapper, persistenceService)
 
         val serialConnection = SerialConnection(executorService, System.getProperty("DST_HOST"))
         serialConnection.start()
@@ -31,12 +27,20 @@ class Configuration {
         val garageDoorService = GarageDoorService(serialConnection, influxDBClient)
         val chipCap2SensorService = ChipCap2SensorService(influxDBClient)
 
+        val tibberService = TibberService(
+            Clock.systemDefaultZone(),
+            TibberPriceClient(objectMapper, persistenceService),
+            influxDBClient,
+            executorService
+        )
+        tibberService.start()
+
         val heaterService = UnderFloorHeaterService(
             serialConnection,
             executorService,
             persistenceService,
             influxDBClient,
-            TibberService(Clock.systemDefaultZone(), tibberPriceClient)
+            tibberService
         )
         heaterService.start()
         serialConnection.listeners.add(heaterService::onRfMessage)

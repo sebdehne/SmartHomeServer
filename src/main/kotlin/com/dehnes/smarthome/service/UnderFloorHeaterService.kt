@@ -8,9 +8,11 @@ import com.dehnes.smarthome.math.Sht15SensorService
 import com.dehnes.smarthome.math.Sht15SensorService.getRelativeHumidity
 import com.dehnes.smarthome.math.divideBy100
 import mu.KotlinLogging
-import java.util.concurrent.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.locks.ReentrantLock
 
 private const val TARGET_TEMP_KEY = "HeatingControllerService.targetTemp"
 private const val HEATER_STATUS_KEY = "HeatingControllerService.heaterTarget"
@@ -19,11 +21,11 @@ private const val MOSTEXPENSIVEHOURSTOSKIP_KEY = "HeatingControllerService.mostE
 
 class UnderFloorHeaterService(
     private val serialConnection: SerialConnection,
-    private val executorService: ExecutorService,
+    executorService: ExecutorService,
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
     private val tibberService: TibberService
-) {
+) : AbstractProcess(executorService, 120) {
 
     private val rfAddr = 27
     private val commandReadStatus = 1
@@ -31,8 +33,6 @@ class UnderFloorHeaterService(
     private val commandSwitchOffHeater = 3
 
     private val logger = KotlinLogging.logger { }
-    private val runLock = ReentrantLock()
-    private val timer = Executors.newSingleThreadScheduledExecutor()
     private val failedAttempts = AtomicInteger(0)
 
     private var lastTick: Long = 0
@@ -43,29 +43,9 @@ class UnderFloorHeaterService(
     @Volatile
     private var lastStatus: UnderFloorHeaterStatus? = null
 
-    fun start() {
-        timer.scheduleAtFixedRate({
-            executorService.submit {
-                try {
-                    tick()
-                } catch (e: Exception) {
-                    logger.error("", e)
-                }
-            }
-        }, 2, 2, TimeUnit.MINUTES)
-    }
+    override fun logger() = logger
 
-    private fun tick() = if (runLock.tryLock()) {
-        try {
-            tickLocked()
-        } finally {
-            runLock.unlock()
-        }
-    } else {
-        false
-    }
-
-    private fun tickLocked(): Boolean {
+    override fun tickLocked(): Boolean {
         val currentMode: Mode = getCurrentMode()
         logger.info("Current mode: $currentMode")
 
@@ -122,7 +102,11 @@ class UnderFloorHeaterService(
             UnderFloorHeaterMode.values().first { it.mode == currentMode },
             if (heaterStatus) OnOff.on else OnOff.off,
             temperatureAndHeaterStatus.temp,
-            UnderFloorHeaterConstantTemperaturStatus(getTargetTemperature(), getMostExpensiveHoursToSkip(), energyPriceCurrentlyTooExpensive)
+            UnderFloorHeaterConstantTemperaturStatus(
+                getTargetTemperature(),
+                getMostExpensiveHoursToSkip(),
+                energyPriceCurrentlyTooExpensive
+            )
         )
 
         listeners.forEach {

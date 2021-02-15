@@ -72,7 +72,8 @@ class GarageDoorService(
         logger.info("Garage door. Light=$lightIsOn, Door=$doorIsOpen")
 
         influxDBClient.recordSensorData(
-            dbType, listOf(
+            dbType,
+            listOf(
                 "light" to lightIsOn.toString(),
                 "door" to doorIsOpen.toString()
             )
