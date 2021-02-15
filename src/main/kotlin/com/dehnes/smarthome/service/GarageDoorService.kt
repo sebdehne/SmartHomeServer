@@ -39,7 +39,7 @@ class GarageDoorService(
     fun sendCommand(doorCommandOpen: Boolean): Boolean {
         logger.info { "sendCommand doorCommandOpen=$doorCommandOpen current=$lastStatus" }
 
-        var autoCloseAfter: Long?
+        val autoCloseAfter: Long?
         val sent: Boolean
         val newStatus = if (doorCommandOpen) {
             sent = sendCommandInternal(true)
@@ -67,6 +67,8 @@ class GarageDoorService(
             return
         }
 
+        Thread.sleep(500)
+
         logger.info { "handleIncoming statusReceived=$statusReceived current=$lastStatus" }
 
         var newStatus = if (statusReceived.isDoorOpen()) DoorStatus.doorOpen else DoorStatus.doorClosed
@@ -85,11 +87,13 @@ class GarageDoorService(
                     autoCloseAfter = null
                 }
                 current.doorStatus == DoorStatus.doorOpen && statusReceived.isDoorOpen() -> {
-                    if (autoCloseAfter != null && System.currentTimeMillis() > autoCloseAfter!!) {
+                    if (autoCloseAfter != null && System.currentTimeMillis() > autoCloseAfter) {
                         // close now
                         sendCommandInternal(false)
                         newStatus = DoorStatus.doorClosing
                         autoCloseAfter = null
+                    } else if (autoCloseAfter == null) {
+                        autoCloseAfter = System.currentTimeMillis() + (defaultAutoCloseInSeconds * 1000)
                     }
                 }
                 current.doorStatus == DoorStatus.doorOpening && statusReceived.isDoorClosed() -> {

@@ -16,6 +16,8 @@ import javax.websocket.server.ServerEndpoint
 @ServerEndpoint(value = "/api")
 class WebSocketServer {
 
+    private val instanceId = UUID.randomUUID().toString()
+
     private val objectMapper = configuration.getBean<ObjectMapper>(ObjectMapper::class)
     private val logger = KotlinLogging.logger { }
     private val garageDoorService = configuration.getBean<GarageDoorService>(GarageDoorService::class)
@@ -24,7 +26,7 @@ class WebSocketServer {
 
     @OnOpen
     fun onWebSocketConnect(sess: Session) {
-        logger.info("Socket connected: $sess")
+        logger.info("$instanceId Socket connected: $sess")
     }
 
     @OnMessage
@@ -72,24 +74,30 @@ class WebSocketServer {
                 val subscribe = rpcRequest.subscribe!!
                 val subscriptionId = subscribe.subscriptionId
 
-                val sub = when (subscribe.type) {
-                    getGarageStatus -> GarageStatusSubscription(subscriptionId, argSession).apply {
-                        garageDoorService.listeners[subscriptionId] = this::onEvent
+                val existing = subscriptions[subscriptionId]
+                if (existing == null) {
+                    val sub = when (subscribe.type) {
+                        getGarageStatus -> GarageStatusSubscription(subscriptionId, argSession).apply {
+                            garageDoorService.listeners[subscriptionId] = this::onEvent
+                        }
+                        getUnderFloorHeaterStatus -> UnderFloorHeaterSubscription(subscriptionId, argSession).apply {
+                            underFloopHeaterService.listeners[subscriptionId] = this::onEvent
+                        }
+                        else -> error("Not supported subscription ${subscribe.type}")
                     }
-                    getUnderFloorHeaterStatus -> UnderFloorHeaterSubscription(subscriptionId, argSession).apply {
-                        underFloopHeaterService.listeners[subscriptionId] = this::onEvent
-                    }
-                    else -> error("Not supported subscription ${subscribe.type}")
+
+                    subscriptions.put(subscriptionId, sub)?.close()
+                    logger.info { "$instanceId New subscription id=$subscriptionId type=${subscribe.type}" }
+                } else {
+                    logger.info { "$instanceId re-subscription id=$subscriptionId type=${subscribe.type}" }
                 }
 
-                subscriptions.put(subscriptionId, sub)?.close()
-                logger.info { "New subscription id=$subscriptionId type=${subscribe.type}" }
                 RpcResponse(subscriptionCreated = true)
             }
             unsubscribe -> {
                 val subscriptionId = rpcRequest.unsubscribe!!.subscriptionId
                 subscriptions.remove(subscriptionId)?.close()
-                logger.info { "Removed subscription id=$subscriptionId" }
+                logger.info { "$instanceId Removed subscription id=$subscriptionId" }
                 RpcResponse(subscriptionRemoved = true)
             }
         }
@@ -110,12 +118,12 @@ class WebSocketServer {
     @OnClose
     fun onWebSocketClose(reason: CloseReason) {
         subscriptions.forEach { (_, u) -> u.close() }
-        logger.info("Socket Closed: $reason")
+        logger.info("$instanceId Socket Closed: $reason")
     }
 
     @OnError
     fun onWebSocketError(cause: Throwable) {
-        logger.warn("", cause)
+        logger.warn("$instanceId ", cause)
     }
 
     inner class GarageStatusSubscription(
@@ -123,6 +131,7 @@ class WebSocketServer {
         sess: Session
     ) : Subscription<GarageStatus>(subscriptionId, sess) {
         override fun onEvent(e: GarageStatus) {
+            logger.info("$instanceId onEvent GarageStatusSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -145,6 +154,7 @@ class WebSocketServer {
         sess: Session
     ) : Subscription<UnderFloorHeaterStatus>(subscriptionId, sess) {
         override fun onEvent(e: UnderFloorHeaterStatus) {
+            logger.info("$instanceId onEvent UnderFloorHeaterSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(

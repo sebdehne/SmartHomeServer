@@ -29,7 +29,7 @@ function subscribe(type: RequestType, onNotify: (notify: Notify) => void) {
 
     SubscriptionsById.set(subscriptionId, new Subscription(type, onNotify));
 
-    rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null, null, null)).then(response => {
+    rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null, null, null)).then(() => {
         // OK
     });
 
@@ -43,7 +43,7 @@ function unsubscribe(subscriptionId: string) {
         return;
     }
 
-    rpc(new RpcRequest(RequestType.unsubscribe, null, new Unsubscribe(subscriptionId), null, null)).then(response => {
+    rpc(new RpcRequest(RequestType.unsubscribe, null, new Unsubscribe(subscriptionId), null, null)).then(() => {
         SubscriptionsById.delete(subscriptionId);
     });
 
@@ -51,7 +51,7 @@ function unsubscribe(subscriptionId: string) {
 
 function rpc(rpcRequest: RpcRequest): Promise<RpcResponse> {
     const msgId = uuidv4();
-    return new Promise<RpcResponse>((resolve, reject) => {
+    return new Promise<RpcResponse>((resolve) => {
         const rpc = new Rpc(
             resolve,
             new WebsocketMessage(
@@ -83,7 +83,7 @@ function send(msg: WebsocketMessage) {
 
 function setConnectionStatusChanged(newState: ConnectionStatus) {
     connectionStatus = newState;
-    ConnectionStatusSubscriptionsById.forEach((value, key) => {
+    ConnectionStatusSubscriptionsById.forEach((value) => {
         value(newState);
     });
 }
@@ -99,16 +99,24 @@ function reconnect() {
     ws.onopen = function () {
         setConnectionStatusChanged(ConnectionStatus.connected);
         // re-subscribe
+        let subscriptions = new Array<String>();
+        // re-send ongoing RPCs
+        OngoingRPCsById.forEach((ongoingRPC) => {
+            send(ongoingRPC.msg);
+            if (ongoingRPC.msg.rpcRequest?.type === RequestType.subscribe) {
+                subscriptions.push(ongoingRPC.msg.rpcRequest.subscribe!!.subscriptionId)
+            }
+        });
+
         SubscriptionsById.forEach((sub, key) => {
-            rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null, null, null)).then(response => {
-                // OK
-            });
+            console.log("onopen - re-subscribe: " + key)
+            if (subscriptions.indexOf(key) < 0) {
+                rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null, null, null)).then(() => {
+                    // OK
+                });
+            }
         })
 
-        // re-send ongoing RPCs
-        OngoingRPCsById.forEach((ongoingRPC, key) => {
-            send(ongoingRPC.msg);
-        });
     };
     ws.onmessage = function (e) {
         let plain = JSON.parse(e.data);
@@ -126,6 +134,8 @@ function reconnect() {
             let subscription = SubscriptionsById.get(subId);
             if (subscription) {
                 subscription.onNotify(notify);
+            } else {
+                console.log("Could not send notify - sub not found");
             }
         } else {
             console.log("Dont know what to do received websocket msg:");
@@ -133,14 +143,14 @@ function reconnect() {
         }
     };
 
-    ws.onclose = function (e) {
+    ws.onclose = function () {
         setConnectionStatusChanged(ConnectionStatus.closed);
         setTimeout(function () {
             reconnect();
         }, 1000);
     };
 
-    ws.onerror = function (err) {
+    ws.onerror = function () {
         ws?.close();
     };
 }
