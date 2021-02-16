@@ -38,12 +38,13 @@ const HeaterController = () => {
     }
 
     useEffect(() => {
-        WebsocketService.rpc(new RpcRequest(RequestType.getUnderFloorHeaterStatus, null, null, null, null))
-            .then(response => onNewStatus(response.underFloorHeaterStatus!!));
-
         const subId = WebsocketService.subscribe(
             RequestType.getUnderFloorHeaterStatus,
-            (notify: Notify) => onNewStatus(notify.underFloorHeaterStatus!!)
+            (notify: Notify) => onNewStatus(notify.underFloorHeaterStatus!!),
+            () => {
+                WebsocketService.rpc(new RpcRequest(RequestType.getUnderFloorHeaterStatus, null, null, null, null))
+                    .then(response => onNewStatus(response.underFloorHeaterStatus!!));
+            }
         )
 
         return () => WebsocketService.unsubscribe(subId);
@@ -94,7 +95,8 @@ const HeaterController = () => {
                         <li>Current status: {underFloorHeaterStatus.status}</li>
                         <li>Current mode: {underFloorHeaterStatus.mode}</li>
                         <li>Current temperature: {underFloorHeaterStatus.currentTemperature / 100}&deg;C</li>
-                        <li>Current energy price too expensive: {underFloorHeaterStatus.constantTemperatureStatus.energyPriceCurrentlyTooExpensive ? 'Yes' : 'No'}</li>
+                        <li>Current energy price too
+                            expensive: {underFloorHeaterStatus.constantTemperatureStatus.energyPriceCurrentlyTooExpensive ? 'Yes' : 'No'}</li>
                     </ul>
                 </div>
                 }
@@ -121,13 +123,16 @@ const HeaterController = () => {
                             <ArrowDownward/>
                         </Button>
                     </div>
-                    <Button variant="contained" color="secondary" onClick={() => sendUpdate(UnderFloorHeaterMode.constantTemperature)}>
+                    <Button variant="contained" color="secondary"
+                            onClick={() => sendUpdate(UnderFloorHeaterMode.constantTemperature)}>
                         Constant Temp
                     </Button>
-                    <Button variant="contained" color="secondary" onClick={() => sendUpdate(UnderFloorHeaterMode.permanentOn)}>
+                    <Button variant="contained" color="secondary"
+                            onClick={() => sendUpdate(UnderFloorHeaterMode.permanentOn)}>
                         On
                     </Button>
-                    <Button variant="contained" color="secondary" onClick={() => sendUpdate(UnderFloorHeaterMode.permanentOff)}>
+                    <Button variant="contained" color="secondary"
+                            onClick={() => sendUpdate(UnderFloorHeaterMode.permanentOff)}>
                         Off
                     </Button>
                     {sending &&

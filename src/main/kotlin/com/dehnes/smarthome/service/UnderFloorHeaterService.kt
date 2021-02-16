@@ -6,13 +6,14 @@ import com.dehnes.smarthome.external.RfPacket
 import com.dehnes.smarthome.external.SerialConnection
 import com.dehnes.smarthome.math.Sht15SensorService
 import com.dehnes.smarthome.math.Sht15SensorService.getRelativeHumidity
-import com.dehnes.smarthome.math.divideBy100
 import mu.KotlinLogging
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.absoluteValue
 
 private const val TARGET_TEMP_KEY = "HeatingControllerService.targetTemp"
 private const val HEATER_STATUS_KEY = "HeatingControllerService.heaterTarget"
@@ -42,6 +43,7 @@ class UnderFloorHeaterService(
 
     @Volatile
     private var lastStatus: UnderFloorHeaterStatus? = null
+    private var previousValue: UnderFloorSensorData? = null
 
     override fun logger() = logger
 
@@ -56,9 +58,12 @@ class UnderFloorHeaterService(
 
         // request measurement
         val rfPacket: RfPacket? = executeCommand(commandReadStatus)
-        // TODO ignore values too unrealistic / remember last values in memory -
         recordLocalValues(currentMode, failedAttempts.get())
-        val temperatureAndHeaterStatus = rfPacket?.let { parsePacket(it, true) } ?: return false
+        val sensorData = rfPacket?.let { parsePacket(it, true) } ?: return false
+        if (!accept(sensorData)) {
+            return false
+        }
+
         var energyPriceCurrentlyTooExpensive = false
 
         // evaluate state
@@ -69,7 +74,7 @@ class UnderFloorHeaterService(
                 val targetTemperature = getTargetTemperature()
                 logger.info("Evaluating target temperature now: $targetTemperature")
                 energyPriceCurrentlyTooExpensive = !tibberService.isEnergyPriceOK(24 - getMostExpensiveHoursToSkip())
-                if (!energyPriceCurrentlyTooExpensive && temperatureAndHeaterStatus.temp < targetTemperature) {
+                if (!energyPriceCurrentlyTooExpensive && sensorData.temperature < targetTemperature) {
                     logger.info("Setting heater to on")
                     persistenceService[HEATER_STATUS_KEY] = "on"
                 } else {
@@ -81,15 +86,15 @@ class UnderFloorHeaterService(
             }
         }
 
-        var heaterStatus = temperatureAndHeaterStatus.heaterIsOn
+        var heaterStatus = sensorData.heaterIsOn
 
         // bring the heater to the desired state
-        val executionResult = if (temperatureAndHeaterStatus.heaterIsOn && "off" == getConfiguredHeaterTarget()) {
+        val executionResult = if (sensorData.heaterIsOn && "off" == getConfiguredHeaterTarget()) {
             executeCommand(commandSwitchOffHeater)?.let {
                 heaterStatus = parsePacket(it, false).heaterIsOn
                 true
             } ?: false
-        } else if (!temperatureAndHeaterStatus.heaterIsOn && "on" == getConfiguredHeaterTarget()) {
+        } else if (!sensorData.heaterIsOn && "on" == getConfiguredHeaterTarget()) {
             executeCommand(commandSwitchOnHeater)?.let {
                 heaterStatus = parsePacket(it, false).heaterIsOn
                 true
@@ -101,7 +106,7 @@ class UnderFloorHeaterService(
         lastStatus = UnderFloorHeaterStatus(
             UnderFloorHeaterMode.values().first { it.mode == currentMode },
             if (heaterStatus) OnOff.on else OnOff.off,
-            temperatureAndHeaterStatus.temp,
+            sensorData.temperature,
             UnderFloorHeaterConstantTemperaturStatus(
                 getTargetTemperature(),
                 getMostExpensiveHoursToSkip(),
@@ -147,32 +152,42 @@ class UnderFloorHeaterService(
         return tick()
     }
 
+    private fun accept(sensorData: UnderFloorSensorData): Boolean {
+        val previous = previousValue
+        return if (previous == null || previous.ageInSeconds() > 15 * 60) {
+            previousValue = sensorData
+            true
+        } else {
+            val delta = ((sensorData.temperature - previous.temperature).absoluteValue) / 100
+            (delta <= 5).apply {
+                if (!this) {
+                    logger.info("Ignoring abnormal values. previous=$previous")
+                }
+            }
+        }
+    }
+
     private fun parsePacket(
         p: RfPacket,
         record: Boolean
-    ): TemperatureAndHeaterStatus {
-        val temperature: Int = Sht15SensorService.getTemperature(p)
-        val temp: String = divideBy100(temperature)
-        val humidity: String = divideBy100(getRelativeHumidity(p, temperature))
-        val heaterStatus = p.message[4] == 1
+    ): UnderFloorSensorData {
+        val sensorData = UnderFloorSensorData.fromRfPacket(p)
 
-        logger.info("Relative humidity $humidity")
-        logger.info("Temperature $temp")
-        logger.info("Heater on? $heaterStatus")
+        logger.info { "Received sensorData=$sensorData" }
 
         if (record) {
             influxDBClient.recordSensorData(
                 "sensor",
                 listOf(
-                    "temperature" to temp,
-                    "humidity" to humidity,
-                    "heater_status" to (if (heaterStatus) 1 else 0).toString(),
+                    "temperature" to sensorData.toTemperature(),
+                    "humidity" to sensorData.toHumidity(),
+                    "heater_status" to (if (sensorData.heaterIsOn) 1 else 0).toString(),
                 ),
                 "room" to "heating_controller"
             )
         }
 
-        return TemperatureAndHeaterStatus(temperature, heaterStatus)
+        return sensorData
     }
 
     private fun recordLocalValues(
@@ -183,7 +198,7 @@ class UnderFloorHeaterService(
             "sensor",
             listOf(
                 "manual_mode" to (if (currentMode == Mode.MANUAL) 1 else 0).toString(),
-                "target_temperature" to divideBy100(getTargetTemperature()),
+                "target_temperature" to (getTargetTemperature().toFloat() / 100).toString(),
                 "configured_heater_target" to (if (getConfiguredHeaterTarget() == "on") 1 else 0).toString(),
                 "failed_attempts" to failedAttempts.toString()
             ),
@@ -248,3 +263,34 @@ data class TemperatureAndHeaterStatus(
     val temp: Int,
     val heaterIsOn: Boolean
 )
+
+data class UnderFloorSensorData(
+    val temperature: Int,
+    val humidity: Int,
+    val heaterIsOn: Boolean,
+    val receivedAt: Instant = Instant.now()
+) {
+    companion object {
+        fun fromRfPacket(p: RfPacket): UnderFloorSensorData {
+            val temperature = Sht15SensorService.getTemperature(p)
+            val humidity = getRelativeHumidity(p, temperature)
+            val heaterStatus = p.message[4] == 1
+
+            return UnderFloorSensorData(
+                temperature,
+                humidity,
+                heaterStatus
+            )
+        }
+    }
+
+    fun toTemperature() = (temperature.toFloat() / 100).toString()
+    fun toHumidity() = (humidity.toFloat() / 100).toString()
+
+    override fun toString(): String {
+        return "UnderFloorSensorData(temperature=${toTemperature()}, humidity=${toHumidity()}, heaterIsOn=$heaterIsOn, receivedAt=$receivedAt)"
+    }
+
+    fun ageInSeconds() = (System.currentTimeMillis() - receivedAt.toEpochMilli()) / 1000
+
+}

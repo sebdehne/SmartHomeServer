@@ -18,12 +18,13 @@ const GarageDoor = () => {
     }, [currentSeconds])
 
     useEffect(() => {
-        WebsocketService.rpc(new RpcRequest(RequestType.getGarageStatus, null, null, null, null))
-            .then(response => setGarageStatus(response.garageStatus));
-
         const subId = WebsocketService.subscribe(
             RequestType.getGarageStatus,
-            (notify: Notify) => setGarageStatus(notify.garageStatus)
+            (notify: Notify) => setGarageStatus(notify.garageStatus),
+            () => {
+                WebsocketService.rpc(new RpcRequest(RequestType.getGarageStatus, null, null, null, null))
+                    .then(response => setGarageStatus(response.garageStatus));
+            }
         )
 
         return () => WebsocketService.unsubscribe(subId);

@@ -24,13 +24,13 @@ const ConnectionStatusSubscriptionsById = new Map<String, (connectionStatus: Con
 let ws: WebSocket | undefined = undefined;
 let connectionStatus: ConnectionStatus = ConnectionStatus.closed;
 
-function subscribe(type: RequestType, onNotify: (notify: Notify) => void) {
+function subscribe(type: RequestType, onNotify: (notify: Notify) => void, onOpened: () => void) {
     const subscriptionId = uuidv4();
 
-    SubscriptionsById.set(subscriptionId, new Subscription(type, onNotify));
+    SubscriptionsById.set(subscriptionId, new Subscription(type, onNotify, onOpened));
 
     rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null, null, null)).then(() => {
-        // OK
+        onOpened();
     });
 
     return subscriptionId;
@@ -112,7 +112,7 @@ function reconnect() {
             console.log("onopen - re-subscribe: " + key)
             if (subscriptions.indexOf(key) < 0) {
                 rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null, null, null)).then(() => {
-                    // OK
+                    sub.onOpened();
                 });
             }
         })
@@ -175,10 +175,13 @@ export default WebsocketService;
 class Subscription {
     public type: RequestType;
     public onNotify: (notify: Notify) => void;
+    public onOpened: () => void;
 
-    public constructor(type: RequestType, onNotify: (notify: Notify) => void) {
+
+   public constructor(type: RequestType, onNotify: (notify: Notify) => void, onOpened: () => void) {
         this.type = type;
         this.onNotify = onNotify;
+        this.onOpened = onOpened;
     }
 }
 
