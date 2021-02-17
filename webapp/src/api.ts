@@ -27,6 +27,8 @@ export enum RequestType {
     getUnderFloorHeaterStatus = "getUnderFloorHeaterStatus",
     updateUnderFloorHeaterMode = "updateUnderFloorHeaterMode",
 
+    getEvCharingStationFirmwareVersion = "getEvCharingStationFirmwareVersion",
+
     subscribe = "subscribe",
     unsubscribe = "unsubscribe"
 }
@@ -56,13 +58,16 @@ export class RpcRequest {
     public unsubscribe: Unsubscribe | null;
     public updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode | null;
     public garageDoorChangeAutoCloseDeltaInSeconds: number | null;
+    public evCharingStationId: number | null;
 
-    public constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode | null, garageDoorChangeAutoCloseDeltaInSeconds: number | null) {
+
+   public constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode | null, garageDoorChangeAutoCloseDeltaInSeconds: number | null, evCharingStationId: number | null) {
         this.type = type;
         this.subscribe = subscribe;
         this.unsubscribe = unsubscribe;
         this.updateUnderFloorHeaterMode = updateUnderFloorHeaterMode;
         this.garageDoorChangeAutoCloseDeltaInSeconds = garageDoorChangeAutoCloseDeltaInSeconds;
+        this.evCharingStationId = evCharingStationId;
     }
 }
 
@@ -73,14 +78,16 @@ export class RpcResponse {
     public subscriptionRemoved: boolean | null;
     public garageCommandSendSuccess: boolean | null;
     public updateUnderFloorHeaterModeSuccess: boolean | null;
+    public evCharingStationFirmwareVersion: number | null;
 
-    constructor(garageStatus: GarageStatus | null, underFloorHeaterStatus: UnderFloorHeaterStatus | null, subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageCommandSendSuccess: boolean | null, updateUnderFloorHeaterModeSuccess: boolean | null) {
+    public constructor(garageStatus: GarageStatus | null, underFloorHeaterStatus: UnderFloorHeaterStatus | null, subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageCommandSendSuccess: boolean | null, updateUnderFloorHeaterModeSuccess: boolean | null, evCharingStationFirmwareVersion: number | null) {
         this.garageStatus = garageStatus;
         this.underFloorHeaterStatus = underFloorHeaterStatus;
         this.subscriptionCreated = subscriptionCreated;
         this.subscriptionRemoved = subscriptionRemoved;
         this.garageCommandSendSuccess = garageCommandSendSuccess;
         this.updateUnderFloorHeaterModeSuccess = updateUnderFloorHeaterModeSuccess;
+        this.evCharingStationFirmwareVersion = evCharingStationFirmwareVersion;
     }
 }
 

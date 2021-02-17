@@ -22,7 +22,8 @@ data class RpcRequest(
     val subscribe: Subscribe?,
     val unsubscribe: Unsubscribe?,
     val updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode?,
-    val garageDoorChangeAutoCloseDeltaInSeconds: Long?
+    val garageDoorChangeAutoCloseDeltaInSeconds: Long?,
+    val evCharingStationId: Int?
 )
 
 data class Subscribe(
@@ -41,6 +42,7 @@ data class RpcResponse(
     val subscriptionRemoved: Boolean? = null,
     val garageCommandSendSuccess: Boolean? = null,
     val updateUnderFloorHeaterModeSuccess: Boolean? = null,
+    val evCharingStationFirmwareVersion: Int? = null
 )
 
 data class Notify(
@@ -57,6 +59,8 @@ enum class RequestType {
 
     getUnderFloorHeaterStatus,
     updateUnderFloorHeaterMode,
+
+    getEvCharingStationFirmwareVersion,
 
     subscribe,
     unsubscribe

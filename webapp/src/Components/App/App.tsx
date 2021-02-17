@@ -33,6 +33,11 @@ const App = () => {
                         </Button>
                     </li>
                     <li>
+                        <Button variant="contained" color="secondary" onClick={relative("/evTester")}>
+                            EVChargingStationTester
+                        </Button>
+                    </li>
+                    <li>
                         <Link href="https://dehnes.com/stats/d/000000007/current">
                             <Button variant="contained" color="secondary">
                                 Temp's and Stats

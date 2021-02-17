@@ -22,7 +22,7 @@ const GarageDoor = () => {
             RequestType.getGarageStatus,
             (notify: Notify) => setGarageStatus(notify.garageStatus),
             () => {
-                WebsocketService.rpc(new RpcRequest(RequestType.getGarageStatus, null, null, null, null))
+                WebsocketService.rpc(new RpcRequest(RequestType.getGarageStatus, null, null, null, null, null))
                     .then(response => setGarageStatus(response.garageStatus));
             }
         )
@@ -37,7 +37,8 @@ const GarageDoor = () => {
             null,
             null,
             null,
-            deltaInMinutes * 60
+            deltaInMinutes * 60,
+            null
         )).then((response: RpcResponse) => {
             setCmdResult(true);
             setTimeout(() => {
@@ -51,6 +52,7 @@ const GarageDoor = () => {
         setSending(true);
         WebsocketService.rpc(new RpcRequest(
             cmd,
+            null,
             null,
             null,
             null,

@@ -2,6 +2,7 @@ package com.dehnes.smarthome.api
 
 import com.dehnes.smarthome.api.RequestType.*
 import com.dehnes.smarthome.configuration
+import com.dehnes.smarthome.external.EVChargingStationConnection
 import com.dehnes.smarthome.service.GarageDoorService
 import com.dehnes.smarthome.service.UnderFloorHeaterService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -23,6 +24,8 @@ class WebSocketServer {
     private val garageDoorService = configuration.getBean<GarageDoorService>(GarageDoorService::class)
     private val underFloopHeaterService = configuration.getBean<UnderFloorHeaterService>(UnderFloorHeaterService::class)
     private val subscriptions = mutableMapOf<String, Subscription<*>>()
+    private val evChargingStationConnection =
+        configuration.getBean<EVChargingStationConnection>(EVChargingStationConnection::class)
 
     @OnOpen
     fun onWebSocketConnect(sess: Session) {
@@ -39,6 +42,9 @@ class WebSocketServer {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            getEvCharingStationFirmwareVersion -> RpcResponse(
+                evCharingStationFirmwareVersion = evChargingStationConnection.getFirmwareVersion(rpcRequest.evCharingStationId!!)
+            )
             garageDoorExtendAutoClose -> {
                 garageDoorService.updateAutoCloseAfter(rpcRequest.garageDoorChangeAutoCloseDeltaInSeconds!!)
                 RpcResponse(

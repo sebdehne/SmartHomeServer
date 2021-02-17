@@ -7,6 +7,7 @@ import {CssBaseline} from "@material-ui/core";
 import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
 import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
+import EVChargingStationTester from "./Components/EVChargingStationTester/EVChargingStationTester";
 
 ReactDOM.render(
     <React.StrictMode>
@@ -22,6 +23,9 @@ ReactDOM.render(
                 </Route>
                 <Route path="/heater">
                     <HeaterController/>
+                </Route>
+                <Route path="/evTester">
+                    <EVChargingStationTester/>
                 </Route>
             </Switch>
         </Router>

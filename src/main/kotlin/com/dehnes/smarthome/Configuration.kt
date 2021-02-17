@@ -1,5 +1,6 @@
 package com.dehnes.smarthome
 
+import com.dehnes.smarthome.external.EVChargingStationConnection
 import com.dehnes.smarthome.external.InfluxDBClient
 import com.dehnes.smarthome.external.SerialConnection
 import com.dehnes.smarthome.external.TibberPriceClient
@@ -43,6 +44,10 @@ class Configuration {
             tibberService
         )
         heaterService.start()
+
+        val evChargingStationConnection = EVChargingStationConnection(9091, executorService)
+        evChargingStationConnection.start()
+
         serialConnection.listeners.add(heaterService::onRfMessage)
         serialConnection.listeners.add(garageDoorService::handleIncoming)
         serialConnection.listeners.add(chipCap2SensorService::handleIncoming)
@@ -51,6 +56,7 @@ class Configuration {
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageDoorService::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
+        beans[EVChargingStationConnection::class] = evChargingStationConnection
     }
 
     fun <T> getBean(klass: KClass<*>): T {
