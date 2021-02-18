@@ -1,16 +1,9 @@
 import {plainToClass, serialize} from 'class-transformer';
 
 import {v4 as uuidv4} from 'uuid';
-import {
-    Notify,
-    RequestType,
-    RpcRequest,
-    RpcResponse,
-    Subscribe,
-    Unsubscribe,
-    WebsocketMessage,
-    WebsocketMessageType
-} from "./api";
+import {RequestType, RpcRequest, RpcResponse} from "./types/Rpc";
+import {Notify, Subscribe, SubscriptionType, Unsubscribe} from "./types/Subscription";
+import {WebsocketMessage, WebsocketMessageType} from "./types/WebsocketMessage";
 
 export enum ConnectionStatus {
     connected = "connected",
@@ -18,13 +11,13 @@ export enum ConnectionStatus {
     closed = "closed"
 }
 
-const OngoingRPCsById = new Map<String, Rpc>();
-const SubscriptionsById = new Map<String, Subscription>();
-const ConnectionStatusSubscriptionsById = new Map<String, (connectionStatus: ConnectionStatus) => void>();
+const OngoingRPCsById = new Map<string, Rpc>();
+const SubscriptionsById = new Map<string, Subscription>();
+const ConnectionStatusSubscriptionsById = new Map<string, (connectionStatus: ConnectionStatus) => void>();
 let ws: WebSocket | undefined = undefined;
 let connectionStatus: ConnectionStatus = ConnectionStatus.closed;
 
-function subscribe(type: RequestType, onNotify: (notify: Notify) => void, onOpened: () => void) {
+function subscribe(type: SubscriptionType, onNotify: (notify: Notify) => void, onOpened: () => void) {
     const subscriptionId = uuidv4();
 
     SubscriptionsById.set(subscriptionId, new Subscription(type, onNotify, onOpened));
@@ -99,7 +92,7 @@ function reconnect() {
     ws.onopen = function () {
         setConnectionStatusChanged(ConnectionStatus.connected);
         // re-subscribe
-        let subscriptions = new Array<String>();
+        let subscriptions = new Array<string>();
         // re-send ongoing RPCs
         OngoingRPCsById.forEach((ongoingRPC) => {
             send(ongoingRPC.msg);
@@ -173,12 +166,12 @@ export default WebsocketService;
 
 
 class Subscription {
-    public type: RequestType;
+    public type: SubscriptionType;
     public onNotify: (notify: Notify) => void;
     public onOpened: () => void;
 
 
-   public constructor(type: RequestType, onNotify: (notify: Notify) => void, onOpened: () => void) {
+   public constructor(type: SubscriptionType, onNotify: (notify: Notify) => void, onOpened: () => void) {
         this.type = type;
         this.onNotify = onNotify;
         this.onOpened = onOpened;

@@ -1,10 +1,14 @@
 package com.dehnes.smarthome.external
 
+import com.dehnes.smarthome.api.dtos.EvChargingStationClient
+import com.dehnes.smarthome.api.dtos.Event
+import com.dehnes.smarthome.api.dtos.EventType
 import mu.KotlinLogging
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.util.concurrent.*
+import java.util.zip.CRC32
 
 class EVChargingStationConnection(
     private val port: Int,
@@ -15,6 +19,8 @@ class EVChargingStationConnection(
     private val connectedClientsById = ConcurrentHashMap<Int, ClientConext>()
     private val timer = Executors.newSingleThreadScheduledExecutor()
 
+    val listeners = ConcurrentHashMap<String, (Event) -> Unit>()
+
     fun start() {
         serverSocket = ServerSocket(port)
 
@@ -24,7 +30,7 @@ class EVChargingStationConnection(
                     while (true) {
                         val clientSocket = serverSocket!!.accept()
                         logger.info { "New connection from ${clientSocket.toAddressString()}" }
-                        clientSocket.soTimeout = 1000
+                        clientSocket.soTimeout = 2000
                         onNewClient(clientSocket)
                     }
                 } catch (t: Throwable) {
@@ -37,11 +43,17 @@ class EVChargingStationConnection(
         thread.start()
     }
 
-    fun getFirmwareVersion(clientId: Int) = doWithClient(clientId) { socket ->
-        send(socket, Ping())
+    fun getConnectedClients() = connectedClientsById.values.map { it.evChargingStationClient }
 
-        val pongResponse = readResponse(socket) as PongResponse
-        pongResponse.firmwareVersion
+    fun ping(clientId: Int) = doWithClient(clientId) { socket ->
+        send(socket, Ping())
+        readResponse(socket) is PongResponse
+    }
+
+    fun uploadFirmwareAndReboot(clientId: Int, firmware: ByteArray) {
+        doWithClient(clientId) { socket ->
+            send(socket, Firmware(firmware))
+        }
     }
 
     private fun readResponse(socket: Socket): InboundPacket {
@@ -106,6 +118,16 @@ class EVChargingStationConnection(
     private fun closeContext(clientContext: ClientConext) {
         clientContext.scheduledFuture.cancel(false)
         closeSocket(clientContext.socket)
+
+        executorService.submit {
+            listeners.values.forEach { fn ->
+                try {
+                    fn(Event(EventType.clientConnectionsChanged, getConnectedClients()))
+                } catch (e: Exception) {
+                    logger.error("", e)
+                }
+            }
+        }
     }
 
     private fun closeSocket(socket: Socket) {
@@ -132,13 +154,27 @@ class EVChargingStationConnection(
                 logger.info { "Timeout while reading client ID. Closing socket" }
                 return
             }
-            logger.info { "ClientId=$clientId for ${socket.toAddressString()}" }
+
+            val firmwareVersion = socket.getInputStream().read()
+            if (firmwareVersion < 0) {
+                closeSocket(socket)
+                logger.info { "Timeout while reading firmwareVersion. Closing socket" }
+                return
+            }
+
+            val evChargingStationClient = EvChargingStationClient(
+                clientId,
+                socket.inetAddress.toString(),
+                socket.port,
+                firmwareVersion
+            )
+            logger.info { "New client connected $evChargingStationClient" }
 
             // start timer
             val timerRef = timer.scheduleAtFixedRate(
                 {
                     executorService.submit {
-                        getFirmwareVersion(clientId)
+                        ping(clientId)
                     }
                 },
                 5,
@@ -146,7 +182,18 @@ class EVChargingStationConnection(
                 TimeUnit.SECONDS
             )
 
-            connectedClientsById[clientId] = ClientConext(socket, timerRef)
+            connectedClientsById[clientId] = ClientConext(socket, timerRef, evChargingStationClient)
+
+            executorService.submit {
+                listeners.values.forEach { fn ->
+                    try {
+                        fn(Event(EventType.clientConnectionsChanged, getConnectedClients()))
+                    } catch (e: Exception) {
+                        logger.error("", e)
+                    }
+                }
+            }
+
         } catch (t: Throwable) {
             logger.info("", t)
         }
@@ -158,7 +205,8 @@ fun Socket.toAddressString() = "${this.inetAddress}:${this.port}"
 
 class ClientConext(
     val socket: Socket,
-    val scheduledFuture: ScheduledFuture<*>
+    val scheduledFuture: ScheduledFuture<*>,
+    val evChargingStationClient: EvChargingStationClient
 )
 
 enum class RequestType(val value: Int) {
@@ -179,10 +227,9 @@ sealed class InboundPacket(
 )
 
 class PongResponse(
-    val firmwareVersion: Int
 ) : InboundPacket(ResponseType.pongResponse) {
     companion object {
-        fun parse(msg: ByteArray) = PongResponse(msg[0].toInt())
+        fun parse(msg: ByteArray) = PongResponse()
     }
 }
 
@@ -196,6 +243,23 @@ class Ping : OutboundPacket(RequestType.pingRequest) {
     override fun serializedMessage() = byteArrayOf()
 }
 
-class Firmware : OutboundPacket(RequestType.firmwareUpdate) {
-    override fun serializedMessage() = TODO()
+class Firmware(
+    val firmware: ByteArray
+) : OutboundPacket(RequestType.firmwareUpdate) {
+    override fun serializedMessage(): ByteArray {
+        val crc32 = CRC32()
+        crc32.update(firmware)
+        val crc32Value = crc32.value
+
+        return ByteBuffer.allocate(firmware.size + 4)
+            .put(crc32Value.to32Bit())
+            .put(firmware)
+            .array()
+    }
+}
+
+fun Long.to32Bit(): ByteArray {
+    val bytes = ByteArray(8)
+    ByteBuffer.wrap(bytes).putLong(this)
+    return bytes.copyOfRange(4, 8)
 }

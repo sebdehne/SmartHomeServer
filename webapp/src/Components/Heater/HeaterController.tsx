@@ -1,20 +1,20 @@
 import React, {useEffect, useState} from 'react';
 import {Button, CircularProgress, Container, Paper, TextField, Typography} from "@material-ui/core";
 import {useHistory} from "react-router-dom";
-import {
-    Notify,
-    RequestType,
-    RpcRequest,
-    RpcResponse,
-    UnderFloorHeaterMode,
-    UnderFloorHeaterStatus,
-    UpdateUnderFloorHeaterMode
-} from "../../api";
-import WebsocketService from "../../websocketClient";
+import WebsocketService from "../../Websocket/websocketClient";
 import {timeToDelta} from "../GarageDoor/GarageDoor";
 import ConnectionStatusComponent from "../ConnectionStatus";
 import './HeaterController.css';
 import {ArrowDownward, ArrowUpward} from "@material-ui/icons";
+import {
+    UnderFloorHeaterMode,
+    UnderFloorHeaterRequest,
+    UnderFloorHeaterRequestType,
+    UnderFloorHeaterStatus,
+    UpdateUnderFloorHeaterMode
+} from "../../Websocket/types/UnderFloorHeater";
+import {Notify, SubscriptionType} from "../../Websocket/types/Subscription";
+import {RequestType, RpcRequest, RpcResponse} from "../../Websocket/types/Rpc";
 
 const HeaterController = () => {
     let history = useHistory();
@@ -39,11 +39,20 @@ const HeaterController = () => {
 
     useEffect(() => {
         const subId = WebsocketService.subscribe(
-            RequestType.getUnderFloorHeaterStatus,
+            SubscriptionType.getUnderFloorHeaterStatus,
             (notify: Notify) => onNewStatus(notify.underFloorHeaterStatus!!),
             () => {
-                WebsocketService.rpc(new RpcRequest(RequestType.getUnderFloorHeaterStatus, null, null, null, null, null))
-                    .then(response => onNewStatus(response.underFloorHeaterStatus!!));
+                WebsocketService.rpc(new RpcRequest(
+                    RequestType.underFloorHeaterRequest,
+                    null,
+                    null,
+                    null,
+                    new UnderFloorHeaterRequest(
+                        UnderFloorHeaterRequestType.getUnderFloorHeaterStatus,
+                        null
+                    ),
+                    null))
+                    .then(response => onNewStatus(response.underFloorHeaterResponse!!.underFloorHeaterStatus));
             }
         )
 
@@ -53,26 +62,38 @@ const HeaterController = () => {
     const sendUpdate = (underFloorHeaterMode: UnderFloorHeaterMode) => {
         setSending(true);
         WebsocketService.rpc(new RpcRequest(
-            RequestType.updateUnderFloorHeaterMode,
+            RequestType.underFloorHeaterRequest,
             null,
             null,
-            new UpdateUnderFloorHeaterMode(
-                underFloorHeaterMode,
-                targetTemperatur * 100,
-                null
+            null,
+            new UnderFloorHeaterRequest(
+                UnderFloorHeaterRequestType.updateUnderFloorHeaterMode,
+                new UpdateUnderFloorHeaterMode(
+                    underFloorHeaterMode,
+                    targetTemperatur * 100,
+                    null
+                )
             ),
-            null,
             null
         )).then((response: RpcResponse) => {
-            setCmdResult(response.updateUnderFloorHeaterModeSuccess);
-            onNewStatus(response.underFloorHeaterStatus)
+            setCmdResult(response.underFloorHeaterResponse!!.updateUnderFloorHeaterModeSuccess);
+            onNewStatus(response.underFloorHeaterResponse!!.underFloorHeaterStatus);
             setTimeout(() => {
                 setCmdResult(null);
             }, 2000);
 
             // refresh
-            WebsocketService.rpc(new RpcRequest(RequestType.getUnderFloorHeaterStatus, null, null, null, null, null))
-                .then(response => onNewStatus(response.underFloorHeaterStatus!!));
+            WebsocketService.rpc(new RpcRequest(
+                RequestType.underFloorHeaterRequest,
+                null,
+                null,
+                null,
+                new UnderFloorHeaterRequest(
+                    UnderFloorHeaterRequestType.getUnderFloorHeaterStatus,
+                    null
+                ),
+                null))
+                .then(response => onNewStatus(response.underFloorHeaterResponse!!.underFloorHeaterStatus));
 
         }).finally(() => setSending(false));
     };

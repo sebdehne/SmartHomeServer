@@ -1,6 +1,6 @@
 package com.dehnes.smarthome.service
 
-import com.dehnes.smarthome.api.*
+import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.external.InfluxDBClient
 import com.dehnes.smarthome.external.RfPacket
 import com.dehnes.smarthome.external.SerialConnection
@@ -253,10 +253,6 @@ class UnderFloorHeaterService(
 
     private fun getConfiguredHeaterTarget() = persistenceService[HEATER_STATUS_KEY, "off"]!!
 
-}
-
-enum class Mode {
-    ON, OFF, MANUAL
 }
 
 data class TemperatureAndHeaterStatus(

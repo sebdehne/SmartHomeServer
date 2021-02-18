@@ -1,7 +1,7 @@
 package com.dehnes.smarthome.service
 
-import com.dehnes.smarthome.api.DoorStatus
-import com.dehnes.smarthome.api.GarageStatus
+import com.dehnes.smarthome.api.dtos.DoorStatus
+import com.dehnes.smarthome.api.dtos.GarageStatus
 import com.dehnes.smarthome.external.InfluxDBClient
 import com.dehnes.smarthome.external.RfPacket
 import com.dehnes.smarthome.external.SerialConnection

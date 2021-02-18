@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import WebsocketService, {ConnectionStatus} from "../websocketClient";
+import WebsocketService, {ConnectionStatus} from "../Websocket/websocketClient";
 
 
 const ConnectionStatusComponent = () => {
