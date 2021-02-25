@@ -46,7 +46,7 @@ class Configuration {
         )
         heaterService.start()
 
-        val evChargingStationConnection = EVChargingStationConnection(9091, executorService)
+        val evChargingStationConnection = EVChargingStationConnection(9091, executorService, persistenceService)
         evChargingStationConnection.start()
 
         val firmwareUploadService = FirmwareUploadService(evChargingStationConnection)

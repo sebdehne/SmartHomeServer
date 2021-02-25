@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, CardContent, CircularProgress, Container, Paper, Typography } from "@material-ui/core";
+import { Button, CircularProgress, Container, Paper, Typography } from "@material-ui/core";
 import { useHistory } from "react-router-dom";
 import WebsocketService from "../../Websocket/websocketClient";
 import ConnectionStatusComponent from "../ConnectionStatus";
@@ -10,12 +10,18 @@ import {
 } from "../../Websocket/types/EVChargingStation";
 import { SubscriptionType } from "../../Websocket/types/Subscription";
 import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
-import Checkbox from '@material-ui/core/Checkbox';
 import Select from '@material-ui/core/Select';
 import MenuItem from '@material-ui/core/MenuItem';
 
-interface SelectedClientByFirmware {
-    [firmware: string]: number | null
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
 }
 
 const EVChargingStationsManager = () => {
@@ -24,35 +30,42 @@ const EVChargingStationsManager = () => {
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
 
     const [connectedClients, setConnectedClients] = useState<EvChargingStationClient[]>([]);
-    const [firmwareVersions, setFirmwareVersions] = useState<string[]>([]);
-    const [selectedClientByFirmware, setSelectedClientByFirmware] = useState<SelectedClientByFirmware>({});
+    const [selectedClientForFirmwareUpload, setSelectedClientForFirmwareUpload] = useState<string | null>(null);
 
-    const onSelectClientForFirmware = (firmware: string, clientId: number | null) => {
-        setSelectedClientByFirmware(prevState => ({
-            ...prevState,
-            [firmware]: clientId
-        }));
-    };
-
-    const requestFirmwareUpload = (firmware: string, clientId: number) => {
+    const uploadFirmware = (clientId: string, file: File) => {
+        setSelectedClientForFirmwareUpload(null);
         setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.evChargingStationRequest,
-            null,
-            null,
-            null,
-            null,
-            new EvChargingStationRequest(
-                EvChargingStationRequestType.uploadFirmwareToClient,
-                clientId,
-                firmware
-            )
-        )).then(response => {
-            setCmdResult(response.evChargingStationResponse!!.uploadFirmwareToClientResult);
-            setTimeout(() => {
-                setCmdResult(null);
-            }, 2000);
-        }).finally(() => setSending(false));
+
+        const reader = new FileReader();
+
+        reader.onload = ev => {
+            const rawData = ev!!.target!!.result as ArrayBuffer;
+            const firmwareBased64Encoded = arrayBufferToBase64(rawData);
+
+            WebsocketService.rpc(new RpcRequest(
+                RequestType.evChargingStationRequest,
+                null,
+                null,
+                null,
+                null,
+                new EvChargingStationRequest(
+                    EvChargingStationRequestType.uploadFirmwareToClient,
+                    clientId,
+                    firmwareBased64Encoded
+                )
+            )).then(response => {
+                setCmdResult(response.evChargingStationResponse!!.uploadFirmwareToClientResult);
+                setTimeout(() => {
+                    setCmdResult(null);
+                }, 2000);
+            }).finally(() => setSending(false));
+
+        };
+        reader.onerror = ev => {
+            console.log("Error reading file:");
+            console.log(ev);
+        };
+        reader.readAsArrayBuffer(file);
     };
 
     useEffect(() => {
@@ -72,20 +85,6 @@ const EVChargingStationsManager = () => {
                 )
             )).then(response => {
                 setConnectedClients(response.evChargingStationResponse!!.connectedClients!!);
-                return WebsocketService.rpc(new RpcRequest(
-                    RequestType.evChargingStationRequest,
-                    null,
-                    null,
-                    null,
-                    null,
-                    new EvChargingStationRequest(
-                        EvChargingStationRequestType.listAllFirmwareVersions,
-                        null,
-                        null
-                    )
-                ))
-            }).then(response => {
-                setFirmwareVersions(response.evChargingStationResponse!!.allFirmwareVersions!!);
             });
         });
 
@@ -112,42 +111,46 @@ const EVChargingStationsManager = () => {
                 {connectedClients.length > 0 &&
                 <div>
                     <h4>Connected EV charing stations:</h4>
-                    <div>
+                    <ul>
                         {connectedClients.map(client => (
-                            <div key={client.addr}>
-                                <Checkbox/> <ClientComponent client={client}/>
-                            </div>
+                            <li key={client.addr}>
+                                <ClientComponent client={client}/>
+                            </li>
                         ))}
-                    </div>
+                    </ul>
                 </div>
                 }
                 {connectedClients.length === 0 &&
                 <h4>Currently no EV charing stations online</h4>
                 }
 
-                {firmwareVersions.length > 0 &&
                 <div>
-                    {firmwareVersions.map(firmwareVersion => (
-                        <Card key={firmwareVersion}>
-                            <CardContent>
-                                <Typography color="textSecondary">
-                                    {firmwareVersion}
-                                </Typography>
+                    <h4>Firmware uploader</h4>
+                    <ClientSelect
+                        connectedClients={connectedClients}
+                        value={selectedClientForFirmwareUpload}
+                        setValue={clientId => setSelectedClientForFirmwareUpload(clientId)}
+                    />
+                    {selectedClientForFirmwareUpload &&
+                    <div>
+                        <input
+                            accept=".bin"
+                            hidden
+                            id="firmwareUploadFileSelector"
+                            type="file"
+                            onChange={e => {
+                                uploadFirmware(selectedClientForFirmwareUpload!!, e.target.files!![0]);
+                            }}
+                        />
+                        <label htmlFor="firmwareUploadFileSelector">
+                            <Button variant="text" component="span">
+                                Upload firmware
+                            </Button>
+                        </label>
+                    </div>
+                    }
 
-                                Upload to client: <ClientSelect
-                                value={selectedClientByFirmware[firmwareVersion]}
-                                connectedClients={connectedClients}
-                                setValue={clientId => onSelectClientForFirmware(firmwareVersion, clientId)}
-                            /> <Button
-                                disabled={selectedClientByFirmware[firmwareVersion] === null}
-                                onClick={() => requestFirmwareUpload(firmwareVersion, selectedClientByFirmware[firmwareVersion]!!)}>Upload</Button>
-                            </CardContent>
-                        </Card>
-                    ))}
                 </div>
-
-                }
-
 
                 {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}
                 {cmdResult != null && !cmdResult && <p>Failed &#128078;!</p>}
@@ -161,8 +164,8 @@ export default EVChargingStationsManager;
 
 type ClientSelectProps = {
     connectedClients: EvChargingStationClient[],
-    value: number | null,
-    setValue: (clientId: number | null) => void
+    value: string | null,
+    setValue: (clientId: string | null) => void
 }
 const ClientSelect = ({ connectedClients, value, setValue }: ClientSelectProps) => {
     return (
@@ -170,7 +173,7 @@ const ClientSelect = ({ connectedClients, value, setValue }: ClientSelectProps) 
             labelId="demo-simple-select-label"
             id="demo-simple-select"
             value={value}
-            onChange={e => setValue(e.target.value as number)}
+            onChange={e => setValue(e.target.value as string)}
         >
             <MenuItem value={undefined}/>
             {connectedClients.map(c => (

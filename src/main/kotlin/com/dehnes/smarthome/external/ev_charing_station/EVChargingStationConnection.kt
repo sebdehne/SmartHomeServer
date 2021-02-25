@@ -3,6 +3,7 @@ package com.dehnes.smarthome.external
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.Event
 import com.dehnes.smarthome.api.dtos.EventType
+import com.dehnes.smarthome.service.PersistenceService
 import mu.KotlinLogging
 import java.net.ServerSocket
 import java.net.Socket
@@ -12,11 +13,12 @@ import java.util.zip.CRC32
 
 class EVChargingStationConnection(
     private val port: Int,
-    private val executorService: ExecutorService
+    private val executorService: ExecutorService,
+    private val persistenceService: PersistenceService
 ) {
     private val logger = KotlinLogging.logger { }
     private var serverSocket: ServerSocket? = null
-    private val connectedClientsById = ConcurrentHashMap<Int, ClientConext>()
+    private val connectedClientsById = ConcurrentHashMap<String, ClientConext>()
     private val timer = Executors.newSingleThreadScheduledExecutor()
 
     val listeners = ConcurrentHashMap<String, (Event) -> Unit>()
@@ -45,12 +47,12 @@ class EVChargingStationConnection(
 
     fun getConnectedClients() = connectedClientsById.values.map { it.evChargingStationClient }
 
-    fun ping(clientId: Int) = doWithClient(clientId) { socket ->
+    fun ping(clientId: String) = doWithClient(clientId) { socket ->
         send(socket, Ping())
         readResponse(socket) is PongResponse
     }
 
-    fun uploadFirmwareAndReboot(clientId: Int, firmware: ByteArray) {
+    fun uploadFirmwareAndReboot(clientId: String, firmware: ByteArray) {
         doWithClient(clientId) { socket ->
             send(socket, Firmware(firmware))
         }
@@ -98,7 +100,7 @@ class EVChargingStationConnection(
         socket.getOutputStream().write(message)
     }
 
-    private fun <T> doWithClient(clientId: Int, fn: (socket: Socket) -> T) =
+    private fun <T> doWithClient(clientId: String, fn: (socket: Socket) -> T) =
         connectedClientsById[clientId]?.let { clientContext ->
             synchronized(clientContext) {
                 try {
@@ -148,11 +150,16 @@ class EVChargingStationConnection(
     private fun onNewClient(socket: Socket) {
         try {
 
-            val clientId = socket.getInputStream().read()
-            if (clientId < 0) {
-                closeSocket(socket)
-                logger.info { "Timeout while reading client ID. Closing socket" }
-                return
+            // clientId 16 bytes
+            val clientId = ByteArray(16)
+            clientId.indices.forEach { i ->
+                val  value = socket.getInputStream().read()
+                if (value < 0) {
+                    closeSocket(socket)
+                    logger.info { "Timeout while reading client ID. Closing socket" }
+                    return
+                }
+                clientId[i] = value.toByte()
             }
 
             val firmwareVersion = socket.getInputStream().read()
@@ -162,8 +169,12 @@ class EVChargingStationConnection(
                 return
             }
 
+            val clientIdStr =
+                clientId.toHexString().let { id ->
+                    persistenceService["ChargerName.$id", id]!!
+                }
             val evChargingStationClient = EvChargingStationClient(
-                clientId,
+                clientIdStr,
                 socket.inetAddress.toString(),
                 socket.port,
                 firmwareVersion
@@ -174,7 +185,7 @@ class EVChargingStationConnection(
             val timerRef = timer.scheduleAtFixedRate(
                 {
                     executorService.submit {
-                        ping(clientId)
+                        ping(clientIdStr)
                     }
                 },
                 5,
@@ -182,7 +193,7 @@ class EVChargingStationConnection(
                 TimeUnit.SECONDS
             )
 
-            connectedClientsById[clientId] = ClientConext(socket, timerRef, evChargingStationClient)
+            connectedClientsById[clientIdStr] = ClientConext(socket, timerRef, evChargingStationClient)
 
             executorService.submit {
                 listeners.values.forEach { fn ->
@@ -263,3 +274,5 @@ fun Long.to32Bit(): ByteArray {
     ByteBuffer.wrap(bytes).putLong(this)
     return bytes.copyOfRange(4, 8)
 }
+
+fun ByteArray.toHexString() = joinToString("") { "%02x".format(it) }

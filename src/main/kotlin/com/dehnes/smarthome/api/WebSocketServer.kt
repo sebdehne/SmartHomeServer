@@ -105,13 +105,10 @@ class WebSocketServer {
         EvChargingStationRequestType.getConnectedClients -> EvChargingStationResponse(
             connectedClients = evChargingStationConnection.getConnectedClients()
         )
-        EvChargingStationRequestType.listAllFirmwareVersions -> EvChargingStationResponse(
-            allFirmwareVersions = firmwareUploadService.listVersions()
-        )
         EvChargingStationRequestType.uploadFirmwareToClient -> EvChargingStationResponse(
             uploadFirmwareToClientResult = firmwareUploadService.uploadVersion(
                 request.clientId!!,
-                request.firmwareVersion!!
+                request.firmwareBased64Encoded!!
             )
         )
     }
@@ -156,7 +153,7 @@ class WebSocketServer {
 
     @OnClose
     fun onWebSocketClose(reason: CloseReason) {
-        subscriptions.forEach { (_, u) -> u.close() }
+        subscriptions.values.toList().forEach { it.close() }
         logger.info("$instanceId Socket Closed: $reason")
     }
 

@@ -1,40 +1,37 @@
 export enum EvChargingStationRequestType {
     getConnectedClients = "getConnectedClients",
-    listAllFirmwareVersions = "listAllFirmwareVersions",
     uploadFirmwareToClient = "uploadFirmwareToClient"
 }
 
 export class EvChargingStationRequest {
     public type: EvChargingStationRequestType;
-    public clientId: number | null;
-    public firmwareVersion: string | null;
+    public clientId: string | null;
+    public firmwareBased64Encoded: string | null;
 
-    public constructor(type: EvChargingStationRequestType, clientId: number | null, firmwareVersion: string | null) {
+    public constructor(type: EvChargingStationRequestType, clientId: string | null, firmwareBased64Encoded: string | null) {
         this.type = type;
         this.clientId = clientId;
-        this.firmwareVersion = firmwareVersion;
+        this.firmwareBased64Encoded = firmwareBased64Encoded;
     }
 }
 
 export class EvChargingStationResponse {
     public connectedClients: EvChargingStationClient[] | null;
-    public allFirmwareVersions: string[] | null;
     public uploadFirmwareToClientResult: boolean | null;
 
-    public constructor(connectedClients: EvChargingStationClient[] | null, allFirmwareVersions: string[] | null, uploadFirmwareToClientResult: boolean | null) {
+   public constructor(connectedClients: EvChargingStationClient[] | null, uploadFirmwareToClientResult: boolean | null) {
         this.connectedClients = connectedClients;
-        this.allFirmwareVersions = allFirmwareVersions;
         this.uploadFirmwareToClientResult = uploadFirmwareToClientResult;
     }
 }
 
 export class EvChargingStationClient {
-    public clientId: number;
+    public clientId: string;
     public addr: string;
     public port: number;
     public firmwareVersion: number;
 
-    public constructor(clientId: number, addr: string, port: number, firmwareVersion: number) {
+    public constructor(clientId: string, addr: string, port: number, firmwareVersion: number) {
         this.clientId = clientId;
         this.addr = addr;
         this.port = port;
