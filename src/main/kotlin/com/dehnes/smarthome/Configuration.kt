@@ -1,6 +1,6 @@
 package com.dehnes.smarthome
 
-import com.dehnes.smarthome.external.EVChargingStationConnection
+import com.dehnes.smarthome.external.ev_charing_station.EVChargingStationConnection
 import com.dehnes.smarthome.external.InfluxDBClient
 import com.dehnes.smarthome.external.SerialConnection
 import com.dehnes.smarthome.external.TibberPriceClient

@@ -1,6 +1,6 @@
 package com.dehnes.smarthome.service.ev_charging_station
 
-import com.dehnes.smarthome.external.EVChargingStationConnection
+import com.dehnes.smarthome.external.ev_charing_station.EVChargingStationConnection
 import mu.KotlinLogging
 import java.util.*
 

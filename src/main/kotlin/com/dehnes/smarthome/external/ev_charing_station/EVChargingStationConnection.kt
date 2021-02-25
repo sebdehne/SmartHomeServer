@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.external
+package com.dehnes.smarthome.external.ev_charing_station
 
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.Event
@@ -32,7 +32,7 @@ class EVChargingStationConnection(
                     while (true) {
                         val clientSocket = serverSocket!!.accept()
                         logger.info { "New connection from ${clientSocket.toAddressString()}" }
-                        clientSocket.soTimeout = 2000
+                        clientSocket.soTimeout = 4000
                         onNewClient(clientSocket)
                     }
                 } catch (t: Throwable) {
@@ -58,6 +58,11 @@ class EVChargingStationConnection(
         }
     }
 
+    fun getData(clientId: String) = doWithClient(clientId) { socket ->
+        send(socket, GetData())
+        readResponse(socket) as DataResponse
+    }!!
+
     private fun readResponse(socket: Socket): InboundPacket {
         // type
         var read = socket.getInputStream().read()
@@ -78,7 +83,7 @@ class EVChargingStationConnection(
         var bytesRead = 0
         while (bytesRead < msg.size) {
             read = socket.getInputStream().read(msg, bytesRead, msg.size - bytesRead)
-            check(read >= 0) { "Client disconnected" }
+            check(read >= 0) { "Client disconnected $read" }
             bytesRead += read
         }
 
@@ -98,6 +103,8 @@ class EVChargingStationConnection(
 
         // msg
         socket.getOutputStream().write(message)
+
+        socket.getOutputStream().flush()
     }
 
     private fun <T> doWithClient(clientId: String, fn: (socket: Socket) -> T) =
@@ -153,7 +160,7 @@ class EVChargingStationConnection(
             // clientId 16 bytes
             val clientId = ByteArray(16)
             clientId.indices.forEach { i ->
-                val  value = socket.getInputStream().read()
+                val value = socket.getInputStream().read()
                 if (value < 0) {
                     closeSocket(socket)
                     logger.info { "Timeout while reading client ID. Closing socket" }
@@ -185,7 +192,9 @@ class EVChargingStationConnection(
             val timerRef = timer.scheduleAtFixedRate(
                 {
                     executorService.submit {
-                        ping(clientIdStr)
+                        //ping(clientIdStr)
+                        val data = getData(clientIdStr)
+                        logger.info { "Data response $data" }
                     }
                 },
                 5,
@@ -222,11 +231,13 @@ class ClientConext(
 
 enum class RequestType(val value: Int) {
     pingRequest(1),
-    firmwareUpdate(2)
+    firmwareUpdate(2),
+    getData(3)
 }
 
 enum class ResponseType(val value: Int, val parser: (ByteArray) -> InboundPacket) {
-    pongResponse(1, PongResponse::parse);
+    pongResponse(1, PongResponse.Companion::parse),
+    dataResponse(2, DataResponse.Companion::parse);
 
     companion object {
         fun fromValue(value: Int) = values().first { it.value == value }
@@ -244,6 +255,118 @@ class PongResponse(
     }
 }
 
+data class DataResponse(
+    val chargingState: ChargingState,
+    val chargeCurrentAmps: Int,
+    val pilotVoltage: PilotVoltage,
+    val proximityPilotAmps: ProximityPilotAmps,
+    val phase1Millivolts: Int,
+    val phase2Millivolts: Int,
+    val phase3Millivolts: Int,
+    val phase1Milliamps: Int,
+    val phase2Milliamps: Int,
+    val phase3Milliamps: Int,
+    val wifiRSSI: Int,
+    val systemUptime: Int,
+    val logMessages: List<String>
+) : InboundPacket(ResponseType.pongResponse) {
+    companion object {
+        fun parse(msg: ByteArray): DataResponse {
+
+            /*
+             *
+             * [field]            | size in bytes
+             * chargingState      | 1
+             * chargeCurrentAmps  | 1
+             * pilotVoltage       | 1
+             * proximityPilotAmps | 1
+             * phase1Millivolts   | 4
+             * phase2Millivolts   | 4
+             * phase3Millivolts   | 4
+             * phase1Milliamps    | 4
+             * phase2Milliamps    | 4
+             * phase3Milliamps    | 4
+             * wifi RSSI          | 4 (signed int)
+             * system uptime      | 4
+             * bytesLogged        | 4
+             * logBuffer          | 1024
+             *
+             * Total msgLen = 1064
+             */
+
+
+            val bytesLogged = readInt32Bits(msg, 36)
+            val logMessages = mutableListOf<String>()
+            val stringBuilder = StringBuilder()
+            for (i in 40 until bytesLogged) {
+                val c = msg[i].toInt()
+                if (c == 0) {
+                    logMessages.add(stringBuilder.toString())
+                    stringBuilder.clear()
+                } else {
+                    stringBuilder.append(c.toChar())
+                }
+            }
+            if (stringBuilder.isNotEmpty()) {
+                logMessages.add(stringBuilder.toString())
+            }
+
+            return DataResponse(
+                ChargingState.values().first { it.value == msg[0].toInt() },
+                msg[1].toInt(),
+                PilotVoltage.values().first { it.value == msg[2].toInt() },
+                ProximityPilotAmps.values().first { it.value == msg[3].toInt() },
+                readInt32Bits(msg, 4), // phase1Millivolts
+                readInt32Bits(msg, 8), // phase2Millivolts
+                readInt32Bits(msg, 12), // phase3Millivolts
+                readInt32Bits(msg, 16), // phase1Milliamps
+                readInt32Bits(msg, 20), // phase2Milliamps
+                readInt32Bits(msg, 24), // phase3Milliamps
+                readInt32Bits(msg, 28), // rssi
+                readInt32Bits(msg, 32), // uptime
+                logMessages
+            )
+        }
+    }
+}
+
+fun readInt32Bits(buf: ByteArray, offset: Int): Int {
+    val byteBuffer = ByteBuffer.allocate(4)
+    byteBuffer.put(buf, offset, 4)
+    byteBuffer.flip()
+    return byteBuffer.getInt(0)
+}
+
+enum class ProximityPilotAmps(
+    val value: Int
+) {
+    Amp13(0),
+    Amp20(1),
+    Amp32(2),
+}
+
+enum class PilotVoltage(
+    val value: Int
+) {
+    Volt_12(0),
+    Volt_9(1),
+    Volt_6(2),
+    Volt_3(3),
+    Volt_0(4),
+    Volt_12Neg(5),
+}
+
+enum class ChargingState(
+    val value: Int
+) {
+    StatusA(0),
+    StatusB(1),
+    StatusC(2),
+    StatusD(3),
+    StatusE(4),
+    StatusF(5)
+}
+
 sealed class OutboundPacket(
     val type: RequestType
 ) {
@@ -251,6 +374,10 @@ sealed class OutboundPacket(
 }
 
 class Ping : OutboundPacket(RequestType.pingRequest) {
+    override fun serializedMessage() = byteArrayOf()
+}
+
+class GetData : OutboundPacket(RequestType.getData) {
     override fun serializedMessage() = byteArrayOf()
 }
 

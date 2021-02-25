@@ -3,7 +3,7 @@ package com.dehnes.smarthome.api
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
-import com.dehnes.smarthome.external.EVChargingStationConnection
+import com.dehnes.smarthome.external.ev_charing_station.EVChargingStationConnection
 import com.dehnes.smarthome.service.GarageDoorService
 import com.dehnes.smarthome.service.UnderFloorHeaterService
 import com.dehnes.smarthome.service.ev_charging_station.FirmwareUploadService
