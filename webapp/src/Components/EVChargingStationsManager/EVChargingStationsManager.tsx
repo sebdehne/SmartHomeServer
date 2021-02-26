@@ -110,7 +110,7 @@ const EVChargingStationsManager = () => {
 
                 {connectedClients.length > 0 &&
                 <div>
-                    <h4>Connected EV charing stations:</h4>
+                    <h4>Connected EV charging stations:</h4>
                     <ul>
                         {connectedClients.map(client => (
                             <li key={client.addr}>
@@ -121,7 +121,7 @@ const EVChargingStationsManager = () => {
                 </div>
                 }
                 {connectedClients.length === 0 &&
-                <h4>Currently no EV charing stations online</h4>
+                <h4>Currently no EV charging stations online</h4>
                 }
 
                 <div>

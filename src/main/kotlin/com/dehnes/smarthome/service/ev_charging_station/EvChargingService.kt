@@ -1,9 +1,9 @@
 package com.dehnes.smarthome.service.ev_charging_station
 
 import com.dehnes.smarthome.api.dtos.*
-import com.dehnes.smarthome.external.ev_charing_station.DataResponse
-import com.dehnes.smarthome.external.ev_charing_station.EVChargingStationConnection
-import com.dehnes.smarthome.external.ev_charing_station.EventType
+import com.dehnes.smarthome.external.ev_charging_station.DataResponse
+import com.dehnes.smarthome.external.ev_charging_station.EVChargingStationConnection
+import com.dehnes.smarthome.external.ev_charging_station.EventType
 import com.dehnes.smarthome.service.AbstractProcess
 import com.dehnes.smarthome.service.PersistenceService
 import com.dehnes.smarthome.service.TibberService
@@ -192,7 +192,7 @@ class EvChargingService(
                 chargeRate < internalState.dataResponse.chargeCurrentAmps
             }
 
-            // reduce charing rate before increasing others
+            // reduce charging rate before increasing others
             if (decrements.isNotEmpty()) {
                 decrements.forEach { (clientId, chargeRate) ->
                     val internalState = stationsCanCharge.first { it.evChargingStationClient.clientId == clientId }

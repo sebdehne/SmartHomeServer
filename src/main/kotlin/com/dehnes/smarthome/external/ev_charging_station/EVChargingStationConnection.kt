@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.external.ev_charing_station
+package com.dehnes.smarthome.external.ev_charging_station
 
 import com.dehnes.smarthome.api.dtos.ChargingStationState
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient

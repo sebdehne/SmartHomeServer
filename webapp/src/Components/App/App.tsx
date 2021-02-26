@@ -29,7 +29,7 @@ const App = () => {
                     </li>
                     <li>
                         <Button variant="contained" color="secondary">
-                            EV Charing
+                            EV Charging
                         </Button>
                     </li>
                     <li>
