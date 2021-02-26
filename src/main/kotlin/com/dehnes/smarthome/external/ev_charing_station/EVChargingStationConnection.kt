@@ -17,6 +17,7 @@ class EVChargingStationConnection(
     private val persistenceService: PersistenceService
 ) {
     private val logger = KotlinLogging.logger { }
+    private val chargerStationLogger = KotlinLogging.logger("ChargerStationLogger")
     private var serverSocket: ServerSocket? = null
     private val connectedClientsById = ConcurrentHashMap<String, ClientConext>()
     private val timer = Executors.newSingleThreadScheduledExecutor()
@@ -62,6 +63,14 @@ class EVChargingStationConnection(
         send(socket, GetData())
         readResponse(socket) as DataResponse
     }!!
+
+    fun sendMaxChargeRate(clientId: String, maxChargeAmp: Int) {
+        check(maxChargeAmp in 0..32) { "Invalid charge rate" }
+        doWithClient(clientId) { socket ->
+            send(socket, SetChargeRate(maxChargeAmp))
+            readResponse(socket) as SetMaxChargeRateResponse
+        }
+    }
 
     private fun readResponse(socket: Socket): InboundPacket {
         // type
@@ -195,6 +204,7 @@ class EVChargingStationConnection(
                         //ping(clientIdStr)
                         val data = getData(clientIdStr)
                         logger.info { "Data response $data" }
+                        data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=$clientIdStr msg=$msg" } }
                     }
                 },
                 5,
@@ -232,12 +242,14 @@ class ClientConext(
 enum class RequestType(val value: Int) {
     pingRequest(1),
     firmwareUpdate(2),
-    getData(3)
+    getData(3),
+    setChargeRateAmps(4)
 }
 
 enum class ResponseType(val value: Int, val parser: (ByteArray) -> InboundPacket) {
     pongResponse(1, PongResponse.Companion::parse),
-    dataResponse(2, DataResponse.Companion::parse);
+    dataResponse(2, DataResponse.Companion::parse),
+    setMaxChargeRateResponse(3, SetMaxChargeRateResponse.Companion::parse);
 
     companion object {
         fun fromValue(value: Int) = values().first { it.value == value }
@@ -254,6 +266,14 @@ class PongResponse(
         fun parse(msg: ByteArray) = PongResponse()
     }
 }
+
+class SetMaxChargeRateResponse(
+) : InboundPacket(ResponseType.setMaxChargeRateResponse) {
+    companion object {
+        fun parse(msg: ByteArray) = SetMaxChargeRateResponse()
+    }
+}
+
 
 data class DataResponse(
     val chargingState: ChargingState,
@@ -274,7 +294,6 @@ data class DataResponse(
         fun parse(msg: ByteArray): DataResponse {
 
             /*
-             *
              * [field]            | size in bytes
              * chargingState      | 1
              * chargeCurrentAmps  | 1
@@ -289,16 +308,12 @@ data class DataResponse(
              * wifi RSSI          | 4 (signed int)
              * system uptime      | 4
              * bytesLogged        | 4
-             * logBuffer          | 1024
-             *
-             * Total msgLen = 1064
+             * logBuffer          | remaining
              */
 
-
-            val bytesLogged = readInt32Bits(msg, 36)
             val logMessages = mutableListOf<String>()
             val stringBuilder = StringBuilder()
-            for (i in 40 until bytesLogged) {
+            for (i in 36 until msg.size) {
                 val c = msg[i].toInt()
                 if (c == 0) {
                     logMessages.add(stringBuilder.toString())
@@ -328,6 +343,24 @@ data class DataResponse(
             )
         }
     }
+
+    override fun toString(): String {
+        return "DataResponse(" +
+                "chargingState=$chargingState, " +
+                "chargeCurrentAmps=$chargeCurrentAmps, " +
+                "pilotVoltage=$pilotVoltage, " +
+                "proximityPilotAmps=$proximityPilotAmps, " +
+                "phase1Millivolts=$phase1Millivolts, " +
+                "phase2Millivolts=$phase2Millivolts, " +
+                "phase3Millivolts=$phase3Millivolts, " +
+                "phase1Milliamps=$phase1Milliamps, " +
+                "phase2Milliamps=$phase2Milliamps, " +
+                "phase3Milliamps=$phase3Milliamps, " +
+                "wifiRSSI=$wifiRSSI, " +
+                "systemUptime=$systemUptime)"
+    }
+
+
 }
 
 fun readInt32Bits(buf: ByteArray, offset: Int): Int {
@@ -379,6 +412,12 @@ class Ping : OutboundPacket(RequestType.pingRequest) {
 
 class GetData : OutboundPacket(RequestType.getData) {
     override fun serializedMessage() = byteArrayOf()
+}
+
+class SetChargeRate(
+    val maxChargeAmp: Int
+) : OutboundPacket(RequestType.setChargeRateAmps) {
+    override fun serializedMessage() = byteArrayOf(maxChargeAmp.toByte())
 }
 
 class Firmware(
