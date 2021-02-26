@@ -1,14 +1,17 @@
 package com.dehnes.smarthome.external.ev_charing_station
 
+import com.dehnes.smarthome.api.dtos.ChargingStationState
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
-import com.dehnes.smarthome.api.dtos.Event
-import com.dehnes.smarthome.api.dtos.EventType
+import com.dehnes.smarthome.api.dtos.EvChargingStationData
+import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.service.PersistenceService
 import mu.KotlinLogging
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.ByteBuffer
+import java.time.Instant
 import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
 
 class EVChargingStationConnection(
@@ -64,12 +67,16 @@ class EVChargingStationConnection(
         readResponse(socket) as DataResponse
     }!!
 
-    fun sendMaxChargeRate(clientId: String, maxChargeAmp: Int) {
+    fun sendMaxChargeRate(clientId: String, maxChargeAmp: Int) = try {
         check(maxChargeAmp in 0..32) { "Invalid charge rate" }
         doWithClient(clientId) { socket ->
             send(socket, SetChargeRate(maxChargeAmp))
             readResponse(socket) as SetMaxChargeRateResponse
-        }
+            true
+        }!!
+    } catch (e: Exception) {
+        logger.error("Could not send max charge rate", e)
+        false
     }
 
     private fun readResponse(socket: Socket): InboundPacket {
@@ -119,6 +126,7 @@ class EVChargingStationConnection(
     private fun <T> doWithClient(clientId: String, fn: (socket: Socket) -> T) =
         connectedClientsById[clientId]?.let { clientContext ->
             synchronized(clientContext) {
+                clientContext.lastRequestSent.set(System.currentTimeMillis())
                 try {
                     fn(clientContext.socket)
                 } catch (t: Throwable) {
@@ -140,7 +148,7 @@ class EVChargingStationConnection(
         executorService.submit {
             listeners.values.forEach { fn ->
                 try {
-                    fn(Event(EventType.clientConnectionsChanged, getConnectedClients()))
+                    fn(Event(EventType.clientData, clientContext.evChargingStationClient, null))
                 } catch (e: Exception) {
                     logger.error("", e)
                 }
@@ -185,15 +193,17 @@ class EVChargingStationConnection(
                 return
             }
 
-            val clientIdStr =
-                clientId.toHexString().let { id ->
-                    persistenceService["ChargerName.$id", id]!!
-                }
+            val clientIdStr = clientId.toHexString().let { id ->
+                persistenceService["ChargerName.$id", id]!!
+            }
+
             val evChargingStationClient = EvChargingStationClient(
                 clientIdStr,
+                persistenceService["ChargerDisplayName.$clientIdStr", clientIdStr]!!,
                 socket.inetAddress.toString(),
                 socket.port,
-                firmwareVersion
+                firmwareVersion,
+                persistenceService.get("ChargePowerConnection.$clientIdStr", "unknown")!!
             )
             logger.info { "New client connected $evChargingStationClient" }
 
@@ -201,10 +211,14 @@ class EVChargingStationConnection(
             val timerRef = timer.scheduleAtFixedRate(
                 {
                     executorService.submit {
-                        //ping(clientIdStr)
                         val data = getData(clientIdStr)
                         logger.info { "Data response $data" }
                         data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=$clientIdStr msg=$msg" } }
+                        executorService.submit {
+                            listeners.forEach { entry ->
+                                entry.value(Event(EventType.clientData, evChargingStationClient, data))
+                            }
+                        }
                     }
                 },
                 5,
@@ -217,7 +231,7 @@ class EVChargingStationConnection(
             executorService.submit {
                 listeners.values.forEach { fn ->
                     try {
-                        fn(Event(EventType.clientConnectionsChanged, getConnectedClients()))
+                        fn(Event(EventType.newClientConnection, evChargingStationClient, null))
                     } catch (e: Exception) {
                         logger.error("", e)
                     }
@@ -236,7 +250,20 @@ fun Socket.toAddressString() = "${this.inetAddress}:${this.port}"
 class ClientConext(
     val socket: Socket,
     val scheduledFuture: ScheduledFuture<*>,
-    val evChargingStationClient: EvChargingStationClient
+    val evChargingStationClient: EvChargingStationClient,
+    val lastRequestSent: AtomicLong = AtomicLong()
+)
+
+enum class EventType {
+    newClientConnection,
+    closedClientConnection,
+    clientData
+}
+
+data class Event(
+    val eventType: EventType,
+    val evChargingStationClient: EvChargingStationClient,
+    val clientData: DataResponse?
 )
 
 enum class RequestType(val value: Int) {
@@ -260,8 +287,7 @@ sealed class InboundPacket(
     val type: ResponseType
 )
 
-class PongResponse(
-) : InboundPacket(ResponseType.pongResponse) {
+class PongResponse : InboundPacket(ResponseType.pongResponse) {
     companion object {
         fun parse(msg: ByteArray) = PongResponse()
     }
@@ -276,7 +302,7 @@ class SetMaxChargeRateResponse(
 
 
 data class DataResponse(
-    val chargingState: ChargingState,
+    val chargingState: ChargingStationState,
     val chargeCurrentAmps: Int,
     val pilotVoltage: PilotVoltage,
     val proximityPilotAmps: ProximityPilotAmps,
@@ -288,7 +314,8 @@ data class DataResponse(
     val phase3Milliamps: Int,
     val wifiRSSI: Int,
     val systemUptime: Int,
-    val logMessages: List<String>
+    val logMessages: List<String>,
+    val utcTimestampInMs: Long = Instant.now().toEpochMilli()
 ) : InboundPacket(ResponseType.pongResponse) {
     companion object {
         fun parse(msg: ByteArray): DataResponse {
@@ -327,7 +354,7 @@ data class DataResponse(
             }
 
             return DataResponse(
-                ChargingState.values().first { it.value == msg[0].toInt() },
+                ChargingStationState.values().first { it.value == msg[0].toInt() },
                 msg[1].toInt(),
                 PilotVoltage.values().first { it.value == msg[2].toInt() },
                 ProximityPilotAmps.values().first { it.value == msg[3].toInt() },
@@ -360,6 +387,21 @@ data class DataResponse(
                 "systemUptime=$systemUptime)"
     }
 
+    fun map() = EvChargingStationData(
+        chargingState,
+        proximityPilotAmps,
+        chargeCurrentAmps,
+        phase1Millivolts,
+        phase2Millivolts,
+        phase3Millivolts,
+        phase1Milliamps,
+        phase2Milliamps,
+        phase3Milliamps,
+        systemUptime,
+        utcTimestampInMs
+    )
+
+    fun measuredCurrentInAmp() = listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!! / 1000
 
 }
 
@@ -368,14 +410,6 @@ fun readInt32Bits(buf: ByteArray, offset: Int): Int {
     byteBuffer.put(buf, offset, 4)
     byteBuffer.flip()
     return byteBuffer.getInt(0)
-}
-
-enum class ProximityPilotAmps(
-    val value: Int
-) {
-    Amp13(0),
-    Amp20(1),
-    Amp32(2),
 }
 
 enum class PilotVoltage(
@@ -387,17 +421,6 @@ enum class PilotVoltage(
     Volt_3(3),
     Volt_0(4),
     Volt_12Neg(5),
-}
-
-enum class ChargingState(
-    val value: Int
-) {
-    StatusA(0),
-    StatusB(1),
-    StatusC(2),
-    StatusD(3),
-    StatusE(4),
-    StatusF(5)
 }
 
 sealed class OutboundPacket(

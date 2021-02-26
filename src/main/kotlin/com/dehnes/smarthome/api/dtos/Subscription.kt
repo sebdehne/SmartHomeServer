@@ -19,5 +19,5 @@ data class Notify(
     val subscriptionId: String,
     val garageStatus: GarageStatus?,
     val underFloorHeaterStatus: UnderFloorHeaterStatus?,
-    val evChargingStationEvent: Event?
+    val evChargingStationEvent: EvChargingEvent?
 )

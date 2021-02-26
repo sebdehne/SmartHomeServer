@@ -3,9 +3,9 @@ package com.dehnes.smarthome.api
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
-import com.dehnes.smarthome.external.ev_charing_station.EVChargingStationConnection
 import com.dehnes.smarthome.service.GarageDoorService
 import com.dehnes.smarthome.service.UnderFloorHeaterService
+import com.dehnes.smarthome.service.ev_charging_station.EvChargingService
 import com.dehnes.smarthome.service.ev_charging_station.FirmwareUploadService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -26,8 +26,8 @@ class WebSocketServer {
     private val garageDoorService = configuration.getBean<GarageDoorService>(GarageDoorService::class)
     private val underFloopHeaterService = configuration.getBean<UnderFloorHeaterService>(UnderFloorHeaterService::class)
     private val subscriptions = mutableMapOf<String, Subscription<*>>()
-    private val evChargingStationConnection =
-        configuration.getBean<EVChargingStationConnection>(EVChargingStationConnection::class)
+    private val evChargingService =
+        configuration.getBean<EvChargingService>(EvChargingService::class)
     private val firmwareUploadService =
         configuration.getBean<FirmwareUploadService>(FirmwareUploadService::class)
 
@@ -65,7 +65,7 @@ class WebSocketServer {
                             subscriptionId,
                             argSession
                         ).apply {
-                            evChargingStationConnection.listeners[subscriptionId] = this::onEvent
+                            evChargingService.listeners[subscriptionId] = this::onEvent
                         }
                     }
 
@@ -103,13 +103,16 @@ class WebSocketServer {
 
     private fun evChargingStationRequest(request: EvChargingStationRequest) = when (request.type) {
         EvChargingStationRequestType.getConnectedClients -> EvChargingStationResponse(
-            connectedClients = evChargingStationConnection.getConnectedClients()
+            connectedClients = evChargingService.getConnectedClients()
         )
         EvChargingStationRequestType.uploadFirmwareToClient -> EvChargingStationResponse(
             uploadFirmwareToClientResult = firmwareUploadService.uploadVersion(
                 request.clientId!!,
                 request.firmwareBased64Encoded!!
             )
+        )
+        EvChargingStationRequestType.getData -> EvChargingStationResponse(
+            evChargingStationData = evChargingService.getData(request.clientId!!)
         )
     }
 
@@ -188,8 +191,8 @@ class WebSocketServer {
     inner class EvChargingStationSubscription(
         subscriptionId: String,
         sess: Session
-    ) : Subscription<Event>(subscriptionId, sess) {
-        override fun onEvent(e: Event) {
+    ) : Subscription<EvChargingEvent>(subscriptionId, sess) {
+        override fun onEvent(e: EvChargingEvent) {
             logger.info("$instanceId onEvent EvChargingStationSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
@@ -203,7 +206,7 @@ class WebSocketServer {
         }
 
         override fun close() {
-            evChargingStationConnection.listeners.remove(subscriptionId)
+            evChargingService.listeners.remove(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }

@@ -14,7 +14,7 @@ abstract class AbstractProcess(
     private val timer = Executors.newSingleThreadScheduledExecutor()
     private val runLock = ReentrantLock()
 
-    fun start() {
+    open fun start() {
         timer.scheduleAtFixedRate({
             executorService.submit {
                 try {

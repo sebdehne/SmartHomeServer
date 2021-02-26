@@ -190,7 +190,7 @@ const ClientComponent = (props: ClientComponentProps) => {
     return (
         <>
             <span>
-                Client {props.client.clientId}
+                {props.client.clientId}
             </span>
             <span> (currentVersion={props.client.firmwareVersion}, addr={props.client.addr}:{props.client.port})</span>
         </>
