@@ -46,7 +46,7 @@ data class EvChargingStationData(
     val chargingState: ChargingState,
     val chargingStateChangedAt: Long,
     val proximityPilotAmps: ProximityPilotAmps,
-    val chargingRate: Int,
+    val maxChargingRate: Int,
     val phase1Millivolts: Int,
     val phase2Millivolts: Int,
     val phase3Millivolts: Int,
