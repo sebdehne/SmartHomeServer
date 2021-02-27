@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.api.dtos
 
+import com.dehnes.smarthome.service.ev_charging_station.ChargingState
 import java.time.Instant
 
 enum class EvChargingEventType {
@@ -42,9 +43,10 @@ data class EvChargingStationClient(
 )
 
 data class EvChargingStationData(
-    val chargingState: ChargingStationState,
+    val chargingState: ChargingState,
+    val chargingStateChangedAt: Long,
     val proximityPilotAmps: ProximityPilotAmps,
-    val chargeCurrentAmps: Int,
+    val chargingRate: Int,
     val phase1Millivolts: Int,
     val phase2Millivolts: Int,
     val phase3Millivolts: Int,
@@ -69,13 +71,3 @@ enum class ProximityPilotAmps(
     Amp32(2),
 }
 
-enum class ChargingStationState(
-    val value: Int
-) {
-    StatusA(0),
-    StatusB(1),
-    StatusC(2),
-    StatusD(3),
-    StatusE(4),
-    StatusF(5)
-}

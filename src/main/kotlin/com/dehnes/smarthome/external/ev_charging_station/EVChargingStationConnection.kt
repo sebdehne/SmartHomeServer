@@ -1,8 +1,6 @@
 package com.dehnes.smarthome.external.ev_charging_station
 
-import com.dehnes.smarthome.api.dtos.ChargingStationState
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
-import com.dehnes.smarthome.api.dtos.EvChargingStationData
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.service.PersistenceService
 import mu.KotlinLogging
@@ -22,7 +20,7 @@ class EVChargingStationConnection(
     private val logger = KotlinLogging.logger { }
     private val chargerStationLogger = KotlinLogging.logger("ChargerStationLogger")
     private var serverSocket: ServerSocket? = null
-    private val connectedClientsById = ConcurrentHashMap<String, ClientConext>()
+    private val connectedClientsById = ConcurrentHashMap<String, ClientContext>()
     private val timer = Executors.newSingleThreadScheduledExecutor()
 
     val listeners = ConcurrentHashMap<String, (Event) -> Unit>()
@@ -36,7 +34,6 @@ class EVChargingStationConnection(
                     while (true) {
                         val clientSocket = serverSocket!!.accept()
                         logger.info { "New connection from ${clientSocket.toAddressString()}" }
-                        clientSocket.soTimeout = 4000
                         onNewClient(clientSocket)
                     }
                 } catch (t: Throwable) {
@@ -51,59 +48,43 @@ class EVChargingStationConnection(
 
     fun getConnectedClients() = connectedClientsById.values.map { it.evChargingStationClient }
 
-    fun ping(clientId: String) = doWithClient(clientId) { socket ->
+    fun ping(clientId: String) = doWithClient(clientId) { socket, getResponse ->
         send(socket, Ping())
-        readResponse(socket) is PongResponse
+        getResponse() is PongResponse
     }
 
     fun uploadFirmwareAndReboot(clientId: String, firmware: ByteArray) {
-        doWithClient(clientId) { socket ->
+        doWithClient(clientId) { socket, inboundQueue ->
             send(socket, Firmware(firmware))
         }
     }
 
-    fun getData(clientId: String) = doWithClient(clientId) { socket ->
-        send(socket, GetData())
-        readResponse(socket) as DataResponse
+    fun collectData(clientId: String) = doWithClient(clientId) { socket, getResponse ->
+        send(socket, CollectDataRequest())
+        getResponse() as DataResponse
     }!!
 
-    fun sendMaxChargeRate(clientId: String, maxChargeAmp: Int) = try {
-        check(maxChargeAmp in 0..32) { "Invalid charge rate" }
-        doWithClient(clientId) { socket ->
-            send(socket, SetChargeRate(maxChargeAmp))
-            readResponse(socket) as SetMaxChargeRateResponse
+    fun setPwmPercent(clientId: String, pwmPercent: Int) = try {
+        check(pwmPercent in 0..100) { "Invalid pwn percent $pwmPercent" }
+        doWithClient(clientId) { socket, getResponse ->
+            send(socket, SetPwmPercent(pwmPercent))
+            getResponse() as SetPwmPercentResponse
             true
         }!!
     } catch (e: Exception) {
-        logger.error("Could not send max charge rate", e)
+        logger.error("Could not send pwm percent", e)
         false
     }
 
-    private fun readResponse(socket: Socket): InboundPacket {
-        // type
-        var read = socket.getInputStream().read()
-        check(read >= 0) { "Client disconnected" }
-        val responseType = ResponseType.fromValue(read)
-
-        // len- 4 bytes
-        val allocate = ByteBuffer.allocate(4)
-        while (allocate.hasRemaining()) {
-            read = socket.getInputStream().read()
-            check(read >= 0) { "Client disconnected" }
-            allocate.put(read.toByte())
-        }
-        val len = allocate.getInt(0)
-
-        // msg
-        val msg = ByteArray(len)
-        var bytesRead = 0
-        while (bytesRead < msg.size) {
-            read = socket.getInputStream().read(msg, bytesRead, msg.size - bytesRead)
-            check(read >= 0) { "Client disconnected $read" }
-            bytesRead += read
-        }
-
-        return responseType.parser(msg)
+    fun setContactorState(clientId: String, newState: Boolean) = try {
+        doWithClient(clientId) { socket, getResponse ->
+            send(socket, SetContactorState(newState))
+            getResponse() as SetContactorStateResponse
+            true
+        }!!
+    } catch (e: Exception) {
+        logger.error("Could not send pwm percent", e)
+        false
     }
 
     private fun send(socket: Socket, outboundPacket: OutboundPacket) {
@@ -123,34 +104,38 @@ class EVChargingStationConnection(
         socket.getOutputStream().flush()
     }
 
-    private fun <T> doWithClient(clientId: String, fn: (socket: Socket) -> T) =
+    private fun <T> doWithClient(clientId: String, fn: (socket: Socket, getResponse: () -> InboundPacket) -> T) =
         connectedClientsById[clientId]?.let { clientContext ->
             synchronized(clientContext) {
                 clientContext.lastRequestSent.set(System.currentTimeMillis())
                 try {
-                    fn(clientContext.socket)
+                    fn(clientContext.socket) {
+                        clientContext.inboundQueue.poll(5, TimeUnit.SECONDS)
+                            ?: error("Error while waiting for response")
+                    }
                 } catch (t: Throwable) {
                     logger.info(
                         "Got error against client=$clientId inet=${clientContext.socket.toAddressString()} - closing socket",
                         t
                     )
-                    closeContext(clientContext)
-                    connectedClientsById.remove(clientId)
+                    closeContext(clientId)
                     null
                 }
             }
         }
 
-    private fun closeContext(clientContext: ClientConext) {
-        clientContext.scheduledFuture.cancel(false)
-        closeSocket(clientContext.socket)
+    private fun closeContext(clientId: String) {
+        connectedClientsById.remove(clientId)?.let { clientContext ->
+            clientContext.scheduledFuture.cancel(false)
+            closeSocket(clientContext.socket)
 
-        executorService.submit {
-            listeners.values.forEach { fn ->
-                try {
-                    fn(Event(EventType.clientData, clientContext.evChargingStationClient, null))
-                } catch (e: Exception) {
-                    logger.error("", e)
+            executorService.submit {
+                listeners.values.forEach { fn ->
+                    try {
+                        fn(Event(EventType.closedClientConnection, clientContext.evChargingStationClient, null))
+                    } catch (e: Exception) {
+                        logger.error("", e)
+                    }
                 }
             }
         }
@@ -205,20 +190,60 @@ class EVChargingStationConnection(
                 firmwareVersion,
                 persistenceService.get("ChargePowerConnection.$clientIdStr", "unknown")!!
             )
-            logger.info { "New client connected $evChargingStationClient" }
 
-            // start timer
+            val inboundQueue: BlockingQueue<InboundPacket> = LinkedBlockingQueue()
+
+            // reader thread
+            executorService.submit {
+                logger.info { "New client connected $evChargingStationClient" }
+
+                try {
+                    while (true) {
+
+                        // type
+                        var read = socket.getInputStream().read()
+                        check(read >= 0) { "Client disconnected" }
+                        val responseType = InboundType.fromValue(read)
+
+                        // len- 4 bytes
+                        val allocate = ByteBuffer.allocate(4)
+                        while (allocate.hasRemaining()) {
+                            read = socket.getInputStream().read()
+                            check(read >= 0) { "Client disconnected" }
+                            allocate.put(read.toByte())
+                        }
+                        val len = allocate.getInt(0)
+
+                        // msg
+                        val msg = ByteArray(len)
+                        var bytesRead = 0
+                        while (bytesRead < msg.size) {
+                            read = socket.getInputStream().read(msg, bytesRead, msg.size - bytesRead)
+                            check(read >= 0) { "Client disconnected $read" }
+                            bytesRead += read
+                        }
+
+                        val inboundPacket = responseType.parser(msg)
+
+                        if (inboundPacket.type == InboundType.notifyDataChanged) {
+                            executorService.submit {
+                                collectDataAndDistribute(evChargingStationClient)
+                            }
+                        } else {
+                            inboundQueue.offer(inboundPacket);
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.info { "Connection error for client $evChargingStationClient" }
+                    closeContext(clientIdStr)
+                }
+            }
+
+            // keep-alive timer
             val timerRef = timer.scheduleAtFixedRate(
                 {
                     executorService.submit {
-                        val data = getData(clientIdStr)
-                        logger.info { "Data response $data" }
-                        data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=$clientIdStr msg=$msg" } }
-                        executorService.submit {
-                            listeners.forEach { entry ->
-                                entry.value(Event(EventType.clientData, evChargingStationClient, data))
-                            }
-                        }
+                        collectDataAndDistribute(evChargingStationClient)
                     }
                 },
                 5,
@@ -226,7 +251,8 @@ class EVChargingStationConnection(
                 TimeUnit.SECONDS
             )
 
-            connectedClientsById[clientIdStr] = ClientConext(socket, timerRef, evChargingStationClient)
+            connectedClientsById[clientIdStr] =
+                ClientContext(socket, timerRef, evChargingStationClient, AtomicLong(), inboundQueue)
 
             executorService.submit {
                 listeners.values.forEach { fn ->
@@ -243,15 +269,27 @@ class EVChargingStationConnection(
         }
     }
 
+    private fun collectDataAndDistribute(evChargingStationClient: EvChargingStationClient) {
+        val data = collectData(evChargingStationClient.clientId)
+        logger.info { "Data response $data" }
+        data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=${evChargingStationClient.clientId} msg=$msg" } }
+        executorService.submit {
+            listeners.forEach { entry ->
+                entry.value(Event(EventType.clientData, evChargingStationClient, data))
+            }
+        }
+    }
+
 }
 
 fun Socket.toAddressString() = "${this.inetAddress}:${this.port}"
 
-class ClientConext(
+class ClientContext(
     val socket: Socket,
     val scheduledFuture: ScheduledFuture<*>,
     val evChargingStationClient: EvChargingStationClient,
-    val lastRequestSent: AtomicLong = AtomicLong()
+    val lastRequestSent: AtomicLong = AtomicLong(),
+    val inboundQueue: BlockingQueue<InboundPacket>
 )
 
 enum class EventType {
@@ -269,14 +307,17 @@ data class Event(
 enum class RequestType(val value: Int) {
     pingRequest(1),
     firmwareUpdate(2),
-    getData(3),
-    setChargeRateAmps(4)
+    collectData(3),
+    setPwmPercent(4),
+    setContactorState(5),
 }
 
-enum class ResponseType(val value: Int, val parser: (ByteArray) -> InboundPacket) {
+enum class InboundType(val value: Int, val parser: (ByteArray) -> InboundPacket) {
     pongResponse(1, PongResponse.Companion::parse),
-    dataResponse(2, DataResponse.Companion::parse),
-    setMaxChargeRateResponse(3, SetMaxChargeRateResponse.Companion::parse);
+    collectDataResponse(2, DataResponse.Companion::parse),
+    setPwmPercentResponse(3, SetPwmPercentResponse.Companion::parse),
+    setContactorStateResponse(4, SetContactorStateResponse.Companion::parse),
+    notifyDataChanged(100, NotifyDataChanged.Companion::parse);
 
     companion object {
         fun fromValue(value: Int) = values().first { it.value == value }
@@ -284,26 +325,37 @@ enum class ResponseType(val value: Int, val parser: (ByteArray) -> InboundPacket
 }
 
 sealed class InboundPacket(
-    val type: ResponseType
+    val type: InboundType
 )
 
-class PongResponse : InboundPacket(ResponseType.pongResponse) {
+class PongResponse : InboundPacket(InboundType.pongResponse) {
     companion object {
         fun parse(msg: ByteArray) = PongResponse()
     }
 }
 
-class SetMaxChargeRateResponse(
-) : InboundPacket(ResponseType.setMaxChargeRateResponse) {
+class NotifyDataChanged : InboundPacket(InboundType.notifyDataChanged) {
     companion object {
-        fun parse(msg: ByteArray) = SetMaxChargeRateResponse()
+        fun parse(msg: ByteArray) = NotifyDataChanged()
+    }
+}
+
+class SetPwmPercentResponse : InboundPacket(InboundType.setPwmPercentResponse) {
+    companion object {
+        fun parse(msg: ByteArray) = SetPwmPercentResponse()
+    }
+}
+
+class SetContactorStateResponse : InboundPacket(InboundType.setContactorStateResponse) {
+    companion object {
+        fun parse(msg: ByteArray) = SetContactorStateResponse()
     }
 }
 
 
 data class DataResponse(
-    val chargingState: ChargingStationState,
-    val chargeCurrentAmps: Int,
+    val conactorOn: Boolean,
+    val pwmPercent: Int,
     val pilotVoltage: PilotVoltage,
     val proximityPilotAmps: ProximityPilotAmps,
     val phase1Millivolts: Int,
@@ -316,14 +368,14 @@ data class DataResponse(
     val systemUptime: Int,
     val logMessages: List<String>,
     val utcTimestampInMs: Long = Instant.now().toEpochMilli()
-) : InboundPacket(ResponseType.pongResponse) {
+) : InboundPacket(InboundType.pongResponse) {
     companion object {
         fun parse(msg: ByteArray): DataResponse {
 
             /*
              * [field]            | size in bytes
-             * chargingState      | 1
-             * chargeCurrentAmps  | 1
+             * contactor          | 1
+             * pwmPercent         | 1
              * pilotVoltage       | 1
              * proximityPilotAmps | 1
              * phase1Millivolts   | 4
@@ -334,7 +386,6 @@ data class DataResponse(
              * phase3Milliamps    | 4
              * wifi RSSI          | 4 (signed int)
              * system uptime      | 4
-             * bytesLogged        | 4
              * logBuffer          | remaining
              */
 
@@ -354,7 +405,7 @@ data class DataResponse(
             }
 
             return DataResponse(
-                ChargingStationState.values().first { it.value == msg[0].toInt() },
+                msg[0].toInt() == 1,
                 msg[1].toInt(),
                 PilotVoltage.values().first { it.value == msg[2].toInt() },
                 ProximityPilotAmps.values().first { it.value == msg[3].toInt() },
@@ -373,8 +424,8 @@ data class DataResponse(
 
     override fun toString(): String {
         return "DataResponse(" +
-                "chargingState=$chargingState, " +
-                "chargeCurrentAmps=$chargeCurrentAmps, " +
+                "conactorOn=$conactorOn, " +
+                "pwmPercent=$pwmPercent, " +
                 "pilotVoltage=$pilotVoltage, " +
                 "proximityPilotAmps=$proximityPilotAmps, " +
                 "phase1Millivolts=$phase1Millivolts, " +
@@ -386,20 +437,6 @@ data class DataResponse(
                 "wifiRSSI=$wifiRSSI, " +
                 "systemUptime=$systemUptime)"
     }
-
-    fun map() = EvChargingStationData(
-        chargingState,
-        proximityPilotAmps,
-        chargeCurrentAmps,
-        phase1Millivolts,
-        phase2Millivolts,
-        phase3Millivolts,
-        phase1Milliamps,
-        phase2Milliamps,
-        phase3Milliamps,
-        systemUptime,
-        utcTimestampInMs
-    )
 
     fun measuredCurrentInAmp() = listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!! / 1000
 
@@ -419,8 +456,8 @@ enum class PilotVoltage(
     Volt_9(1),
     Volt_6(2),
     Volt_3(3),
-    Volt_0(4),
-    Volt_12Neg(5),
+    Fault(4);
+
 }
 
 sealed class OutboundPacket(
@@ -433,14 +470,20 @@ class Ping : OutboundPacket(RequestType.pingRequest) {
     override fun serializedMessage() = byteArrayOf()
 }
 
-class GetData : OutboundPacket(RequestType.getData) {
+class CollectDataRequest : OutboundPacket(RequestType.collectData) {
     override fun serializedMessage() = byteArrayOf()
 }
 
-class SetChargeRate(
-    val maxChargeAmp: Int
-) : OutboundPacket(RequestType.setChargeRateAmps) {
-    override fun serializedMessage() = byteArrayOf(maxChargeAmp.toByte())
+class SetPwmPercent(
+    val pwmPercent: Int
+) : OutboundPacket(RequestType.setPwmPercent) {
+    override fun serializedMessage() = byteArrayOf(pwmPercent.toByte())
+}
+
+class SetContactorState(
+    val newState: Boolean
+) : OutboundPacket(RequestType.setContactorState) {
+    override fun serializedMessage() = byteArrayOf(if (newState) 1 else 0)
 }
 
 class Firmware(
