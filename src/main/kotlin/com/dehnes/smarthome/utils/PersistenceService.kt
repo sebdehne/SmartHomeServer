@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.service
+package com.dehnes.smarthome.utils
 
 import java.io.File
 import java.io.FileInputStream

@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.external
+package com.dehnes.smarthome.rf433
 
 import mu.KotlinLogging
 import java.io.Closeable
@@ -13,7 +13,10 @@ import java.util.concurrent.atomic.AtomicInteger
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
 
-class SerialConnection(
+/*
+ * Send and receive messages over RF 433Mhz (using a TCP 2 serial-port bridge)
+ */
+class Rf433Client(
     private val executorService: ExecutorService,
     host: String = "localhost",
     port: Int = 23000,

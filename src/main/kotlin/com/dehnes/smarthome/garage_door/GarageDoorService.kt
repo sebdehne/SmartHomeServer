@@ -1,16 +1,16 @@
-package com.dehnes.smarthome.service
+package com.dehnes.smarthome.garage_door
 
 import com.dehnes.smarthome.api.dtos.DoorStatus
 import com.dehnes.smarthome.api.dtos.GarageStatus
-import com.dehnes.smarthome.external.InfluxDBClient
-import com.dehnes.smarthome.external.RfPacket
-import com.dehnes.smarthome.external.SerialConnection
-import com.dehnes.smarthome.math.merge
+import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.utils.merge
+import com.dehnes.smarthome.rf433.Rf433Client
+import com.dehnes.smarthome.rf433.RfPacket
 import mu.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
 
 class GarageDoorService(
-    private val serialConnection: SerialConnection,
+    private val rf433Client: Rf433Client,
     private val influxDBClient: InfluxDBClient
 ) {
     private val logger = KotlinLogging.logger { }
@@ -148,7 +148,7 @@ class GarageDoorService(
     }
 
     private fun sendCommandInternal(openCommand: Boolean) = try {
-        serialConnection.send(
+        rf433Client.send(
             RfPacket(
                 rfAddr, intArrayOf(if (openCommand) 1 else 2)
             )

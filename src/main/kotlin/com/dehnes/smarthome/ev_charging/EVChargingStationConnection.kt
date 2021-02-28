@@ -1,8 +1,8 @@
-package com.dehnes.smarthome.external.ev_charging_station
+package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
-import com.dehnes.smarthome.service.PersistenceService
+import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
 import java.net.ServerSocket
 import java.net.Socket
@@ -230,7 +230,7 @@ class EVChargingStationConnection(
                                 collectDataAndDistribute(evChargingStationClient)
                             }
                         } else {
-                            inboundQueue.offer(inboundPacket);
+                            inboundQueue.offer(inboundPacket)
                         }
                     }
                 } catch (e: Exception) {

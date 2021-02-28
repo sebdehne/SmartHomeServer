@@ -3,10 +3,10 @@ package com.dehnes.smarthome.api
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
-import com.dehnes.smarthome.service.GarageDoorService
-import com.dehnes.smarthome.service.UnderFloorHeaterService
-import com.dehnes.smarthome.service.ev_charging_station.EvChargingService
-import com.dehnes.smarthome.service.ev_charging_station.FirmwareUploadService
+import com.dehnes.smarthome.ev_charging.FirmwareUploadService
+import com.dehnes.smarthome.garage_door.GarageDoorService
+import com.dehnes.smarthome.heating.UnderFloorHeaterService
+import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging

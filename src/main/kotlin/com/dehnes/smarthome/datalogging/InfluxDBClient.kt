@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.external
+package com.dehnes.smarthome.datalogging
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -27,7 +27,7 @@ class InfluxDBClient(
     private var dbCreated = false
 
 
-    fun InfluxDBConnector() {
+    init {
         createDb()
     }
 
@@ -35,7 +35,7 @@ class InfluxDBClient(
         if (dbCreated) {
             return
         }
-        logger.info("About  to (re-)create DB in influxDb")
+        logger.info("About to (re-)create DB in influxDb")
         val createDbQuery = "CREATE DATABASE $dbName"
         val retentionPolicy = "alter RETENTION POLICY default ON sensor_data DURATION 260w" // 5 years
         //
@@ -45,35 +45,6 @@ class InfluxDBClient(
             dbCreated = true
         } catch (e: IOException) {
             logger.warn("", e)
-        }
-    }
-
-    fun recordSensorData(
-        name: String,
-        temp: String?,
-        humidity: String?,
-        counter: String?,
-        light: String?,
-        batVolt: String?
-    ) {
-        val values: MutableList<Pair<String, String>> = LinkedList()
-        if (temp != null) {
-            values.add("temperature" to temp)
-        }
-        if (humidity != null) {
-            values.add("humidity" to humidity)
-        }
-        if (counter != null) {
-            values.add("counter" to counter)
-        }
-        if (light != null) {
-            values.add("light" to light)
-        }
-        if (batVolt != null) {
-            values.add("battery_volt" to batVolt)
-        }
-        if (values.size > 0) {
-            recordSensorData("sensor", values, "room" to name)
         }
     }
 

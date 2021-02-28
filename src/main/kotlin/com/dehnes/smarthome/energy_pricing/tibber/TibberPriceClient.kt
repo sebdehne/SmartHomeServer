@@ -1,6 +1,6 @@
-package com.dehnes.smarthome.external
+package com.dehnes.smarthome.energy_pricing.tibber
 
-import com.dehnes.smarthome.service.PersistenceService
+import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging

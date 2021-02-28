@@ -1,6 +1,6 @@
 package com.dehnes.smarthome.api.dtos
 
-import com.dehnes.smarthome.service.ev_charging_station.ChargingState
+import com.dehnes.smarthome.ev_charging.ChargingState
 import java.time.Instant
 
 enum class EvChargingEventType {

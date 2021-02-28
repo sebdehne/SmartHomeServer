@@ -1,13 +1,9 @@
-package com.dehnes.smarthome.service.ev_charging_station
+package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.*
-import com.dehnes.smarthome.external.ev_charging_station.DataResponse
-import com.dehnes.smarthome.external.ev_charging_station.EVChargingStationConnection
-import com.dehnes.smarthome.external.ev_charging_station.EventType
-import com.dehnes.smarthome.external.ev_charging_station.PilotVoltage
-import com.dehnes.smarthome.service.PersistenceService
-import com.dehnes.smarthome.service.TibberService
-import com.dehnes.smarthome.service.ev_charging_station.ChargingState.*
+import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.ev_charging.ChargingState.*
+import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
 import java.lang.Integer.max
 import java.lang.Integer.min

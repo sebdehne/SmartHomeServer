@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.service
+package com.dehnes.smarthome.utils
 
 import org.slf4j.Logger
 import java.util.concurrent.ExecutorService

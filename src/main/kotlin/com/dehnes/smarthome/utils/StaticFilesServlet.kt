@@ -6,11 +6,11 @@ import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
 class StaticFilesServlet : HttpServlet() {
-    val logger = KotlinLogging.logger {  }
+    val logger = KotlinLogging.logger { }
     override fun doGet(req: HttpServletRequest, resp: HttpServletResponse) {
 
         val resourceName = pathToResource(req.pathInfo)
-        val resource = Thread.currentThread().getContextClassLoader().getResource("webapp/$resourceName")
+        val resource = Thread.currentThread().contextClassLoader.getResource("webapp/$resourceName")
 
         if (resource == null) {
             resp.status = 404

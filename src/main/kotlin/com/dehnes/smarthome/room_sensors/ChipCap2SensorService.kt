@@ -1,8 +1,8 @@
-package com.dehnes.smarthome.service
+package com.dehnes.smarthome.room_sensors
 
-import com.dehnes.smarthome.external.InfluxDBClient
-import com.dehnes.smarthome.external.RfPacket
-import com.dehnes.smarthome.math.merge
+import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.utils.merge
+import com.dehnes.smarthome.rf433.RfPacket
 import mu.KotlinLogging
 import java.time.Instant
 import kotlin.math.absoluteValue

@@ -1,8 +1,9 @@
 package com.dehnes.smarthome.service
 
-import com.dehnes.smarthome.external.RfPacket
-import com.dehnes.smarthome.service.ChipCap2SensorService.Companion.calcVoltage
-import com.dehnes.smarthome.service.ChipCap2SensorService.Companion.getAdcValue
+import com.dehnes.smarthome.rf433.RfPacket
+import com.dehnes.smarthome.room_sensors.ChipCap2SensorService
+import com.dehnes.smarthome.room_sensors.ChipCap2SensorService.Companion.calcVoltage
+import com.dehnes.smarthome.room_sensors.ChipCap2SensorService.Companion.getAdcValue
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 

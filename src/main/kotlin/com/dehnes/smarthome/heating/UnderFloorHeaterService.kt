@@ -1,11 +1,14 @@
-package com.dehnes.smarthome.service
+package com.dehnes.smarthome.heating
 
 import com.dehnes.smarthome.api.dtos.*
-import com.dehnes.smarthome.external.InfluxDBClient
-import com.dehnes.smarthome.external.RfPacket
-import com.dehnes.smarthome.external.SerialConnection
-import com.dehnes.smarthome.math.Sht15SensorService
-import com.dehnes.smarthome.math.Sht15SensorService.getRelativeHumidity
+import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.rf433.Rf433Client
+import com.dehnes.smarthome.rf433.RfPacket
+import com.dehnes.smarthome.utils.AbstractProcess
+import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.utils.Sht15Calculator
+import com.dehnes.smarthome.utils.Sht15Calculator.calculateRelativeHumidity
 import mu.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
@@ -21,7 +24,7 @@ private const val OPERATING_MODE = "HeatingControllerService.operatingMode"
 private const val MOSTEXPENSIVEHOURSTOSKIP_KEY = "HeatingControllerService.mostExpensiveHoursToSkip"
 
 class UnderFloorHeaterService(
-    private val serialConnection: SerialConnection,
+    private val rf433Client: Rf433Client,
     executorService: ExecutorService,
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
@@ -215,7 +218,7 @@ class UnderFloorHeaterService(
         msgListener = { rfPacket -> inMsg.offer(rfPacket) }
         try {
             repeat(5) {
-                serialConnection.send(RfPacket(rfAddr, intArrayOf(finalCommand)))
+                rf433Client.send(RfPacket(rfAddr, intArrayOf(finalCommand)))
                 val response = inMsg.poll(500, TimeUnit.MILLISECONDS)
                 if (response != null) {
                     return response
@@ -268,8 +271,8 @@ data class UnderFloorSensorData(
 ) {
     companion object {
         fun fromRfPacket(p: RfPacket): UnderFloorSensorData {
-            val temperature = Sht15SensorService.getTemperature(p)
-            val humidity = getRelativeHumidity(p, temperature)
+            val temperature = Sht15Calculator.calculateTermperature(p)
+            val humidity = calculateRelativeHumidity(p, temperature)
             val heaterStatus = p.message[4] == 1
 
             return UnderFloorSensorData(

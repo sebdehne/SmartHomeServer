@@ -1,12 +1,15 @@
 package com.dehnes.smarthome
 
-import com.dehnes.smarthome.external.ev_charging_station.EVChargingStationConnection
-import com.dehnes.smarthome.external.InfluxDBClient
-import com.dehnes.smarthome.external.SerialConnection
-import com.dehnes.smarthome.external.TibberPriceClient
-import com.dehnes.smarthome.service.*
-import com.dehnes.smarthome.service.ev_charging_station.EvChargingService
-import com.dehnes.smarthome.service.ev_charging_station.FirmwareUploadService
+import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.ev_charging.FirmwareUploadService
+import com.dehnes.smarthome.ev_charging.EVChargingStationConnection
+import com.dehnes.smarthome.garage_door.GarageDoorService
+import com.dehnes.smarthome.heating.UnderFloorHeaterService
+import com.dehnes.smarthome.rf433.Rf433Client
+import com.dehnes.smarthome.room_sensors.ChipCap2SensorService
+import com.dehnes.smarthome.ev_charging.EvChargingService
+import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Clock
@@ -24,7 +27,7 @@ class Configuration {
         val influxDBClient = InfluxDBClient(objectMapper, System.getProperty("DST_HOST"))
         val persistenceService = PersistenceService()
 
-        val serialConnection = SerialConnection(executorService, System.getProperty("DST_HOST"))
+        val serialConnection = Rf433Client(executorService, System.getProperty("DST_HOST"))
         serialConnection.start()
 
         val garageDoorService = GarageDoorService(serialConnection, influxDBClient)
@@ -32,7 +35,8 @@ class Configuration {
 
         val tibberService = TibberService(
             Clock.systemDefaultZone(),
-            TibberPriceClient(objectMapper, persistenceService),
+            objectMapper,
+            persistenceService,
             influxDBClient,
             executorService
         )
@@ -65,7 +69,7 @@ class Configuration {
         serialConnection.listeners.add(garageDoorService::handleIncoming)
         serialConnection.listeners.add(chipCap2SensorService::handleIncoming)
 
-        beans[SerialConnection::class] = serialConnection
+        beans[Rf433Client::class] = serialConnection
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageDoorService::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
