@@ -9,6 +9,7 @@ import com.dehnes.smarthome.service.PersistenceService
 import com.dehnes.smarthome.service.TibberService
 import com.dehnes.smarthome.service.ev_charging_station.ChargingState.*
 import mu.KotlinLogging
+import java.lang.Integer.min
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import kotlin.math.roundToInt
@@ -292,23 +293,19 @@ class EvChargingService(
                     }
                 } else {
                     // still charging
-                    var measuredChargeRateLowSince = existingState.measuredChargeRateLowSince
-
-                    val isUsingLess =
-                        dataResponse.measuredCurrentInAmp() < existingState.maxChargingRate - chargingEndingAmpDelta
-                    if (!isUsingLess) {
-                        measuredChargeRateLowSince = null
-                    } else {
-                        if (measuredChargeRateLowSince == null) {
-                            measuredChargeRateLowSince = System.currentTimeMillis()
-                        }
+                    var goesToEnding = false
+                    var measuredChargeRatePeak = existingState.measuredChargeRatePeak
+                    if (measuredChargeRatePeak == null || dataResponse.measuredCurrentInAmp() >= measuredChargeRatePeak) {
+                        measuredChargeRatePeak = dataResponse.measuredCurrentInAmp()
+                    } else if (dataResponse.measuredCurrentInAmp() < measuredChargeRatePeak - chargingEndingAmpDelta) {
+                        goesToEnding = true
                     }
+
                     if (canCharge) {
-                        if (measuredChargeRateLowSince != null && System.currentTimeMillis() - measuredChargeRateLowSince > chargingEndingTimeDeltaInMs) {
-                            existingState.changeState(ChargingEnding)
-                                .copy(measuredChargeRateLowSince = null)
+                        if (goesToEnding) {
+                            existingState.changeState(ChargingEnding).copy(measuredChargeRatePeak = null)
                         } else {
-                            existingState
+                            existingState.copy(measuredChargeRatePeak = measuredChargeRatePeak)
                         }
                     } else {
                         existingState.changeState(StoppingCharging, LOWEST_MAX_CHARGE_RATE)
@@ -437,31 +434,47 @@ class EvChargingService(
             }
         }
 
-        // reclaim from ending stations
+        // reclaim from stations which are not using their capacity (ending or proximity)
         changed
-            .filter { it.value.chargingState == ChargingEnding }
+            .filter { it.value.chargingState == ChargingEnding || it.value.maxChargingRate > it.value.dataResponse.proximityPilotAmps.toAmps() }
             .forEach { (clientId, internalState) ->
-                val breakpoint = internalState.maxChargingRate - chargingEndingAmpDelta
-                val capacityNotUsing = breakpoint - internalState.dataResponse.measuredCurrentInAmp()
+                var state = internalState
+
+                if (state.maxChargingRate > state.dataResponse.proximityPilotAmps.toAmps()) {
+                    val cannotUse = state.maxChargingRate - state.dataResponse.proximityPilotAmps.toAmps()
+                    availableCapacity += cannotUse
+                    state = state.setMaxChargeRate(state.maxChargingRate - cannotUse)
+                }
+
+                val breakpoint = state.maxChargingRate - chargingEndingAmpDelta
+                val capacityNotUsing = breakpoint - state.dataResponse.measuredCurrentInAmp()
                 if (capacityNotUsing > 0) {
                     availableCapacity += capacityNotUsing
-                    changed[clientId] =
-                        internalState.setMaxChargeRate(internalState.maxChargingRate - capacityNotUsing)
+                    state = state.setMaxChargeRate(state.maxChargingRate - capacityNotUsing)
                 }
+
+                changed[clientId] = state
             }
 
-        // give reclaimed to those charging
-        if (availableCapacity > 0) {
-            val stationsChargingButNotEnding = changed
-                .filter { it.value.chargingState.isChargingButNotEnding() }
-            val addToMaxChargingRate = availableCapacity / stationsChargingButNotEnding.count()
-            stationsChargingButNotEnding.forEach { (clientId, internalState) ->
-                val ampsToAdd = requestCapability(addToMaxChargingRate)
+        // give reclaimed to those which are capable of getting more
+        while (true) {
+            val stationsWhichWantMore = changed
+                .filter { it.value.chargingState.isChargingButNotEnding() && it.value.dataResponse.proximityPilotAmps.toAmps() > it.value.maxChargingRate }
+
+            if (stationsWhichWantMore.isEmpty() || availableCapacity == 0) {
+                break
+            }
+
+            val addToMaxChargingRate = availableCapacity / stationsWhichWantMore.count()
+
+            stationsWhichWantMore.forEach { (clientId, internalState) ->
+                val headRoom = internalState.dataResponse.proximityPilotAmps.toAmps() - internalState.maxChargingRate
+                val ampsToAdd = requestCapability(min(headRoom, addToMaxChargingRate))
                 changed[clientId] = internalState.setMaxChargeRate(internalState.maxChargingRate + ampsToAdd)
             }
         }
 
-        // Move on from the requested-state
+        // Move onwards from the requested-state
         changed
             .filter { it.value.chargingState == ChargingRequested }
             .forEach { (clientId, state) ->
@@ -534,7 +547,8 @@ data class InternalState(
     val dataResponse: DataResponse,
     val maxChargingRate: Int, // a value in the range og 6..32
 
-    val measuredChargeRateLowSince: Long?,
+    val measuredChargeRatePeak: Int?,
+
     val reasonChargingUnavailable: String?
 ) {
 

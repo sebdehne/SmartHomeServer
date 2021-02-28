@@ -69,6 +69,12 @@ enum class ProximityPilotAmps(
 ) {
     Amp13(0),
     Amp20(1),
-    Amp32(2),
+    Amp32(2);
+
+    fun toAmps() = when (this) {
+        Amp13 -> 13
+        Amp20 -> 20
+        Amp32 -> 32
+    }
 }
 
