@@ -5,6 +5,7 @@ import com.dehnes.smarthome.external.InfluxDBClient
 import com.dehnes.smarthome.external.SerialConnection
 import com.dehnes.smarthome.external.TibberPriceClient
 import com.dehnes.smarthome.service.*
+import com.dehnes.smarthome.service.ev_charging_station.EvChargingService
 import com.dehnes.smarthome.service.ev_charging_station.FirmwareUploadService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -49,6 +50,15 @@ class Configuration {
         val evChargingStationConnection = EVChargingStationConnection(9091, executorService, persistenceService)
         evChargingStationConnection.start()
 
+        val evChargingService = EvChargingService(
+            evChargingStationConnection,
+            executorService,
+            tibberService,
+            persistenceService,
+            Clock.systemDefaultZone()
+        )
+        evChargingService.start()
+
         val firmwareUploadService = FirmwareUploadService(evChargingStationConnection)
 
         serialConnection.listeners.add(heaterService::onRfMessage)
@@ -61,6 +71,7 @@ class Configuration {
         beans[ObjectMapper::class] = objectMapper
         beans[EVChargingStationConnection::class] = evChargingStationConnection
         beans[FirmwareUploadService::class] = firmwareUploadService
+        beans[EvChargingService::class] = evChargingService
     }
 
     fun <T> getBean(klass: KClass<*>): T {

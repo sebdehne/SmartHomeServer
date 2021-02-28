@@ -271,7 +271,7 @@ class EVChargingStationConnection(
 
     private fun collectDataAndDistribute(evChargingStationClient: EvChargingStationClient) {
         val data = collectData(evChargingStationClient.clientId)
-        logger.info { "Data response $data" }
+        logger.info { "Data response for ${evChargingStationClient.clientId} $data" }
         data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=${evChargingStationClient.clientId} msg=$msg" } }
         executorService.submit {
             listeners.forEach { entry ->
