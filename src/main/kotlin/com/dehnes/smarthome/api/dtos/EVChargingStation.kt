@@ -44,6 +44,7 @@ data class EvChargingStationClient(
 
 data class EvChargingStationData(
     val chargingState: ChargingState,
+    val reasonChargingUnavailable: String?,
     val chargingStateChangedAt: Long,
     val proximityPilotAmps: ProximityPilotAmps,
     val maxChargingRate: Int,
