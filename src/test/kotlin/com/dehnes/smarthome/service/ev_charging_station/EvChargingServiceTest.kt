@@ -57,8 +57,8 @@ internal class EvChargingServiceTest {
             )
         } answers {
             val key = keySlot.captured
-            if (key.startsWith("EvChargingMode.")) {
-                val clientId = key.split(".")[1]
+            if (key.startsWith("EvChargingService.client.mode.")) {
+                val clientId = key.split(".")[3]
                 if (clientId in currentModes) {
                     currentModes[clientId]!!.name
                 } else {
@@ -168,7 +168,7 @@ internal class EvChargingServiceTest {
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(32), s1.pwmPercent)
         assertFalse(s2.contactorOn)
-        assertEquals(11, s2.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(LOWEST_MAX_CHARGE_RATE), s2.pwmPercent)
 
         // Second car starts charging
         s2.pilotVoltage = PilotVoltage.Volt_6
@@ -200,6 +200,7 @@ internal class EvChargingServiceTest {
         assertTrue(s2.contactorOn)
         assertEquals(26, s2.pwmPercent)
 
+        // Car 1 rate declining below threshold
         s1.setMeasuredCurrent(13)
         s2.setMeasuredCurrent(16)
         collectDataCycle()
@@ -208,6 +209,7 @@ internal class EvChargingServiceTest {
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(17), s2.pwmPercent)
 
+        // Car 1 rate declining below threshold
         s1.setMeasuredCurrent(10)
         s2.setMeasuredCurrent(16)
         collectDataCycle()
@@ -216,6 +218,7 @@ internal class EvChargingServiceTest {
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(20), s2.pwmPercent)
 
+        // Car 1 rate declining below threshold
         s1.setMeasuredCurrent(1)
         s2.setMeasuredCurrent(16)
         collectDataCycle()
@@ -224,6 +227,7 @@ internal class EvChargingServiceTest {
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(26), s2.pwmPercent)
 
+        // Car 1 rate declining below threshold
         s1.setMeasuredCurrent(0)
         s2.setMeasuredCurrent(16)
         collectDataCycle()
@@ -248,7 +252,7 @@ internal class EvChargingServiceTest {
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
 
-        // Car 1 - manually stopped
+        // Car 1 - stopped from app
         currentModes[s1.clientId] = EvChargingMode.OFF
         collectDataCycle()
         assertTrue(s1.contactorOn)

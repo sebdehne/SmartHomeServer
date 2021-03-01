@@ -72,11 +72,12 @@ class EvChargingService(
     private val currentData = ConcurrentHashMap<String, InternalState>()
 
     // config
-    private val chargingEndingAmpDelta = persistenceService.get("chargingEndingAmpDelta", "2")!!.toInt()
+    private val chargingEndingAmpDelta =
+        persistenceService.get("EvChargingService.chargingEndingAmpDelta", "2")!!.toInt()
     private val stayInStoppingChargingForMS =
-        persistenceService.get("stayInStoppingChargingForMS", (1000 * 5).toString())!!.toLong()
+        persistenceService.get("EvChargingService.stayInStoppingChargingForMS", (1000 * 5).toString())!!.toLong()
     private val assumeStationLostAfterMs =
-        persistenceService.get("assumeStationLostAfterMs", (1000 * 60 * 5).toString())!!.toLong()
+        persistenceService.get("EvChargingService.assumeStationLostAfterMs", (1000 * 60 * 5).toString())!!.toLong()
 
     val logger = KotlinLogging.logger { }
 
@@ -85,53 +86,67 @@ class EvChargingService(
         // start listening for incoming events from the charging stations
         eVChargingStationConnection.listeners[this::class.qualifiedName!!] = { event ->
             when (event.eventType) {
-                EventType.newClientConnection -> executorService.submit {
-                    listeners.forEach { (_, fn) ->
-                        fn(EvChargingEvent(EvChargingEventType.newConnection, event.evChargingStationClient, null))
-                    }
-                }
-                EventType.closedClientConnection -> {
-                    executorService.submit {
-                        listeners.forEach { (_, fn) ->
-                            fn(
-                                EvChargingEvent(
-                                    EvChargingEventType.closedConnection,
-                                    event.evChargingStationClient,
-                                    null
-                                )
-                            )
-                        }
-                    }
-                }
                 EventType.clientData -> {
                     onIncomingDataUpdate(event.evChargingStationClient, event.clientData!!)?.let { updatedState ->
                         executorService.submit {
                             listeners.forEach { (_, fn) ->
                                 fn(
                                     EvChargingEvent(
-                                        EvChargingEventType.data,
-                                        event.evChargingStationClient,
-                                        updatedState.export()
+                                        EvChargingEventType.chargingStationDataAndConfig,
+                                        toEvChargingStationDataAndConfig(updatedState)
                                     )
                                 )
                             }
                         }
                     }
                 }
+                else -> logger.debug { "Ignored ${event.eventType}" }
             }
         }
     }
 
     fun getConnectedClients() = eVChargingStationConnection.getConnectedClients()
-    fun getData(clientId: String) = currentData[clientId]?.export()
 
-    fun updateMode(clientId: String, evChargingMode: EvChargingMode) {
-        persistenceService["EvChargingMode.$clientId"] = evChargingMode.name
+    fun getChargingStationsDataAndConfig() = currentData.map { entry ->
+        toEvChargingStationDataAndConfig(entry.value)
+    }
+
+    fun updateMode(clientId: String, evChargingMode: EvChargingMode): Boolean {
+        persistenceService["EvChargingService.client.mode.$clientId"] = evChargingMode.name
+        return true
     }
 
     fun getMode(clientId: String) =
-        persistenceService.get("EvChargingMode.$clientId", EvChargingMode.ChargeDuringCheapHours.name)!!
+        persistenceService.get("EvChargingService.client.mode.$clientId", EvChargingMode.ChargeDuringCheapHours.name)!!
             .let { EvChargingMode.valueOf(it) }
+
+    fun getNumberOfHoursRequiredFor(clientId: String) = persistenceService.get(
+        "EvChargingService.client.numberOfHoursRequired.$clientId",
+        "4"
+    )!!.toInt()
+
+    fun setNumberOfHoursRequiredFor(clientId: String, numberOfHoursRequiredFor: Int): Boolean {
+        persistenceService.set(
+            "EvChargingService.client.numberOfHoursRequired.$clientId",
+            numberOfHoursRequiredFor.toString()
+        )
+        return true
+    }
+
+    fun setPriorityFor(clientId: String, loadSharingPriority: LoadSharingPriority) = synchronized(this) {
+        persistenceService.set("EvChargingService.client.priorty.$clientId", loadSharingPriority.name)
+        var result = false
+        currentData.computeIfPresent(clientId) { _, internalState ->
+            result = true
+            internalState.copy(loadSharingPriority = loadSharingPriority)
+        }
+        result
+    }
+
+    fun getPriorityFor(clientId: String) =
+        persistenceService.get("EvChargingService.client.priorty.$clientId", LoadSharingPriority.NORMAL.name)!!.let {
+            LoadSharingPriority.valueOf(it)
+        }
 
 
     internal fun onIncomingDataUpdate(
@@ -149,6 +164,7 @@ class EvChargingService(
                 evChargingStationClient,
                 chargingState,
                 clock.millis(),
+                getPriorityFor(clientId),
                 dataResponse,
                 if (chargingState.pwmOn()) dataResponse.pwmPercentToChargingRate() else LOWEST_MAX_CHARGE_RATE,
                 null,
@@ -166,12 +182,7 @@ class EvChargingService(
          * B) Figure out if the charging stations is allowed to charge at this point in time
          */
         val mode = getMode(clientId)
-        val energyPriceOK = tibberService.isEnergyPriceOK(
-            persistenceService.get(
-                "CheapestHours.$clientId",
-                "4"
-            )!!.toInt()
-        )
+        val energyPriceOK = tibberService.isEnergyPriceOK(getNumberOfHoursRequiredFor(clientId))
         var reasonCannotCharge: String? = null
         val canCharge = when {
             mode == EvChargingMode.ON -> true
@@ -377,14 +388,15 @@ class EvChargingService(
          * E) Rebalance loadsharing between active charging stations
          */
         val loadSharingAlgorithmId = persistenceService.get(
-            "powerConnectionId.loadSharingAlgorithm.$powerConnectionId",
+            "EvChargingService.powerConnection.loadSharingAlgorithm.$powerConnectionId",
             PriorityLoadSharing::class.java.simpleName
         )!!
         val loadSharingAlgorithm = loadSharingAlgorithms[loadSharingAlgorithmId]
             ?: error("Could not find loadSharingAlgorithmId=$loadSharingAlgorithmId")
         val changedStates = loadSharingAlgorithm.calculateLoadSharing(
             currentData,
-            powerConnectionId
+            powerConnectionId,
+            chargingEndingAmpDelta
         ) as List<InternalState>
 
         /*
@@ -473,6 +485,16 @@ class EvChargingService(
                 )
         }
     }
+
+    private fun toEvChargingStationDataAndConfig(internalState: InternalState) = EvChargingStationDataAndConfig(
+        internalState.export(),
+        EVChargingStationConfig(
+            getMode(internalState.clientId),
+            internalState.loadSharingPriority,
+            getNumberOfHoursRequiredFor(internalState.clientId)
+        ),
+        internalState.evChargingStationClient
+    )
 }
 
 data class InternalState(
@@ -481,6 +503,7 @@ data class InternalState(
     val evChargingStationClient: EvChargingStationClient,
     override val chargingState: ChargingState,
     val chargingStateChangedAt: Long,
+    val loadSharingPriority: LoadSharingPriority,
 
     val dataResponse: DataResponse,
     override val maxChargingRate: Int, // a value in the range og 6..32
@@ -494,6 +517,8 @@ data class InternalState(
         get() = dataResponse.proximityPilotAmps.toAmps()
     override val measuredCurrentInAmp: Int
         get() = dataResponse.measuredCurrentInAmp()
+    override val loadSharingPriorityValue: Int
+        get() = loadSharingPriority.value
 
     override fun setNoCapacityAvailable() = copy(
         chargingState = ConnectedChargingUnavailable,
@@ -533,6 +558,7 @@ data class InternalState(
         dataResponse.phase2Milliamps,
         dataResponse.phase3Milliamps,
         dataResponse.systemUptime,
+        dataResponse.wifiRSSI,
         dataResponse.utcTimestampInMs
     )
 

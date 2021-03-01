@@ -3,10 +3,10 @@ package com.dehnes.smarthome.api
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
+import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.garage_door.GarageDoorService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
-import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
@@ -61,7 +61,7 @@ class WebSocketServer {
                         ).apply {
                             underFloopHeaterService.listeners[subscriptionId] = this::onEvent
                         }
-                        SubscriptionType.evChargingStationConnections -> EvChargingStationSubscription(
+                        SubscriptionType.evChargingStationEvents -> EvChargingStationSubscription(
                             subscriptionId,
                             argSession
                         ).apply {
@@ -102,17 +102,29 @@ class WebSocketServer {
     }
 
     private fun evChargingStationRequest(request: EvChargingStationRequest) = when (request.type) {
-        EvChargingStationRequestType.getConnectedClients -> EvChargingStationResponse(
-            connectedClients = evChargingService.getConnectedClients()
-        )
         EvChargingStationRequestType.uploadFirmwareToClient -> EvChargingStationResponse(
             uploadFirmwareToClientResult = firmwareUploadService.uploadVersion(
                 request.clientId!!,
                 request.firmwareBased64Encoded!!
             )
         )
-        EvChargingStationRequestType.getData -> EvChargingStationResponse(
-            evChargingStationData = evChargingService.getData(request.clientId!!)
+        EvChargingStationRequestType.getChargingStationsDataAndConfig -> EvChargingStationResponse(
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+        )
+        EvChargingStationRequestType.setLoadSharingPriority -> EvChargingStationResponse(
+            configUpdated = evChargingService.setPriorityFor(request.clientId!!, request.newLoadSharingPriority!!),
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+        )
+        EvChargingStationRequestType.setMode -> EvChargingStationResponse(
+            configUpdated = evChargingService.updateMode(request.clientId!!, request.newMode!!),
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+        )
+        EvChargingStationRequestType.setNumberOfHoursRequiredFor -> EvChargingStationResponse(
+            configUpdated = evChargingService.setNumberOfHoursRequiredFor(
+                request.clientId!!,
+                request.newNumberOfHoursRequiredFor!!
+            ),
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
     }
 

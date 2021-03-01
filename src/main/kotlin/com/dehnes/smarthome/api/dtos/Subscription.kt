@@ -3,7 +3,7 @@ package com.dehnes.smarthome.api.dtos
 enum class SubscriptionType {
     getGarageStatus,
     getUnderFloorHeaterStatus,
-    evChargingStationConnections
+    evChargingStationEvents
 }
 
 data class Subscribe(

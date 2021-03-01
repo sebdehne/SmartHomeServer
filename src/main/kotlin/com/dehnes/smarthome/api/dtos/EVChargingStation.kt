@@ -1,36 +1,47 @@
 package com.dehnes.smarthome.api.dtos
 
 import com.dehnes.smarthome.ev_charging.ChargingState
+import com.dehnes.smarthome.ev_charging.LoadSharingPriority
 import java.time.Instant
 
 enum class EvChargingEventType {
-    newConnection,
-    closedConnection,
-    data
+    chargingStationDataAndConfig
 }
 
 data class EvChargingEvent(
     val type: EvChargingEventType,
-    val evChargingStationClient: EvChargingStationClient,
-    val evChargingStationData: EvChargingStationData?
+    val chargingStationsDataAndConfig: EvChargingStationDataAndConfig? = null,
 )
 
 enum class EvChargingStationRequestType {
-    getConnectedClients,
+    getChargingStationsDataAndConfig,
     uploadFirmwareToClient,
-    getData
+
+    setMode,
+    setLoadSharingPriority,
+    setNumberOfHoursRequiredFor
 }
 
 data class EvChargingStationRequest(
     val type: EvChargingStationRequestType,
     val clientId: String?,
     val firmwareBased64Encoded: String?,
+
+    val newMode: EvChargingMode?,
+    val newLoadSharingPriority: LoadSharingPriority?,
+    val newNumberOfHoursRequiredFor: Int?
 )
 
 data class EvChargingStationResponse(
-    val connectedClients: List<EvChargingStationClient>? = null,
+    val chargingStationsDataAndConfig: List<EvChargingStationDataAndConfig>? = null,
     val uploadFirmwareToClientResult: Boolean? = null,
-    val evChargingStationData: EvChargingStationData? = null
+    val configUpdated: Boolean? = null
+)
+
+data class EvChargingStationDataAndConfig(
+    val data: EvChargingStationData,
+    val config: EVChargingStationConfig,
+    val clientConnection: EvChargingStationClient
 )
 
 data class EvChargingStationClient(
@@ -55,7 +66,14 @@ data class EvChargingStationData(
     val phase2Milliamps: Int,
     val phase3Milliamps: Int,
     val systemUptime: Int,
+    val wifiRSSI: Int,
     val utcTimestampInMs: Long = Instant.now().toEpochMilli()
+)
+
+data class EVChargingStationConfig(
+    val mode: EvChargingMode,
+    val loadSharingPriority: LoadSharingPriority,
+    val numberOfHoursRequiredFor: Int
 )
 
 enum class EvChargingMode {

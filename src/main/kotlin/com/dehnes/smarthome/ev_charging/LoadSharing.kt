@@ -5,7 +5,11 @@ import com.dehnes.smarthome.utils.PersistenceService
 
 
 interface LoadSharing {
-    fun calculateLoadSharing(currentData: Map<String, LoadSharable>, powerConnectionId: String): List<LoadSharable>
+    fun calculateLoadSharing(
+        currentData: Map<String, LoadSharable>,
+        powerConnectionId: String,
+        chargingEndingAmpDelta: Int
+    ): List<LoadSharable>
 }
 
 interface LoadSharable {
@@ -14,6 +18,7 @@ interface LoadSharable {
     val proximityPilotAmps: Int
     val measuredCurrentInAmp: Int
     val maxChargingRate: Int
+    val loadSharingPriorityValue: Int
 
     fun setNoCapacityAvailable(): LoadSharable
     fun allowChargingWith(maxChargingRate: Int): LoadSharable
@@ -35,20 +40,10 @@ class PriorityLoadSharing(
     private val persistenceService: PersistenceService
 ) : LoadSharing {
 
-    private val chargingEndingAmpDelta = persistenceService.get("chargingEndingAmpDelta", "2")!!.toInt()
-
-    fun setPriorityFor(clientId: String, loadSharingPriority: LoadSharingPriority) {
-        persistenceService.set("PriorityLoadSharing.priority.$clientId", loadSharingPriority.name)
-    }
-
-    fun getPriorityFor(clientId: String) =
-        persistenceService.get("PriorityLoadSharing.priority.$clientId", LoadSharingPriority.NORMAL.name)!!.let {
-            LoadSharingPriority.valueOf(it)
-        }
-
     override fun calculateLoadSharing(
         currentData: Map<String, LoadSharable>,
-        powerConnectionId: String
+        powerConnectionId: String,
+        chargingEndingAmpDelta: Int
     ): List<LoadSharable> {
 
         /*
@@ -57,7 +52,7 @@ class PriorityLoadSharing(
         val loadSharableById =
             currentData.filter { it.value.powerConnectionId == powerConnectionId }.toMap().toMutableMap()
         var availableCapacity =
-            persistenceService.get("powerConnectionId.availableCapacity.$powerConnectionId", "32")!!.toInt()
+            persistenceService.get("PowerConnection.availableCapacity.$powerConnectionId", "32")!!.toInt()
         check(availableCapacity in 1..1000) { "AvailableCapacity outside of reasonable range? $availableCapacity" }
 
         val requestCapability = { request: Int ->
@@ -163,7 +158,7 @@ class PriorityLoadSharing(
     }
 
     private fun sortByPriority(input: Map<String, LoadSharable>) = input.toList()
-        .groupBy { getPriorityFor(it.first).value }
+        .groupBy { it.second.loadSharingPriorityValue }
         .mapValues { entry ->
             entry.value.toMap()
         }
