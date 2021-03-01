@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
     EvChargingMode,
+    EvChargingStationClient,
     EvChargingStationDataAndConfig,
     EvChargingStationRequest,
     EvChargingStationRequestType,
@@ -28,6 +29,7 @@ import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import WebsocketService from "../../Websocket/websocketClient";
 import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
+import { FirmwareUpload } from "./FirmwareUpload";
 
 type EvChargingStationProps = {
     setSending: (sending: boolean) => void;
@@ -203,6 +205,10 @@ export const EvChargingStation = ({
                                 systemUptime={station.data.systemUptime}
                                 utcTimestampInMs={station.data.utcTimestampInMs}
                                 wifiRSSI={station.data.wifiRSSI}
+                                currentSeconds={currentSeconds}
+                                clientConnection={station.clientConnection}
+                                setSending={setSending}
+                                setCmdResult={setCmdResult}
                             />
                         </Grid>
                     </Grid>
@@ -215,12 +221,16 @@ export const EvChargingStation = ({
 };
 
 type StationsDetailsProps = {
-    proximityPilotAmps: ProximityPilotAmps,
-    reasonChargingUnavailable: string | null,
-    maxChargingRate: number,
-    systemUptime: number,
-    wifiRSSI: number,
-    utcTimestampInMs: number
+    proximityPilotAmps: ProximityPilotAmps;
+    reasonChargingUnavailable: string | null;
+    maxChargingRate: number;
+    systemUptime: number;
+    wifiRSSI: number;
+    utcTimestampInMs: number;
+    currentSeconds: number;
+    clientConnection: EvChargingStationClient;
+    setSending: (sending: boolean) => void;
+    setCmdResult: (sending: boolean | null) => void;
 };
 
 const StationsDetails = (props: StationsDetailsProps) => {
@@ -241,6 +251,45 @@ const StationsDetails = (props: StationsDetailsProps) => {
                     <TableCell component="th" scope="row">Max charging rate</TableCell>
                     <TableCell align="right">{props.maxChargingRate}</TableCell>
                 </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">System Uptime</TableCell>
+                    <TableCell align="right">{Math.round(props.systemUptime / 1000 / 60)} minutes</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">WiFi RSSI</TableCell>
+                    <TableCell align="right">{props.wifiRSSI}dB</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">Connected power line</TableCell>
+                    <TableCell align="right">{props.clientConnection.powerConnectionId}</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">TCP endpoint</TableCell>
+                    <TableCell align="right">{props.clientConnection.addr}:{props.clientConnection.port}</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">TCP connection uptime</TableCell>
+                    <TableCell
+                        align="right">{timeToDelta(props.currentSeconds, props.clientConnection.connectedSince)}</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">Updated</TableCell>
+                    <TableCell align="right">{timeToDelta(props.currentSeconds, props.utcTimestampInMs)} ago</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">Firmware version</TableCell>
+                    <TableCell align="right">{props.clientConnection.firmwareVersion}</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">Firmware upgrade</TableCell>
+                    <TableCell align="right">
+                        <FirmwareUpload
+                            setSending={props.setSending}
+                            setCmdResult={props.setCmdResult}
+                            clientId={props.clientConnection.clientId}/>
+                    </TableCell>
+                </TableRow>
+
             </TableBody>
         </Table>
     </TableContainer>;
@@ -283,25 +332,25 @@ const PowerComponent = (props: PowerComponentProps) => {
                     <TableCell component="th" scope="row">
                         Phase 1
                     </TableCell>
-                    <TableCell align="right">{props.phase1volts}</TableCell>
-                    <TableCell align="right">{props.phase1amps}</TableCell>
-                    <TableCell align="right">{props.phase1amps * props.phase1volts}</TableCell>
+                    <TableCell align="right">{props.phase1volts.toFixed(2)}</TableCell>
+                    <TableCell align="right">{props.phase1amps.toFixed(2)}</TableCell>
+                    <TableCell align="right">{(props.phase1amps * props.phase1volts).toFixed(2)}</TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell component="th" scope="row">
                         Phase 2
                     </TableCell>
-                    <TableCell align="right">{props.phase2volts}</TableCell>
-                    <TableCell align="right">{props.phase2amps}</TableCell>
-                    <TableCell align="right">{props.phase2amps * props.phase2volts}</TableCell>
+                    <TableCell align="right">{props.phase2volts.toFixed(2)}</TableCell>
+                    <TableCell align="right">{props.phase2amps.toFixed(2)}</TableCell>
+                    <TableCell align="right">{(props.phase2amps * props.phase2volts).toFixed(2)}</TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell component="th" scope="row">
                         Phase 3
                     </TableCell>
-                    <TableCell align="right">{props.phase3volts}</TableCell>
-                    <TableCell align="right">{props.phase3amps}</TableCell>
-                    <TableCell align="right">{props.phase3amps * props.phase3volts}</TableCell>
+                    <TableCell align="right">{props.phase3volts.toFixed(2)}</TableCell>
+                    <TableCell align="right">{props.phase3amps.toFixed(2)}</TableCell>
+                    <TableCell align="right">{(props.phase3amps * props.phase3volts).toFixed(2)}</TableCell>
                 </TableRow>
             </TableBody>
         </Table>

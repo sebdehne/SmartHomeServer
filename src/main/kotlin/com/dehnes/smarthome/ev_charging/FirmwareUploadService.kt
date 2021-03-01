@@ -11,7 +11,6 @@ class FirmwareUploadService(
     fun uploadVersion(clientId: String, firmwareBased64Encoded: String) = try {
         val firmware = Base64.getDecoder().decode(firmwareBased64Encoded)
         evChargingStationConnection.uploadFirmwareAndReboot(clientId, firmware)
-        true
     } catch (e: Exception) {
         logger.error("Could not upload to clientId=$clientId", e)
         false

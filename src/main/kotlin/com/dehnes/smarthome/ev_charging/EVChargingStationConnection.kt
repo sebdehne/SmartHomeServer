@@ -53,10 +53,11 @@ class EVChargingStationConnection(
         getResponse() is PongResponse
     }
 
-    fun uploadFirmwareAndReboot(clientId: String, firmware: ByteArray) {
-        doWithClient(clientId) { socket, inboundQueue ->
+    fun uploadFirmwareAndReboot(clientId: String, firmware: ByteArray): Boolean {
+        return doWithClient(clientId) { socket, inboundQueue ->
             send(socket, Firmware(firmware))
-        }
+            true
+        } ?: false
     }
 
     fun collectData(clientId: String) = doWithClient(clientId) { socket, getResponse ->
