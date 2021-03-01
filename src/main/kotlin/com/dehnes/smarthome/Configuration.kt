@@ -9,6 +9,7 @@ import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.rf433.Rf433Client
 import com.dehnes.smarthome.room_sensors.ChipCap2SensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
+import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -59,7 +60,10 @@ class Configuration {
             executorService,
             tibberService,
             persistenceService,
-            Clock.systemDefaultZone()
+            Clock.systemDefaultZone(),
+            mapOf(
+                PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(persistenceService)
+            )
         )
         evChargingService.start()
 

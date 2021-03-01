@@ -5,8 +5,6 @@ import com.dehnes.smarthome.energy_pricing.tibber.TibberService
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
-import java.lang.Integer.max
-import java.lang.Integer.min
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -60,16 +58,6 @@ enum class ChargingState {
         ConnectedChargingAvailable, ChargingRequested, Charging, ChargingEnding, StoppingCharging -> true
         else -> false
     }
-
-    fun isChargingAndEnding() = when (this) {
-        Charging, ChargingEnding, ChargingRequested -> true
-        else -> false
-    }
-
-    fun isChargingButNotEnding() = when (this) {
-        Charging, ChargingRequested -> true
-        else -> false
-    }
 }
 
 class EvChargingService(
@@ -77,7 +65,8 @@ class EvChargingService(
     private val executorService: ExecutorService,
     private val tibberService: TibberService,
     private val persistenceService: PersistenceService,
-    private val clock: Clock
+    private val clock: Clock,
+    private val loadSharingAlgorithms: Map<String, LoadSharing>
 ) {
     val listeners = ConcurrentHashMap<String, (EvChargingEvent) -> Unit>()
     private val currentData = ConcurrentHashMap<String, InternalState>()
@@ -387,7 +376,16 @@ class EvChargingService(
         /*
          * E) Rebalance loadsharing between active charging stations
          */
-        val changedStates = calculateLoadSharing(powerConnectionId)
+        val loadSharingAlgorithmId = persistenceService.get(
+            "powerConnectionId.loadSharingAlgorithm.$powerConnectionId",
+            PriorityLoadSharing::class.java.simpleName
+        )!!
+        val loadSharingAlgorithm = loadSharingAlgorithms[loadSharingAlgorithmId]
+            ?: error("Could not find loadSharingAlgorithmId=$loadSharingAlgorithmId")
+        val changedStates = loadSharingAlgorithm.calculateLoadSharing(
+            currentData,
+            powerConnectionId
+        ) as List<InternalState>
 
         /*
          * F) Send out updates, but send those which should give up capacity (decrease) first and about if this failed
@@ -416,121 +414,6 @@ class EvChargingService(
         }
 
         updatedState
-    }
-
-    private fun calculateLoadSharing(powerConnectionId: String): List<InternalState> {
-
-        val changed = currentData
-            .filter { it.value.powerConnectionId == powerConnectionId }
-            .toMap()
-            .toMutableMap()
-
-        var availableCapacity =
-            persistenceService.get("powerConnectionId.availableCapacity.$powerConnectionId", "32")!!.toInt()
-        check(availableCapacity in 1..32)
-
-        val requestCapability = { request: Int ->
-            val requestNormalized = max(LOWEST_MAX_CHARGE_RATE, request)
-            val canGive = min(availableCapacity, requestNormalized)
-            availableCapacity -= canGive
-            canGive
-        }
-
-        // Those which are in StoppingCharging state - set to lowest maxChargingRate
-        changed
-            .filter { it.value.chargingState == StoppingCharging }
-            .forEach { (clientId, internalState) ->
-                val amps = requestCapability(LOWEST_MAX_CHARGE_RATE)
-                if (amps > 0) {
-                    changed[clientId] = internalState.setMaxChargeRate(amps)
-                } else {
-                    changed[clientId] = internalState.changeState(
-                        ConnectedChargingUnavailable,
-                        reasonChargingUnavailable = "Not enough capacity"
-                    )
-                }
-            }
-
-        // Spread the remaining capacity evenly
-        val stationsChargingAndEnding = changed
-            .filter { it.value.chargingState.isChargingAndEnding() }
-        if (stationsChargingAndEnding.isNotEmpty()) {
-            val maxPerStation = availableCapacity / stationsChargingAndEnding.count()
-            stationsChargingAndEnding.forEach { (clientId, internalState) ->
-                val amps = requestCapability(max(LOWEST_MAX_CHARGE_RATE, maxPerStation))
-                if (amps > 0) {
-                    changed[clientId] = internalState.setMaxChargeRate(amps)
-                } else {
-                    changed[clientId] = internalState.changeState(
-                        ConnectedChargingUnavailable,
-                        reasonChargingUnavailable = "Not enough capacity"
-                    )
-                }
-            }
-        }
-
-        // Reclaim capacity from stations which are not using their capacity (ending or proximity limited)
-        changed
-            .filter { it.value.chargingState == ChargingEnding || it.value.maxChargingRate > it.value.dataResponse.proximityPilotAmps.toAmps() }
-            .forEach { (clientId, internalState) ->
-                var state = internalState
-
-                // cannot use capacity because of low proximity (charging cable)
-                if (state.maxChargingRate > state.dataResponse.proximityPilotAmps.toAmps()) {
-                    val cannotUse = state.maxChargingRate - state.dataResponse.proximityPilotAmps.toAmps()
-                    availableCapacity += cannotUse
-                    state = state.setMaxChargeRate(state.maxChargingRate - cannotUse)
-                }
-
-                // not using full capacity because charging is ending (measured rate is low)
-                if (state.maxChargingRate > LOWEST_MAX_CHARGE_RATE) {
-                    val breakpoint = state.maxChargingRate - chargingEndingAmpDelta
-                    val capacityNotUsing = breakpoint - state.dataResponse.measuredCurrentInAmp()
-                    if (capacityNotUsing > 0) {
-
-                        val newRate = if (state.maxChargingRate - capacityNotUsing < LOWEST_MAX_CHARGE_RATE) {
-                            LOWEST_MAX_CHARGE_RATE
-                        } else {
-                            state.maxChargingRate - capacityNotUsing
-                        }
-                        val madeAvailable = state.maxChargingRate - newRate
-
-                        if (madeAvailable > 0) {
-                            availableCapacity += madeAvailable
-                            state = state.setMaxChargeRate(state.maxChargingRate - madeAvailable)
-                        }
-                    }
-                }
-
-                changed[clientId] = state
-            }
-
-        // Give reclaimed capacity to those which are capable of getting more
-        while (true) {
-            val stationsWhichWantMore = changed
-                .filter { it.value.chargingState.isChargingButNotEnding() && it.value.dataResponse.proximityPilotAmps.toAmps() > it.value.maxChargingRate }
-
-            if (stationsWhichWantMore.isEmpty() || availableCapacity == 0) {
-                break
-            }
-
-            val addToMaxChargingRate = availableCapacity / stationsWhichWantMore.count()
-
-            stationsWhichWantMore.forEach { (clientId, internalState) ->
-                val headRoom = internalState.dataResponse.proximityPilotAmps.toAmps() - internalState.maxChargingRate
-                val ampsToAdd = requestCapability(min(headRoom, addToMaxChargingRate))
-                changed[clientId] = internalState.setMaxChargeRate(internalState.maxChargingRate + ampsToAdd)
-            }
-        }
-
-        // At last, those in ChargingRequested have received their chargingRate, move them out of ChargingRequested state
-        changed
-            .filter { it.value.chargingState == ChargingRequested }
-            .forEach { (clientId, state) ->
-                changed[clientId] = state.changeState(Charging, state.maxChargingRate)
-            }
-
-        return changed.values.toList()
     }
 
     private fun synchronizeIfNeeded(internalState: InternalState, dataToCompareAgainst: DataResponse? = null): Boolean {
@@ -590,23 +473,37 @@ class EvChargingService(
                 )
         }
     }
-
 }
 
 data class InternalState(
     val clientId: String,
-    val powerConnectionId: String,
+    override val powerConnectionId: String,
     val evChargingStationClient: EvChargingStationClient,
-    val chargingState: ChargingState,
+    override val chargingState: ChargingState,
     val chargingStateChangedAt: Long,
 
     val dataResponse: DataResponse,
-    val maxChargingRate: Int, // a value in the range og 6..32
+    override val maxChargingRate: Int, // a value in the range og 6..32
 
     val measuredChargeRatePeak: Int?,
 
     val reasonChargingUnavailable: String?
-) {
+) : LoadSharable {
+
+    override val proximityPilotAmps: Int
+        get() = dataResponse.proximityPilotAmps.toAmps()
+    override val measuredCurrentInAmp: Int
+        get() = dataResponse.measuredCurrentInAmp()
+
+    override fun setNoCapacityAvailable() = copy(
+        chargingState = ConnectedChargingUnavailable,
+        reasonChargingUnavailable = "No capacity available"
+    )
+
+    override fun allowChargingWith(maxChargingRate: Int) = copy(
+        chargingState = if (this.chargingState == ChargingRequested) Charging else this.chargingState, // do not change ending-state
+        maxChargingRate = maxChargingRate
+    )
 
     fun desiredPwmPercent() = if (chargingState.pwmOn()) {
         chargeRateToPwmPercent(maxChargingRate)

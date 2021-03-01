@@ -3,14 +3,9 @@ package com.dehnes.smarthome.service.ev_charging_station
 import com.dehnes.smarthome.api.dtos.EvChargingMode
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
-import com.dehnes.smarthome.ev_charging.DataResponse
-import com.dehnes.smarthome.ev_charging.EVChargingStationConnection
-import com.dehnes.smarthome.ev_charging.PilotVoltage
 import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
-import com.dehnes.smarthome.ev_charging.EvChargingService
-import com.dehnes.smarthome.ev_charging.LOWEST_MAX_CHARGE_RATE
-import com.dehnes.smarthome.ev_charging.chargeRateToPwmPercent
+import com.dehnes.smarthome.ev_charging.*
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -117,7 +112,10 @@ internal class EvChargingServiceTest {
         executorService,
         tibberService,
         persistenceService,
-        clockMock
+        clockMock,
+        mapOf(
+            PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(persistenceService)
+        )
     )
 
     @Test
