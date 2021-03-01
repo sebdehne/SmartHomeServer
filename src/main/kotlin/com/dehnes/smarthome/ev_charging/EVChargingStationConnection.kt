@@ -188,7 +188,8 @@ class EVChargingStationConnection(
                 socket.inetAddress.toString(),
                 socket.port,
                 firmwareVersion,
-                persistenceService.get("ChargePowerConnection.$clientIdStr", "unknown")!!
+                persistenceService.get("ChargePowerConnection.$clientIdStr", "unknown")!!,
+                System.currentTimeMillis()
             )
 
             val inboundQueue: BlockingQueue<InboundPacket> = LinkedBlockingQueue()

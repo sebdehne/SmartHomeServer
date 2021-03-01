@@ -106,7 +106,8 @@ class WebSocketServer {
             uploadFirmwareToClientResult = firmwareUploadService.uploadVersion(
                 request.clientId!!,
                 request.firmwareBased64Encoded!!
-            )
+            ),
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
         EvChargingStationRequestType.getChargingStationsDataAndConfig -> EvChargingStationResponse(
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()

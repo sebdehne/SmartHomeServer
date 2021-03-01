@@ -33,7 +33,7 @@ data class EvChargingStationRequest(
 )
 
 data class EvChargingStationResponse(
-    val chargingStationsDataAndConfig: List<EvChargingStationDataAndConfig>? = null,
+    val chargingStationsDataAndConfig: List<EvChargingStationDataAndConfig>,
     val uploadFirmwareToClientResult: Boolean? = null,
     val configUpdated: Boolean? = null
 )
@@ -50,7 +50,8 @@ data class EvChargingStationClient(
     val addr: String,
     val port: Int,
     val firmwareVersion: Int,
-    val powerConnectionId: String
+    val powerConnectionId: String,
+    val connectedSince: Long = System.currentTimeMillis()
 )
 
 data class EvChargingStationData(

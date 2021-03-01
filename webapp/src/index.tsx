@@ -3,11 +3,11 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './Components/App/App';
 import reportWebVitals from './reportWebVitals';
-import {CssBaseline} from "@material-ui/core";
-import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
+import { CssBaseline } from "@material-ui/core";
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
-import EVChargingStationTester from "./Components/EVChargingStationsManager/EVChargingStationsManager";
+import { EvChargingStations } from "./Components/EvChargingStations/EvChargingStations";
 
 ReactDOM.render(
     <React.StrictMode>
@@ -24,8 +24,8 @@ ReactDOM.render(
                 <Route path="/heater">
                     <HeaterController/>
                 </Route>
-                <Route path="/evTester">
-                    <EVChargingStationTester/>
+                <Route path="/evChargingStations">
+                    <EvChargingStations/>
                 </Route>
             </Switch>
         </Router>

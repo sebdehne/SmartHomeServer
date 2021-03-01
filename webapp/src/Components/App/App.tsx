@@ -28,13 +28,8 @@ const App = () => {
                         </Button>
                     </li>
                     <li>
-                        <Button variant="contained" color="secondary">
+                        <Button variant="contained" color="secondary" onClick={relative("/evChargingStations")}>
                             EV Charging
-                        </Button>
-                    </li>
-                    <li>
-                        <Button variant="contained" color="secondary" onClick={relative("/evTester")}>
-                            EVChargingStationTester
                         </Button>
                     </li>
                     <li>

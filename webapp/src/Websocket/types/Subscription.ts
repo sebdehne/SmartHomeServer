@@ -1,11 +1,11 @@
 import {GarageStatus} from "./Garage";
 import {UnderFloorHeaterStatus} from "./UnderFloorHeater";
-import {Event} from "./EVChargingStation";
+import {EvChargingEvent} from "./EVChargingStation";
 
 export enum SubscriptionType {
     getGarageStatus = "getGarageStatus",
     getUnderFloorHeaterStatus = "getUnderFloorHeaterStatus",
-    evChargingStationConnections = "evChargingStationConnections"
+    evChargingStationEvents = "evChargingStationEvents"
 }
 
 export class Subscribe {
@@ -30,9 +30,9 @@ export class Notify {
     public subscriptionId: string;
     public garageStatus: GarageStatus | null;
     public underFloorHeaterStatus: UnderFloorHeaterStatus | null;
-    public evChargingStationEvent: Event | null;
+    public evChargingStationEvent: EvChargingEvent | null;
 
-    public constructor(subscriptionId: string, garageStatus: GarageStatus | null, underFloorHeaterStatus: UnderFloorHeaterStatus | null, evChargingStationEvent: Event | null) {
+    public constructor(subscriptionId: string, garageStatus: GarageStatus | null, underFloorHeaterStatus: UnderFloorHeaterStatus | null, evChargingStationEvent: EvChargingEvent | null) {
         this.subscriptionId = subscriptionId;
         this.garageStatus = garageStatus;
         this.underFloorHeaterStatus = underFloorHeaterStatus;
