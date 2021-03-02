@@ -10,7 +10,7 @@ enum class EvChargingEventType {
 
 data class EvChargingEvent(
     val type: EvChargingEventType,
-    val chargingStationsDataAndConfig: EvChargingStationDataAndConfig? = null,
+    val chargingStationsDataAndConfig: List<EvChargingStationDataAndConfig>? = null,
 )
 
 enum class EvChargingStationRequestType {

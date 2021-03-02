@@ -93,7 +93,7 @@ class EvChargingService(
                                 fn(
                                     EvChargingEvent(
                                         EvChargingEventType.chargingStationDataAndConfig,
-                                        toEvChargingStationDataAndConfig(updatedState)
+                                        getChargingStationsDataAndConfig()
                                     )
                                 )
                             }
@@ -113,6 +113,7 @@ class EvChargingService(
 
     fun updateMode(clientId: String, evChargingMode: EvChargingMode): Boolean {
         persistenceService["EvChargingService.client.mode.$clientId"] = evChargingMode.name
+        eVChargingStationConnection.collectDataAndDistribute(clientId)
         return true
     }
 

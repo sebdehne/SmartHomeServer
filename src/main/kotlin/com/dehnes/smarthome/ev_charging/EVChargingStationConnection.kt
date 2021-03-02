@@ -229,7 +229,7 @@ class EVChargingStationConnection(
 
                         if (inboundPacket.type == InboundType.notifyDataChanged) {
                             executorService.submit {
-                                collectDataAndDistribute(evChargingStationClient)
+                                collectDataAndDistribute(evChargingStationClient.clientId)
                             }
                         } else {
                             inboundQueue.offer(inboundPacket)
@@ -244,11 +244,9 @@ class EVChargingStationConnection(
             // keep-alive timer
             val timerRef = timer.scheduleAtFixedRate(
                 {
-                    executorService.submit {
-                        collectDataAndDistribute(evChargingStationClient)
-                    }
+                    collectDataAndDistribute(evChargingStationClient.clientId)
                 },
-                5,
+                0,
                 5,
                 TimeUnit.SECONDS
             )
@@ -271,13 +269,16 @@ class EVChargingStationConnection(
         }
     }
 
-    private fun collectDataAndDistribute(evChargingStationClient: EvChargingStationClient) {
-        val data = collectData(evChargingStationClient.clientId)
-        logger.info { "Data response for ${evChargingStationClient.clientId} $data" }
-        data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=${evChargingStationClient.clientId} msg=$msg" } }
+    fun collectDataAndDistribute(clientId: String) {
         executorService.submit {
-            listeners.forEach { entry ->
-                entry.value(Event(EventType.clientData, evChargingStationClient, data))
+            val evChargingStationClient = connectedClientsById[clientId]?.evChargingStationClient ?: return@submit
+            val data = collectData(clientId)
+            logger.info { "Data response for $clientId $data" }
+            data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=$clientId msg=$msg" } }
+            executorService.submit {
+                listeners.forEach { entry ->
+                    entry.value(Event(EventType.clientData, evChargingStationClient, data))
+                }
             }
         }
     }
