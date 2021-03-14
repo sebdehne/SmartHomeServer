@@ -2,6 +2,7 @@ package com.dehnes.smarthome
 
 import com.dehnes.smarthome.api.WebSocketServer
 import com.dehnes.smarthome.utils.StaticFilesServlet
+import com.dehnes.smarthome.utils.WebRTCServlet
 import mu.KotlinLogging
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
@@ -28,6 +29,7 @@ fun main() {
     }
     server.handler = context
 
+    context.addServlet(ServletHolder(WebRTCServlet()), "/webrtc/*")
     context.addServlet(ServletHolder(StaticFilesServlet()), "/*")
 
     try {

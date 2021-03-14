@@ -1,6 +1,6 @@
 import React from 'react';
-import {Button, Container, Link, Paper, Typography} from "@material-ui/core";
-import {useHistory} from "react-router-dom";
+import { Button, Container, Link, Paper, Typography } from "@material-ui/core";
+import { useHistory } from "react-router-dom";
 
 const App = () => {
 
@@ -30,6 +30,11 @@ const App = () => {
                     <li>
                         <Button variant="contained" color="secondary" onClick={relative("/evChargingStations")}>
                             EV Charging
+                        </Button>
+                    </li>
+                    <li>
+                        <Button variant="contained" color="secondary" onClick={relative("/webcams")}>
+                            Cameras
                         </Button>
                     </li>
                     <li>

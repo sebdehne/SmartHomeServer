@@ -8,6 +8,7 @@ import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
 import { EvChargingStations } from "./Components/EvChargingStations/EvChargingStations";
+import Webcams from "./Components/Webcams/Webcams";
 
 ReactDOM.render(
     <React.StrictMode>
@@ -26,6 +27,9 @@ ReactDOM.render(
                 </Route>
                 <Route path="/evChargingStations">
                     <EvChargingStations/>
+                </Route>
+                <Route path="/webcams">
+                    <Webcams/>
                 </Route>
             </Switch>
         </Router>
