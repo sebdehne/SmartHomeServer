@@ -154,6 +154,7 @@ export enum EvChargingMode {
 }
 
 export enum ProximityPilotAmps {
+    NoCable = "NoCable",
     Amp13 = "Amp13",
     Amp20 = "Amp20",
     Amp32 = "Amp32"

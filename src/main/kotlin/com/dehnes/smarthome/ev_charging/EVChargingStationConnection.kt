@@ -3,6 +3,8 @@ package com.dehnes.smarthome.ev_charging
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.utils.PersistenceService
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
 import java.net.ServerSocket
 import java.net.Socket
@@ -225,7 +227,7 @@ class EVChargingStationConnection(
                             bytesRead += read
                         }
 
-                        val inboundPacket = responseType.parser(msg)
+                        val inboundPacket = responseType.parser(msg, getCalibrationData(clientIdStr))
 
                         if (inboundPacket.type == InboundType.notifyDataChanged) {
                             executorService.submit {
@@ -283,6 +285,13 @@ class EVChargingStationConnection(
         }
     }
 
+    private fun getCalibrationData(clientId: String): CalibrationData {
+        val default = jacksonObjectMapper().writeValueAsString(CalibrationData())
+        return persistenceService["Charger.calibrationData.$clientId", default].let {
+            jacksonObjectMapper().readValue(it!!)
+        }
+    }
+
 }
 
 fun Socket.toAddressString() = "${this.inetAddress}:${this.port}"
@@ -315,7 +324,7 @@ enum class RequestType(val value: Int) {
     setContactorState(5),
 }
 
-enum class InboundType(val value: Int, val parser: (ByteArray) -> InboundPacket) {
+enum class InboundType(val value: Int, val parser: (ByteArray, CalibrationData) -> InboundPacket) {
     pongResponse(1, PongResponse.Companion::parse),
     collectDataResponse(2, DataResponse.Companion::parse),
     setPwmPercentResponse(3, SetPwmPercentResponse.Companion::parse),
@@ -333,25 +342,25 @@ sealed class InboundPacket(
 
 class PongResponse : InboundPacket(InboundType.pongResponse) {
     companion object {
-        fun parse(msg: ByteArray) = PongResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData) = PongResponse()
     }
 }
 
 class NotifyDataChanged : InboundPacket(InboundType.notifyDataChanged) {
     companion object {
-        fun parse(msg: ByteArray) = NotifyDataChanged()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData) = NotifyDataChanged()
     }
 }
 
 class SetPwmPercentResponse : InboundPacket(InboundType.setPwmPercentResponse) {
     companion object {
-        fun parse(msg: ByteArray) = SetPwmPercentResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData) = SetPwmPercentResponse()
     }
 }
 
 class SetContactorStateResponse : InboundPacket(InboundType.setContactorStateResponse) {
     companion object {
-        fun parse(msg: ByteArray) = SetContactorStateResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData) = SetContactorStateResponse()
     }
 }
 
@@ -373,7 +382,10 @@ data class DataResponse(
     val utcTimestampInMs: Long = Instant.now().toEpochMilli()
 ) : InboundPacket(InboundType.pongResponse) {
     companion object {
-        fun parse(msg: ByteArray): DataResponse {
+        fun parse(
+            msg: ByteArray,
+            calibrationData: CalibrationData
+        ): DataResponse {
 
             /*
              * [field]            | size in bytes
@@ -412,17 +424,23 @@ data class DataResponse(
                 msg[1].toInt(),
                 PilotVoltage.values().first { it.value == msg[2].toInt() },
                 ProximityPilotAmps.values().first { it.value == msg[3].toInt() },
-                readInt32Bits(msg, 4), // phase1Millivolts
-                readInt32Bits(msg, 8), // phase2Millivolts
-                readInt32Bits(msg, 12), // phase3Millivolts
-                readInt32Bits(msg, 16), // phase1Milliamps
-                readInt32Bits(msg, 20), // phase2Milliamps
-                readInt32Bits(msg, 24), // phase3Milliamps
+                convertAdcValue(readInt32Bits(msg, 4), calibrationData.milliVoltsL1),
+                convertAdcValue(readInt32Bits(msg, 8), calibrationData.milliVoltsL2),
+                convertAdcValue(readInt32Bits(msg, 12), calibrationData.milliVoltsL3),
+                convertAdcValue(readInt32Bits(msg, 16), calibrationData.milliAmpsL1),
+                convertAdcValue(readInt32Bits(msg, 20), calibrationData.milliAmpsL2),
+                convertAdcValue(readInt32Bits(msg, 24), calibrationData.milliAmpsL3),
                 readInt32Bits(msg, 28), // rssi
                 readInt32Bits(msg, 32), // uptime
                 logMessages
             )
         }
+
+        private fun convertAdcValue(
+            adcValue: Int,
+            offsetAndSlopeAndDivider: OffsetAndSlopeAndDivider
+        ) =
+            ((adcValue - offsetAndSlopeAndDivider.offset) * offsetAndSlopeAndDivider.slope) / offsetAndSlopeAndDivider.divider
     }
 
     override fun toString(): String {
@@ -444,6 +462,21 @@ data class DataResponse(
     fun measuredCurrentInAmp() = listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!! / 1000
 
 }
+
+data class CalibrationData(
+    val milliVoltsL1: OffsetAndSlopeAndDivider = OffsetAndSlopeAndDivider(),
+    val milliVoltsL2: OffsetAndSlopeAndDivider = OffsetAndSlopeAndDivider(),
+    val milliVoltsL3: OffsetAndSlopeAndDivider = OffsetAndSlopeAndDivider(),
+    val milliAmpsL1: OffsetAndSlopeAndDivider = OffsetAndSlopeAndDivider(),
+    val milliAmpsL2: OffsetAndSlopeAndDivider = OffsetAndSlopeAndDivider(),
+    val milliAmpsL3: OffsetAndSlopeAndDivider = OffsetAndSlopeAndDivider()
+)
+
+data class OffsetAndSlopeAndDivider(
+    val offset: Int = 0,
+    val slope: Int = 1,
+    val divider: Int = 1
+)
 
 fun readInt32Bits(buf: ByteArray, offset: Int): Int {
     val byteBuffer = ByteBuffer.allocate(4)
