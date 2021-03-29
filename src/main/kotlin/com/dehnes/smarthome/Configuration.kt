@@ -1,12 +1,14 @@
 package com.dehnes.smarthome
 
-import com.dehnes.smarthome.api.dtos.EvChargingStationClient
-import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
-import com.dehnes.smarthome.ev_charging.*
+import com.dehnes.smarthome.ev_charging.EVChargingStationConnection
+import com.dehnes.smarthome.ev_charging.EvChargingService
+import com.dehnes.smarthome.ev_charging.FirmwareUploadService
+import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.garage_door.GarageDoorService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
+import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.rf433.Rf433Client
 import com.dehnes.smarthome.room_sensors.ChipCap2SensorService
 import com.dehnes.smarthome.utils.PersistenceService
@@ -72,35 +74,8 @@ class Configuration {
         serialConnection.listeners.add(garageDoorService::handleIncoming)
         serialConnection.listeners.add(chipCap2SensorService::handleIncoming)
 
-        /*
-         *  a fake charging station for (webapp) development
-         * TODO clean up
-        evChargingService.onIncomingDataUpdate(
-            EvChargingStationClient(
-                "TeslaLader",
-                "Tesla Lader",
-                "127.0.0.1",
-                9091,
-                1,
-                "unknown"
-            ),
-            DataResponse(
-                false,
-                100,
-                PilotVoltage.Volt_12,
-                ProximityPilotAmps.Amp32,
-                231123,
-                232456,
-                233789,
-                30256,
-                29541,
-                31154,
-                -53,
-                5000,
-                emptyList()
-            )
-        )
-         */
+        val loRaConnection = LoRaConnection(persistenceService, executorService)
+        loRaConnection.start()
 
         beans[Rf433Client::class] = serialConnection
         beans[UnderFloorHeaterService::class] = heaterService
