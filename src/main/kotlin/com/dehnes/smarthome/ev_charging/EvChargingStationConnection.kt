@@ -14,7 +14,7 @@ import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
 
-class EVChargingStationConnection(
+class EvChargingStationConnection(
     private val port: Int,
     private val executorService: ExecutorService,
     private val persistenceService: PersistenceService

@@ -61,7 +61,7 @@ enum class ChargingState {
 }
 
 class EvChargingService(
-    private val eVChargingStationConnection: EVChargingStationConnection,
+    private val eVChargingStationConnection: EvChargingStationConnection,
     private val executorService: ExecutorService,
     private val tibberService: TibberService,
     private val persistenceService: PersistenceService,
@@ -337,7 +337,6 @@ class EvChargingService(
                     if (canCharge) {
                         if (goesToEnding) {
                             existingState.changeState(ChargingEnding, existingState.maxChargingRate)
-                                .copy(measuredChargeRatePeak = null)
                         } else {
                             existingState.copy(measuredChargeRatePeak = measuredChargeRatePeak)
                         }
@@ -448,7 +447,7 @@ class EvChargingService(
 
         // PWM signal (maxChargingRate)
         if (internalState.desiredPwmPercent() != data.pwmPercent) {
-            logger.info { "(Re-)sending pwm state to " + internalState.chargingState.contactorOn() }
+            logger.info { "(Re-)sending pwm state to " + internalState.desiredPwmPercent() }
             if (!eVChargingStationConnection.setPwmPercent(
                     internalState.clientId,
                     internalState.desiredPwmPercent()
@@ -482,7 +481,8 @@ class EvChargingService(
                 .copy(
                     chargingState = chargingState,
                     chargingStateChangedAt = clock.millis(),
-                    reasonChargingUnavailable = if (chargingState == ConnectedChargingUnavailable) reasonChargingUnavailable else null
+                    reasonChargingUnavailable = if (chargingState == ConnectedChargingUnavailable) reasonChargingUnavailable else null,
+                    measuredChargeRatePeak = if (chargingState == Charging) this.measuredChargeRatePeak else null
                 )
         }
     }

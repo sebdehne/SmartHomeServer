@@ -10,6 +10,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
@@ -26,7 +27,7 @@ internal class EvChargingServiceTest {
     val tibberService = mockk<TibberService>()
     val executorService = mockk<ExecutorService>()
     val persistenceService = mockk<PersistenceService>()
-    val eVChargingStationConnection = mockk<EVChargingStationConnection>()
+    val eVChargingStationConnection = mockk<EvChargingStationConnection>()
     val currentModes = mutableMapOf<String, EvChargingMode>()
     val clockMock = mockk<Clock>()
 
@@ -130,6 +131,55 @@ internal class EvChargingServiceTest {
         assertEquals(100, s1.pwmPercent)
         assertFalse(s2.contactorOn)
         assertEquals(100, s2.pwmPercent)
+    }
+
+    @Test
+    @Disabled
+    fun testPlayground() {
+
+        val s1 = newTestStation("s1")
+        currentModes["s1"] = EvChargingMode.OFF
+        s1.phase1Milliamps = -387
+        s1.phase2Milliamps = -265
+        s1.phase3Milliamps = -666
+        s1.pilotVoltage = PilotVoltage.Volt_12
+        s1.pwmPercent = 100
+        s1.contactorOn = false
+
+        collectDataCycle()
+
+        s1.pilotVoltage = PilotVoltage.Volt_9
+        s1.phase1Milliamps = -240
+        s1.phase2Milliamps = -106
+        s1.phase3Milliamps = -840
+
+        collectDataCycle()
+        collectDataCycle()
+
+        currentModes["s1"] = EvChargingMode.ON
+
+        collectDataCycle() // -> ConnectedChargingAvailable
+
+        s1.pwmPercent = 11
+        s1.pilotVoltage = PilotVoltage.Volt_6
+        s1.phase1Milliamps = -413
+        s1.phase2Milliamps = -278
+        s1.phase3Milliamps = -872
+
+        collectDataCycle()
+
+        // conactor -> on
+        // why resending pwm 11?
+        s1.pwmPercent = 51
+        s1.contactorOn = true
+        s1.phase1Milliamps = -360
+        s1.phase2Milliamps = -437
+        s1.phase3Milliamps = -919
+
+
+        collectDataCycle()
+        collectDataCycle()
+
     }
 
     @Test

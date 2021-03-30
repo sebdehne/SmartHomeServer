@@ -4,7 +4,7 @@ import mu.KotlinLogging
 import java.util.*
 
 class FirmwareUploadService(
-    private val evChargingStationConnection: EVChargingStationConnection
+    private val evChargingStationConnection: EvChargingStationConnection
 ) {
     private val logger = KotlinLogging.logger { }
 

@@ -2,7 +2,7 @@ package com.dehnes.smarthome
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
-import com.dehnes.smarthome.ev_charging.EVChargingStationConnection
+import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
@@ -53,7 +53,7 @@ class Configuration {
         )
         heaterService.start()
 
-        val evChargingStationConnection = EVChargingStationConnection(9091, executorService, persistenceService)
+        val evChargingStationConnection = EvChargingStationConnection(9091, executorService, persistenceService)
         evChargingStationConnection.start()
 
         val evChargingService = EvChargingService(
@@ -81,7 +81,7 @@ class Configuration {
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageDoorService::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
-        beans[EVChargingStationConnection::class] = evChargingStationConnection
+        beans[EvChargingStationConnection::class] = evChargingStationConnection
         beans[FirmwareUploadService::class] = firmwareUploadService
         beans[EvChargingService::class] = evChargingService
     }
