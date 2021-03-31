@@ -323,6 +323,7 @@ class EvChargingService(
                     if (canCharge) {
                         val timeBeenHere = clock.millis() - existingState.chargingStateChangedAt
                         if (timeBeenHere <= stayInChargingForMS) {
+                            logger.info { "Ignoring unstable pilot signal for clientId=$clientId" }
                             existingState // Tesla is a bit unstable in the beginning, ignore flipping back to Volt_9 too soon
                         } else {
                             existingState.changeState(ConnectedChargingAvailable, LOWEST_MAX_CHARGE_RATE)
