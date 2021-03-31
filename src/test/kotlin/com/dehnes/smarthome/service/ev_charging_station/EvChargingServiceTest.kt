@@ -234,11 +234,15 @@ internal class EvChargingServiceTest {
         assertFalse(s2.contactorOn)
         assertEquals(100, s2.pwmPercent)
 
-        // Second car connects
-        s2.pilotVoltage = PilotVoltage.Volt_9
-
+        // Car reached max charging rate
+        timeHolder.set(timeHolder.get().plusSeconds(20))
+        s1.setMeasuredCurrent(32)
         collectDataCycle()
 
+        // Second car connects
+        timeHolder.set(timeHolder.get().plusSeconds(20))
+        s2.pilotVoltage = PilotVoltage.Volt_9
+        collectDataCycle()
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(32), s1.pwmPercent)
         assertFalse(s2.contactorOn)
@@ -255,6 +259,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
 
         // both reach max current
+        timeHolder.set(timeHolder.get().plusSeconds(20))
         s1.setMeasuredCurrent(16)
         s2.setMeasuredCurrent(16)
 
@@ -318,7 +323,7 @@ internal class EvChargingServiceTest {
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(32), s2.pwmPercent)
 
-        // Car 1 read
+        // Car 1 ready
         s1.pilotVoltage = PilotVoltage.Volt_6
         collectDataCycle()
         assertTrue(s1.contactorOn)
@@ -327,6 +332,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
 
         // Car 1 - stopped from app
+        timeHolder.set(timeHolder.get().plusSeconds(20))
         currentModes[s1.clientId] = EvChargingMode.OFF
         collectDataCycle()
         assertTrue(s1.contactorOn)
@@ -343,6 +349,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(32), s2.pwmPercent)
 
         // car 2 gets a fault
+        timeHolder.set(timeHolder.get().plusSeconds(20))
         s2.pilotVoltage = PilotVoltage.Fault
         collectDataCycle()
         assertFalse(s1.contactorOn)
