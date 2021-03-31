@@ -136,7 +136,7 @@ export class EVChargingStationConfig {
     }
 }
 
-enum ChargingState {
+export enum ChargingState {
     Unconnected = "Unconnected",
     ConnectedChargingUnavailable = "ConnectedChargingUnavailable",
     ConnectedChargingAvailable = "ConnectedChargingAvailable",

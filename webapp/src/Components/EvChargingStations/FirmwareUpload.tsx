@@ -72,7 +72,7 @@ export const FirmwareUpload = ({ setSending, setCmdResult, clientId }: FirmwareU
                 }}
             />
             <label htmlFor="firmwareUploadFileSelector">
-                <Button variant="text" component="span">
+                <Button variant="contained" component="span">
                     Upload firmware
                 </Button>
             </label>

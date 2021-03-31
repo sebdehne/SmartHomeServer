@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Container, Typography } from "@material-ui/core";
+import { Button, Container } from "@material-ui/core";
 import './Webcams.css';
 import VideoService from "./video";
 import { useHistory } from "react-router-dom";
+import Header from "../Header";
 
 const streams = [
     "parking1",
@@ -10,8 +11,6 @@ const streams = [
 ]
 
 const Webcams = () => {
-    let history = useHistory();
-
     const refContainer = useRef<HTMLVideoElement>(null);
     const [selectedStream, setSelectedStream] = useState<string>(streams[0]);
 
@@ -22,21 +21,16 @@ const Webcams = () => {
 
     return (
         <Container maxWidth="lg" className="App">
-
-            <Button variant="text" color="secondary" onClick={() => {
-                history.push("/")
-            }}>
-                Home
-            </Button>
-
-            <Typography>
-                <h2>Cameras ({selectedStream})</h2>
-            </Typography>
+            <Header
+                title={"Cameras (" + selectedStream + ")"}
+                sending={false}
+            />
 
             {streams.map(s => (
                 <Button
+                    variant="contained"
                     key={s}
-                    color="secondary"
+                    color="primary"
                     onClick={() => setSelectedStream(s)}
                 >{s}</Button>
             ))}

@@ -1,0 +1,12 @@
+.Menu {
+    list-style-type: none;
+    padding: 0;
+}
+
+.Menu li {
+    margin: 10px 0 0 0;
+}
+
+.Menu li button {
+    width: 100%;
+}

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+    ChargingState,
     EvChargingMode,
     EvChargingStationClient,
     EvChargingStationDataAndConfig,
@@ -14,7 +15,7 @@ import {
     AccordionSummary,
     Button,
     ButtonGroup,
-    Grid,
+    Grid, Link,
     Paper,
     Switch,
     Table,
@@ -22,8 +23,7 @@ import {
     TableCell,
     TableContainer,
     TableHead,
-    TableRow,
-    Typography
+    TableRow
 } from "@material-ui/core";
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import WebsocketService from "../../Websocket/websocketClient";
@@ -101,42 +101,56 @@ export const EvChargingStation = ({
             aria-controls="panel1a-content"
             id="panel1a-header"
         >
-            <Typography>{station.clientConnection.displayName} - {station.data.chargingState} (since: {timeToDelta(currentSeconds, station.data.chargingStateChangedAt)})</Typography>
+            <div>
+                <div>
+                    <span style={{
+                        fontWeight: "bold",
+                        fontSize: "140%"
+                    }
+                    }>{station.clientConnection.displayName}</span> - {station.data.chargingState}
+                </div>
+            </div>
         </AccordionSummary>
         <AccordionDetails>
 
             <Grid container spacing={2}>
                 <Grid item xs={12}>
-                    <Grid container justify="flex-start" spacing={2}>
-                        <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
+                    <Grid container justify="space-between" spacing={2}>
+                        <ButtonGroup variant="contained" style={{
                             margin: "10px"
                         }}>
                             <Button
-                                color={station.config.mode === EvChargingMode.ON ? 'primary' : 'secondary'}
+                                color={station.config.mode === EvChargingMode.ON ? 'secondary' : 'primary'}
                                 onClick={() => updateModeTo(EvChargingMode.ON)}>On</Button>
-                            <Button color={station.config.mode === EvChargingMode.OFF ? 'primary' : 'secondary'}
+                            <Button color={station.config.mode === EvChargingMode.OFF ? 'secondary' : 'primary'}
                                     onClick={() => updateModeTo(EvChargingMode.OFF)}>Off</Button>
                             <Button
-                                color={station.config.mode === EvChargingMode.ChargeDuringCheapHours ? 'primary' : 'secondary'}
+
+                                color={station.config.mode === EvChargingMode.ChargeDuringCheapHours ? 'secondary' : 'primary'}
                                 onClick={() => updateModeTo(EvChargingMode.ChargeDuringCheapHours)}
                             >Low-cost</Button>
                         </ButtonGroup>
+                        <Link href={"https://dehnes.com/stats/d/dYYFH4_Mk/ev-charging?orgId=1&refresh=1m&var-clientId=" + station.clientConnection.clientId}>
+                            <Button color="primary" variant="contained" style={{
+                                margin: "10px"
+                            }}>Stats</Button>
+                        </Link>
                     </Grid>
                 </Grid>
                 <Grid item xs={12}>
                     <Grid container justify="flex-start" spacing={2}>
 
-                        <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
+                        <ButtonGroup variant="contained" style={{
                             margin: "10px"
                         }}>
                             <Button
-                                color={station.config.loadSharingPriority === LoadSharingPriority.HIGH ? 'primary' : 'secondary'}
+                                color={station.config.loadSharingPriority === LoadSharingPriority.HIGH ? 'secondary' : 'primary'}
                                 onClick={() => updatePriorityTo(LoadSharingPriority.HIGH)}>High priority</Button>
                             <Button
-                                color={station.config.loadSharingPriority === LoadSharingPriority.NORMAL ? 'primary' : 'secondary'}
+                                color={station.config.loadSharingPriority === LoadSharingPriority.NORMAL ? 'secondary' : 'primary'}
                                 onClick={() => updatePriorityTo(LoadSharingPriority.NORMAL)}>Normal priority</Button>
                             <Button
-                                color={station.config.loadSharingPriority === LoadSharingPriority.LOW ? 'primary' : 'secondary'}
+                                color={station.config.loadSharingPriority === LoadSharingPriority.LOW ? 'secondary' : 'primary'}
                                 onClick={() => updatePriorityTo(LoadSharingPriority.LOW)}>Low priority</Button>
                         </ButtonGroup>
 

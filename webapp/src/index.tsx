@@ -3,37 +3,38 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './Components/App/App';
 import reportWebVitals from './reportWebVitals';
-import { CssBaseline } from "@material-ui/core";
+import { CssBaseline, MuiThemeProvider } from "@material-ui/core";
 import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
 import { EvChargingStations } from "./Components/EvChargingStations/EvChargingStations";
 import Webcams from "./Components/Webcams/Webcams";
+import theme from "./theme";
 
 ReactDOM.render(
     <React.StrictMode>
-        <CssBaseline/>
-
-        <Router basename={process.env.REACT_APP_BASENAME}>
-            <Switch>
-                <Route exact path="/">
-                    <App/>
-                </Route>
-                <Route path="/garage">
-                    <GarageDoor/>
-                </Route>
-                <Route path="/heater">
-                    <HeaterController/>
-                </Route>
-                <Route path="/evChargingStations">
-                    <EvChargingStations/>
-                </Route>
-                <Route path="/webcams">
-                    <Webcams/>
-                </Route>
-            </Switch>
-        </Router>
-
+        <MuiThemeProvider theme={theme}>
+            <CssBaseline/>
+            <Router basename={process.env.REACT_APP_BASENAME}>
+                <Switch>
+                    <Route exact path="/">
+                        <App/>
+                    </Route>
+                    <Route path="/garage">
+                        <GarageDoor/>
+                    </Route>
+                    <Route path="/heater">
+                        <HeaterController/>
+                    </Route>
+                    <Route path="/evChargingStations">
+                        <EvChargingStations/>
+                    </Route>
+                    <Route path="/webcams">
+                        <Webcams/>
+                    </Route>
+                </Switch>
+            </Router>
+        </MuiThemeProvider>
     </React.StrictMode>,
     document.getElementById('root')
 );

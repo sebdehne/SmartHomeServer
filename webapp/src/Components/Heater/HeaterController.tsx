@@ -1,11 +1,10 @@
-import React, {useEffect, useState} from 'react';
-import {Button, CircularProgress, Container, Paper, TextField, Typography} from "@material-ui/core";
-import {useHistory} from "react-router-dom";
+import React, { useEffect, useState } from 'react';
+import { Button, Container, TextField } from "@material-ui/core";
 import WebsocketService from "../../Websocket/websocketClient";
-import {timeToDelta} from "../GarageDoor/GarageDoor";
-import ConnectionStatusComponent from "../ConnectionStatus";
+import { timeToDelta } from "../GarageDoor/GarageDoor";
+import Header from "../Header";
 import './HeaterController.css';
-import {ArrowDownward, ArrowUpward} from "@material-ui/icons";
+import { ArrowDownward, ArrowUpward } from "@material-ui/icons";
 import {
     UnderFloorHeaterMode,
     UnderFloorHeaterRequest,
@@ -13,11 +12,10 @@ import {
     UnderFloorHeaterStatus,
     UpdateUnderFloorHeaterMode
 } from "../../Websocket/types/UnderFloorHeater";
-import {Notify, SubscriptionType} from "../../Websocket/types/Subscription";
-import {RequestType, RpcRequest, RpcResponse} from "../../Websocket/types/Rpc";
+import { Notify, SubscriptionType } from "../../Websocket/types/Subscription";
+import { RequestType, RpcRequest, RpcResponse } from "../../Websocket/types/Rpc";
 
 const HeaterController = () => {
-    let history = useHistory();
     const [underFloorHeaterStatus, setUnderFloorHeaterStatus] = useState<UnderFloorHeaterStatus | null>(null);
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
@@ -100,78 +98,67 @@ const HeaterController = () => {
 
     return (
         <Container maxWidth="sm" className="App">
-            <Paper>
-                <ConnectionStatusComponent/>
-                <Button variant="text" color="secondary" onClick={() => {
-                    history.push("/")
-                }}>
-                    Home
+            <Header
+                title="Heater Controller"
+                sending={sending}
+            />
+
+            {underFloorHeaterStatus &&
+            <div>
+                <ul>
+                    <li>Current status: {underFloorHeaterStatus.status}</li>
+                    <li>Current mode: {underFloorHeaterStatus.mode}</li>
+                    <li>Current temperature: {underFloorHeaterStatus.currentTemperature / 100}&deg;C</li>
+                    <li>Current energy price too
+                        expensive: {underFloorHeaterStatus.constantTemperatureStatus.energyPriceCurrentlyTooExpensive ? 'Yes' : 'No'}</li>
+                </ul>
+            </div>
+            }
+            {!underFloorHeaterStatus && <p>Status currently not available</p>}
+
+            <div className="Buttons">
+                <p>Target temp:</p>
+                <div className="TargetTempButtonsContainer">
+                    <Button variant="contained" color="primary" onClick={() => {
+                        setTargetTemperatur((prev: number) => {
+                            return prev + 1;
+                        });
+                    }}>
+                        <ArrowUpward/>
+                    </Button>
+                    <TextField
+                        value={targetTemperatur}
+                    />
+                    <Button variant="contained" color="primary" onClick={() => {
+                        setTargetTemperatur((prev: number) => {
+                            return prev - 1;
+                        });
+                    }}>
+                        <ArrowDownward/>
+                    </Button>
+                </div>
+                <Button variant="contained" color="primary"
+                        onClick={() => sendUpdate(UnderFloorHeaterMode.constantTemperature)}>
+                    Constant Temp
                 </Button>
-                <Typography>
-                    <h2>Heater Controller</h2>
-                </Typography>
+                <Button variant="contained" color="primary"
+                        onClick={() => sendUpdate(UnderFloorHeaterMode.permanentOn)}>
+                    On
+                </Button>
+                <Button variant="contained" color="primary"
+                        onClick={() => sendUpdate(UnderFloorHeaterMode.permanentOff)}>
+                    Off
+                </Button>
+            </div>
 
-                {underFloorHeaterStatus &&
-                <div>
-                    <ul>
-                        <li>Current status: {underFloorHeaterStatus.status}</li>
-                        <li>Current mode: {underFloorHeaterStatus.mode}</li>
-                        <li>Current temperature: {underFloorHeaterStatus.currentTemperature / 100}&deg;C</li>
-                        <li>Current energy price too
-                            expensive: {underFloorHeaterStatus.constantTemperatureStatus.energyPriceCurrentlyTooExpensive ? 'Yes' : 'No'}</li>
-                    </ul>
-                </div>
-                }
-                {!underFloorHeaterStatus && <p>Status currently not available</p>}
+            {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}
+            {cmdResult != null && !cmdResult && <p>Failed &#128078;!</p>}
 
-                <div className="Buttons">
-                    <p>Target temp:</p>
-                    <div className="TargetTempButtonsContainer">
-                        <Button variant="contained" color="secondary" onClick={() => {
-                            setTargetTemperatur((prev: number) => {
-                                return prev + 1;
-                            });
-                        }}>
-                            <ArrowUpward/>
-                        </Button>
-                        <TextField
-                            value={targetTemperatur}
-                        />
-                        <Button variant="contained" color="secondary" onClick={() => {
-                            setTargetTemperatur((prev: number) => {
-                                return prev - 1;
-                            });
-                        }}>
-                            <ArrowDownward/>
-                        </Button>
-                    </div>
-                    <Button variant="contained" color="secondary"
-                            onClick={() => sendUpdate(UnderFloorHeaterMode.constantTemperature)}>
-                        Constant Temp
-                    </Button>
-                    <Button variant="contained" color="secondary"
-                            onClick={() => sendUpdate(UnderFloorHeaterMode.permanentOn)}>
-                        On
-                    </Button>
-                    <Button variant="contained" color="secondary"
-                            onClick={() => sendUpdate(UnderFloorHeaterMode.permanentOff)}>
-                        Off
-                    </Button>
-                    {sending &&
-                    <CircularProgress color="secondary"/>
-                    }
-                </div>
+            {
+                underFloorHeaterStatus &&
+                <p>Updated: {timeToDelta(currentSeconds, underFloorHeaterStatus.utcTimestampInMs)} ago</p>
+            }
 
-                {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}
-                {cmdResult != null && !cmdResult && <p>Failed &#128078;!</p>}
-
-                {
-                    underFloorHeaterStatus &&
-                    <p>Updated: {timeToDelta(currentSeconds, underFloorHeaterStatus.utcTimestampInMs)} ago</p>
-                }
-
-
-            </Paper>
         </Container>
     );
 };

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Button, Container, Link, Paper, Typography } from "@material-ui/core";
+import { Button, Container, Link} from "@material-ui/core";
 import { useHistory } from "react-router-dom";
+import './App.css';
 
 const App = () => {
 
@@ -12,40 +13,36 @@ const App = () => {
 
     return (
         <Container maxWidth="sm" className="App">
-            <Paper>
-                <Typography>
-                    <h2>Smart home controller</h2>
-                </Typography>
-                <ul>
-                    <li>
-                        <Button variant="contained" color="secondary" onClick={relative("/garage")}>
-                            Garage door
+            <h2 style={{textAlign: "center"}}>Smart home controller</h2>
+            <ul className="Menu">
+                <li>
+                    <Button variant="contained" color="primary" onClick={relative("/garage")}>
+                        Garage door
+                    </Button>
+                </li>
+                <li>
+                    <Button variant="contained" color="primary" onClick={relative("/heater")}>
+                        Heater under floor
+                    </Button>
+                </li>
+                <li>
+                    <Button variant="contained" color="primary" onClick={relative("/evChargingStations")}>
+                        EV Charging
+                    </Button>
+                </li>
+                <li>
+                    <Button variant="contained" color="primary" onClick={relative("/webcams")}>
+                        Cameras
+                    </Button>
+                </li>
+                <li>
+                    <Link href="https://dehnes.com/stats/d/000000007/current">
+                        <Button variant="contained" color="primary">
+                            Temp's and Stats
                         </Button>
-                    </li>
-                    <li>
-                        <Button variant="contained" color="secondary" onClick={relative("/heater")}>
-                            Heater under floor
-                        </Button>
-                    </li>
-                    <li>
-                        <Button variant="contained" color="secondary" onClick={relative("/evChargingStations")}>
-                            EV Charging
-                        </Button>
-                    </li>
-                    <li>
-                        <Button variant="contained" color="secondary" onClick={relative("/webcams")}>
-                            Cameras
-                        </Button>
-                    </li>
-                    <li>
-                        <Link href="https://dehnes.com/stats/d/000000007/current">
-                            <Button variant="contained" color="secondary">
-                                Temp's and Stats
-                            </Button>
-                        </Link>
-                    </li>
-                </ul>
-            </Paper>
+                    </Link>
+                </li>
+            </ul>
         </Container>
     );
 };

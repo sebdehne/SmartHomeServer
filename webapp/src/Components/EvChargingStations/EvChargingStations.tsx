@@ -7,8 +7,8 @@ import {
 import WebsocketService from "../../Websocket/websocketClient";
 import { SubscriptionType } from "../../Websocket/types/Subscription";
 import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
-import { Button, CircularProgress, Container, Paper, Typography } from "@material-ui/core";
-import ConnectionStatusComponent from "../ConnectionStatus";
+import { Container } from "@material-ui/core";
+import Header from "../Header";
 import { useHistory } from "react-router-dom";
 import { EvChargingStation } from "./EvChargingStation";
 
@@ -48,42 +48,30 @@ export const EvChargingStations = () => {
     }, []);
 
     return <Container maxWidth="sm" className="App">
-        <Paper>
-            <ConnectionStatusComponent/>
-            <Button variant="text" color="secondary" onClick={() => {
-                history.push("/")
-            }}>
-                Home
-            </Button>
+        <Header
+            title="EV Charging"
+            sending={sending}
+        />
 
-            <Typography>
-                <h3 style={{ display: "inline" }}>EV Charging</h3>
-                {sending &&
-                <CircularProgress color="secondary"/>
-                }
-            </Typography>
-
-
-            {stations.length > 0 &&
-            <div>
-                {stations.map(station => (
-                    <EvChargingStation
-                        station={station}
-                        setCmdResult={setCmdResult}
-                        setSending={setSending}
-                        setStations={setStations}
-                        currentSeconds={currentSeconds}
-                    />
-                ))}
-            </div>
-            }
-            {stations.length === 0 &&
-            <h4>Currently no EV charging stations online</h4>
-            }
+        {stations.length > 0 &&
+        <div>
+            {stations.map(station => (
+                <EvChargingStation
+                    station={station}
+                    setCmdResult={setCmdResult}
+                    setSending={setSending}
+                    setStations={setStations}
+                    currentSeconds={currentSeconds}
+                />
+            ))}
+        </div>
+        }
+        {stations.length === 0 &&
+        <h4>Currently no EV charging stations online</h4>
+        }
 
 
-            {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}
-            {cmdResult != null && !cmdResult && <p>Failed &#128078;!</p>}
-        </Paper>
+        {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}
+        {cmdResult != null && !cmdResult && <p>Failed &#128078;!</p>}
     </Container>;
 };
