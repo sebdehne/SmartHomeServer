@@ -279,6 +279,7 @@ class EvChargingStationConnection(
             val data = collectData(clientId)
             logger.info { "Data response for $clientId $data" }
             data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=$clientId msg=$msg" } }
+            recordData(data, evChargingStationClient)
             executorService.submit {
                 listeners.forEach { entry ->
                     entry.value(Event(EventType.clientData, evChargingStationClient, data))
@@ -484,6 +485,9 @@ data class DataResponse(
             ((adcValue - offsetAndSlopeAndDivider.offset) * offsetAndSlopeAndDivider.slope) / offsetAndSlopeAndDivider.divider
     }
 
+
+
+    fun measuredCurrentInAmp() = listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!! / 1000
     override fun toString(): String {
         return "DataResponse(" +
                 "conactorOn=$conactorOn, " +
@@ -491,16 +495,21 @@ data class DataResponse(
                 "pilotVoltage=$pilotVoltage, " +
                 "proximityPilotAmps=$proximityPilotAmps, " +
                 "phase1Millivolts=$phase1Millivolts, " +
+                "phase1VoltsAdc=$phase1VoltsAdc, " +
                 "phase2Millivolts=$phase2Millivolts, " +
+                "phase2VoltsAdc=$phase2VoltsAdc, " +
                 "phase3Millivolts=$phase3Millivolts, " +
+                "phase3VoltsAdc=$phase3VoltsAdc, " +
                 "phase1Milliamps=$phase1Milliamps, " +
+                "phase1AmpsAdc=$phase1AmpsAdc, " +
                 "phase2Milliamps=$phase2Milliamps, " +
+                "phase2AmpsAdc=$phase2AmpsAdc, " +
                 "phase3Milliamps=$phase3Milliamps, " +
+                "phase3AmpsAdc=$phase3AmpsAdc, " +
                 "wifiRSSI=$wifiRSSI, " +
-                "systemUptime=$systemUptime)"
+                "systemUptime=$systemUptime, " +
+                "utcTimestampInMs=$utcTimestampInMs)"
     }
-
-    fun measuredCurrentInAmp() = listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!! / 1000
 
 }
 
