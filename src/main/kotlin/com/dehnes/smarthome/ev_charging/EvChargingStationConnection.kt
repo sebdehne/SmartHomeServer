@@ -2,6 +2,7 @@ package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
+import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -17,7 +18,8 @@ import java.util.zip.CRC32
 class EvChargingStationConnection(
     private val port: Int,
     private val executorService: ExecutorService,
-    private val persistenceService: PersistenceService
+    private val persistenceService: PersistenceService,
+    private val influxDBClient: InfluxDBClient
 ) {
     private val logger = KotlinLogging.logger { }
     private val chargerStationLogger = KotlinLogging.logger("ChargerStationLogger")
@@ -292,6 +294,33 @@ class EvChargingStationConnection(
         }
     }
 
+    private fun recordData(dataResponse: DataResponse, evChargingStationClient: EvChargingStationClient) {
+        influxDBClient.recordSensorData(
+            "evChargingData",
+            listOf(
+                "conactorOn" to dataResponse.conactorOn,
+                "pwmPercent" to dataResponse.pwmPercent,
+                "pilotVoltage" to dataResponse.pilotVoltage.voltValue,
+                "proximityPilotAmps" to dataResponse.proximityPilotAmps.ampValue,
+                "phase1Millivolts" to dataResponse.phase1Millivolts,
+                "phase2Millivolts" to dataResponse.phase2Millivolts,
+                "phase3Millivolts" to dataResponse.phase3Millivolts,
+                "phase1Milliamps" to dataResponse.phase1Milliamps,
+                "phase2Milliamps" to dataResponse.phase2Milliamps,
+                "phase3Milliamps" to dataResponse.phase3Milliamps,
+                "phase1VoltsAdc" to dataResponse.phase1VoltsAdc,
+                "phase2VoltsAdc" to dataResponse.phase2VoltsAdc,
+                "phase3VoltsAdc" to dataResponse.phase3VoltsAdc,
+                "phase1AmpsAdc" to dataResponse.phase1AmpsAdc,
+                "phase2AmpsAdc" to dataResponse.phase2AmpsAdc,
+                "phase3AmpsAdc" to dataResponse.phase3AmpsAdc,
+                "wifiRSSI" to dataResponse.wifiRSSI,
+                "systemUptime" to dataResponse.systemUptime
+            ),
+            "clientId" to evChargingStationClient.clientId
+        )
+    }
+
 }
 
 fun Socket.toAddressString() = "${this.inetAddress}:${this.port}"
@@ -498,14 +527,14 @@ fun readInt32Bits(buf: ByteArray, offset: Int): Int {
 }
 
 enum class PilotVoltage(
-    val value: Int
+    val value: Int,
+    val voltValue: Int
 ) {
-    Volt_12(0),
-    Volt_9(1),
-    Volt_6(2),
-    Volt_3(3),
-    Fault(4);
-
+    Volt_12(0, 12),
+    Volt_9(1, 9),
+    Volt_6(2, 6),
+    Volt_3(3, 3),
+    Fault(4, 0);
 }
 
 sealed class OutboundPacket(

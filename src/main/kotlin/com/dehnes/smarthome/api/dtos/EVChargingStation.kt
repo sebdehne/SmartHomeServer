@@ -84,12 +84,13 @@ enum class EvChargingMode {
 }
 
 enum class ProximityPilotAmps(
-    val value: Int
+    val value: Int,
+    val ampValue: Int
 ) {
-    Amp13(0),
-    Amp20(1),
-    Amp32(2),
-    NoCable(3);
+    Amp13(0, 13),
+    Amp20(1, 20),
+    Amp32(2, 32),
+    NoCable(3, 0);
 
     fun toAmps() = when (this) {
         NoCable -> 13

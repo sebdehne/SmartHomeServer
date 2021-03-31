@@ -53,7 +53,7 @@ class Configuration {
         )
         heaterService.start()
 
-        val evChargingStationConnection = EvChargingStationConnection(9091, executorService, persistenceService)
+        val evChargingStationConnection = EvChargingStationConnection(9091, executorService, persistenceService, influxDBClient)
         evChargingStationConnection.start()
 
         val evChargingService = EvChargingService(

@@ -48,7 +48,7 @@ class InfluxDBClient(
         }
     }
 
-    fun recordSensorData(type: String, fields: List<Pair<String, String>>, vararg tags: Pair<String, String>) {
+    fun recordSensorData(type: String, fields: List<Pair<String, Any>>, vararg tags: Pair<String, String>) {
         try {
             val sb = StringBuilder()
             sb.append(type)
