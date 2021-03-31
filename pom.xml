@@ -16,7 +16,7 @@
         <kotlin.version>1.4.32</kotlin.version>
         <jetty.version>9.4.39.v20210325</jetty.version>
         <httpclient.version>4.5.13</httpclient.version>
-        <kotlin.compiler.jvmTarget>15</kotlin.compiler.jvmTarget>
+        <kotlin.compiler.jvmTarget>14</kotlin.compiler.jvmTarget>
     </properties>
 
     <build>
