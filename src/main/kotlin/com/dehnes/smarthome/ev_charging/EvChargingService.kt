@@ -495,7 +495,7 @@ class EvChargingService(
                 chargingState = chargingState,
                 chargingStateOrRateChangedAt = clock.millis(),
                 reasonChargingUnavailable = if (chargingState == ConnectedChargingUnavailable) reasonChargingUnavailable else null,
-                measuredChargeRatePeak = if (chargingState == Charging) this.measuredChargeRatePeak else null
+                measuredChargeRatePeak = null,
             )
         }
     }
@@ -544,7 +544,8 @@ data class InternalState(
         if (maxChargingRate == this.maxChargingRate && this.chargingState != ChargingRequested) this else copy(
             chargingState = if (this.chargingState == ChargingRequested) Charging else this.chargingState,
             chargingStateOrRateChangedAt = timestamp,
-            maxChargingRate = maxChargingRate
+            maxChargingRate = maxChargingRate,
+            measuredChargeRatePeak = null
         )
 
     fun desiredPwmPercent() = if (chargingState.pwmOn()) {
