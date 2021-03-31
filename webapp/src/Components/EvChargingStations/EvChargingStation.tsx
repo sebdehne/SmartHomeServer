@@ -305,7 +305,9 @@ type PowerComponentProps = {
 };
 
 const PowerComponent = (props: PowerComponentProps) => {
-    let totalPower = (props.phase1volts + props.phase2volts + props.phase3volts) * (props.phase1amps + props.phase2amps + props.phase3amps);
+
+    let totalPower = props.phase1volts * props.phase1amps + props.phase2volts * props.phase2amps + props.phase3volts * props.phase3amps;
+
     return <TableContainer component={Paper} style={{
         marginTop: "20px"
     }}>

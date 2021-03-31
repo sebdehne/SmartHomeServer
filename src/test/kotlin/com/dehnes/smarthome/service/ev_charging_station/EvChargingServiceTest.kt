@@ -395,6 +395,8 @@ data class TestChargingStation(
         1,
         -20,
         0,
+        0,
+        0,
         emptyList()
     )
 

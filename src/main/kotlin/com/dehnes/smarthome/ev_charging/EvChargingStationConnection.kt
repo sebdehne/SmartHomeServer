@@ -231,7 +231,7 @@ class EvChargingStationConnection(
                             bytesRead += read
                         }
 
-                        val inboundPacket = responseType.parser(msg, getCalibrationData(clientIdStr))
+                        val inboundPacket = responseType.parser(msg, getCalibrationData(clientIdStr), evChargingStationClient.firmwareVersion)
 
                         if (inboundPacket.type == InboundType.notifyDataChanged) {
                             executorService.submit {
@@ -356,7 +356,7 @@ enum class RequestType(val value: Int) {
     setContactorState(5),
 }
 
-enum class InboundType(val value: Int, val parser: (ByteArray, CalibrationData) -> InboundPacket) {
+enum class InboundType(val value: Int, val parser: (ByteArray, CalibrationData, Int) -> InboundPacket) {
     pongResponse(1, PongResponse.Companion::parse),
     collectDataResponse(2, DataResponse.Companion::parse),
     setPwmPercentResponse(3, SetPwmPercentResponse.Companion::parse),
@@ -374,25 +374,25 @@ sealed class InboundPacket(
 
 class PongResponse : InboundPacket(InboundType.pongResponse) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData) = PongResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int) = PongResponse()
     }
 }
 
 class NotifyDataChanged : InboundPacket(InboundType.notifyDataChanged) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData) = NotifyDataChanged()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int) = NotifyDataChanged()
     }
 }
 
 class SetPwmPercentResponse : InboundPacket(InboundType.setPwmPercentResponse) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData) = SetPwmPercentResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int) = SetPwmPercentResponse()
     }
 }
 
 class SetContactorStateResponse : InboundPacket(InboundType.setContactorStateResponse) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData) = SetContactorStateResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int) = SetContactorStateResponse()
     }
 }
 
@@ -416,13 +416,16 @@ data class DataResponse(
     val phase3AmpsAdc: Int,
     val wifiRSSI: Int,
     val systemUptime: Int,
+    val pilotControlAdc: Int,
+    val proximityPilotAdc: Int,
     val logMessages: List<String>,
     val utcTimestampInMs: Long = Instant.now().toEpochMilli()
 ) : InboundPacket(InboundType.pongResponse) {
     companion object {
         fun parse(
             msg: ByteArray,
-            calibrationData: CalibrationData
+            calibrationData: CalibrationData,
+            version: Int
         ): DataResponse {
 
             /*
@@ -444,7 +447,8 @@ data class DataResponse(
 
             val logMessages = mutableListOf<String>()
             val stringBuilder = StringBuilder()
-            for (i in 36 until msg.size) {
+            val logMessagesFromIndex = if (version < 3) 36 else 44
+            for (i in logMessagesFromIndex until msg.size) {
                 val c = msg[i].toInt()
                 if (c == 0) {
                     logMessages.add(stringBuilder.toString())
@@ -476,6 +480,8 @@ data class DataResponse(
                 readInt32Bits(msg, 24),
                 readInt32Bits(msg, 28), // rssi
                 readInt32Bits(msg, 32), // uptime
+                if (version < 3) 0 else readInt32Bits(msg, 36), // PilotControlAdc
+                if (version < 3) 0 else readInt32Bits(msg, 40), // ProximityAdc
                 logMessages
             )
         }
@@ -508,6 +514,8 @@ data class DataResponse(
                 "phase2AmpsAdc=$phase2AmpsAdc, " +
                 "phase3Milliamps=$phase3Milliamps, " +
                 "phase3AmpsAdc=$phase3AmpsAdc, " +
+                "pilotControlAdc=$pilotControlAdc, " +
+                "proximityPilotAdc=$proximityPilotAdc, " +
                 "wifiRSSI=$wifiRSSI, " +
                 "systemUptime=$systemUptime, " +
                 "utcTimestampInMs=$utcTimestampInMs)"
