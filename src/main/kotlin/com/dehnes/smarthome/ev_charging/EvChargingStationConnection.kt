@@ -7,6 +7,7 @@ import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
+import java.lang.Integer.max
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.ByteBuffer
@@ -482,7 +483,7 @@ data class DataResponse(
             adcValue: Int,
             offsetAndSlopeAndDivider: OffsetAndSlopeAndDivider
         ) =
-            ((adcValue - offsetAndSlopeAndDivider.offset) * offsetAndSlopeAndDivider.slope) / offsetAndSlopeAndDivider.divider
+            max((((adcValue - offsetAndSlopeAndDivider.offset) * offsetAndSlopeAndDivider.slope) / offsetAndSlopeAndDivider.divider), 0)
     }
 
 
