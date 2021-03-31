@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button, Container } from "@material-ui/core";
 import './Webcams.css';
 import VideoService from "./video";
-import { useHistory } from "react-router-dom";
 import Header from "../Header";
 
 const streams = [

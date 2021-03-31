@@ -9,13 +9,10 @@ import { SubscriptionType } from "../../Websocket/types/Subscription";
 import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { Container } from "@material-ui/core";
 import Header from "../Header";
-import { useHistory } from "react-router-dom";
 import { EvChargingStation } from "./EvChargingStation";
 
 export const EvChargingStations = () => {
 
-
-    let history = useHistory();
     const [currentSeconds, setCurrentSeconds] = useState(Date.now());
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);

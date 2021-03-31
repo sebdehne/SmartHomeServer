@@ -63,9 +63,9 @@ function rpc(rpcRequest: RpcRequest): Promise<RpcResponse> {
 }
 
 function send(msg: WebsocketMessage) {
-    if (connectionStatus == ConnectionStatus.closed) {
+    if (connectionStatus === ConnectionStatus.closed) {
         reconnect();
-    } else if (connectionStatus == ConnectionStatus.connected) {
+    } else if (connectionStatus === ConnectionStatus.connected) {
         try {
             ws?.send(serialize(msg));
         } catch (e) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, CircularProgress, Container, Grid } from "@material-ui/core";
+import { Button, Container, Grid } from "@material-ui/core";
 import WebsocketService from "../../Websocket/websocketClient";
 import Header from "../Header";
 import { ArrowDownward, ArrowUpward } from "@material-ui/icons";
