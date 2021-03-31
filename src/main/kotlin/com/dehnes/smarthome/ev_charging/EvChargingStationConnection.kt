@@ -3,6 +3,7 @@ package com.dehnes.smarthome.ev_charging
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.garage_door.toInt
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -298,9 +299,9 @@ class EvChargingStationConnection(
 
     private fun recordData(dataResponse: DataResponse, evChargingStationClient: EvChargingStationClient) {
         influxDBClient.recordSensorData(
-            "evChargingData",
+            "evChargingDataV2",
             listOf(
-                "conactorOn" to dataResponse.conactorOn,
+                "conactorOn" to dataResponse.conactorOn.toInt(),
                 "pwmPercent" to dataResponse.pwmPercent,
                 "pilotVoltage" to dataResponse.pilotVoltage.voltValue,
                 "proximityPilotAmps" to dataResponse.proximityPilotAmps.ampValue,
