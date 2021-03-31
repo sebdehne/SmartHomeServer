@@ -54,7 +54,7 @@ class PriorityLoadSharing(
         val loadSharableById =
             currentData.filter { it.value.powerConnectionId == powerConnectionId }.toMap().toMutableMap()
         var availableCapacity =
-            persistenceService.get("PowerConnection.availableCapacity.$powerConnectionId", "32")!!.toInt()
+            persistenceService["PowerConnection.availableCapacity.$powerConnectionId", "32"]!!.toInt()
         check(availableCapacity in 1..1000) { "AvailableCapacity outside of reasonable range? $availableCapacity" }
 
         val requestCapability = { request: Int ->

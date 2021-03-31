@@ -5,6 +5,7 @@ import com.dehnes.smarthome.energy_pricing.tibber.TibberService
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
+import java.lang.Integer.min
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -336,7 +337,7 @@ class EvChargingService(
                     // still charging
                     var goesToEnding = false
                     var measuredChargeRatePeak = existingState.measuredChargeRatePeak
-                    if (measuredChargeRatePeak == null || dataResponse.measuredCurrentInAmp() >= measuredChargeRatePeak) {
+                    if (measuredChargeRatePeak == null || isRateLimited(existingState) || dataResponse.measuredCurrentInAmp() >= measuredChargeRatePeak) {
                         measuredChargeRatePeak = dataResponse.measuredCurrentInAmp()
                     } else if (dataResponse.measuredCurrentInAmp() < measuredChargeRatePeak - chargingEndingAmpDelta) {
                         goesToEnding = true
@@ -504,6 +505,13 @@ class EvChargingService(
         ),
         internalState.evChargingStationClient
     )
+
+    private fun isRateLimited(internalState: InternalState): Boolean {
+        val availableCapacity =
+            persistenceService["PowerConnection.availableCapacity.${internalState.evChargingStationClient.powerConnectionId}", "32"]!!.toInt()
+        val availableMaxRate = min(availableCapacity, internalState.proximityPilotAmps)
+        return availableCapacity > internalState.maxChargingRate
+    }
 }
 
 data class InternalState(
