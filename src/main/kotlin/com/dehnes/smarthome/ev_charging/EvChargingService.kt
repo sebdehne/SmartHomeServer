@@ -73,11 +73,13 @@ class EvChargingService(
 
     // config
     private val chargingEndingAmpDelta =
-        persistenceService.get("EvChargingService.chargingEndingAmpDelta", "2")!!.toInt()
+        persistenceService["EvChargingService.chargingEndingAmpDelta", "2"]!!.toInt()
     private val stayInStoppingChargingForMS =
-        persistenceService.get("EvChargingService.stayInStoppingChargingForMS", (1000 * 5).toString())!!.toLong()
+        persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 5).toString()]!!.toLong()
+    private val stayInChargingForMS =
+        persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 10).toString()]!!.toLong()
     private val assumeStationLostAfterMs =
-        persistenceService.get("EvChargingService.assumeStationLostAfterMs", (1000 * 60 * 5).toString())!!.toLong()
+        persistenceService["EvChargingService.assumeStationLostAfterMs", (1000 * 60 * 5).toString()]!!.toLong()
 
     val logger = KotlinLogging.logger { }
 
@@ -319,7 +321,12 @@ class EvChargingService(
                     existingState.changeState(Error)
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Volt_9) {
                     if (canCharge) {
-                        existingState.changeState(ConnectedChargingAvailable, LOWEST_MAX_CHARGE_RATE)
+                        val timeBeenHere = clock.millis() - existingState.chargingStateChangedAt
+                        if (timeBeenHere <= stayInChargingForMS) {
+                            existingState // Tesla is a bit unstable in the beginning, ignore flipping back to Volt_9 too soon
+                        } else {
+                            existingState.changeState(ConnectedChargingAvailable, LOWEST_MAX_CHARGE_RATE)
+                        }
                     } else {
                         existingState.changeState(ConnectedChargingUnavailable)
                             .setReasonChargingUnavailable(reasonCannotCharge)
@@ -521,13 +528,15 @@ data class InternalState(
     override val loadSharingPriorityValue: Int
         get() = loadSharingPriority.value
 
-    override fun setNoCapacityAvailable() = copy(
+    override fun setNoCapacityAvailable(timestamp: Long) = copy(
         chargingState = ConnectedChargingUnavailable,
+        chargingStateChangedAt = if (chargingState != ConnectedChargingUnavailable) timestamp else this.chargingStateChangedAt,
         reasonChargingUnavailable = "No capacity available"
     )
 
-    override fun allowChargingWith(maxChargingRate: Int) = copy(
-        chargingState = if (this.chargingState == ChargingRequested) Charging else this.chargingState, // do not change ending-state
+    override fun allowChargingWith(maxChargingRate: Int, timestamp: Long) = copy(
+        chargingState = if (this.chargingState == ChargingRequested) Charging else this.chargingState,
+        chargingStateChangedAt = if (this.chargingState == ChargingRequested) timestamp else this.chargingStateChangedAt,
         maxChargingRate = maxChargingRate
     )
 

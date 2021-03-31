@@ -35,8 +35,10 @@ class Configuration {
         val garageDoorService = GarageDoorService(serialConnection, influxDBClient)
         val chipCap2SensorService = ChipCap2SensorService(influxDBClient)
 
+        val clock = Clock.systemDefaultZone()
+
         val tibberService = TibberService(
-            Clock.systemDefaultZone(),
+            clock,
             objectMapper,
             persistenceService,
             influxDBClient,
@@ -61,9 +63,9 @@ class Configuration {
             executorService,
             tibberService,
             persistenceService,
-            Clock.systemDefaultZone(),
+            clock,
             mapOf(
-                PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(persistenceService)
+                PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(persistenceService, clock)
             )
         )
         evChargingService.start()

@@ -115,7 +115,7 @@ internal class EvChargingServiceTest {
         persistenceService,
         clockMock,
         mapOf(
-            PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(persistenceService)
+            PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(persistenceService, clockMock)
         )
     )
 
@@ -204,7 +204,31 @@ internal class EvChargingServiceTest {
         s1.pilotVoltage = PilotVoltage.Volt_6
 
         collectDataCycle()
+        assertTrue(s1.contactorOn)
+        assertEquals(chargeRateToPwmPercent(32), s1.pwmPercent)
+        assertFalse(s2.contactorOn)
+        assertEquals(100, s2.pwmPercent)
 
+        // simulate Tesla flipping back to 9Volt too soon
+        s1.pilotVoltage = PilotVoltage.Volt_9
+        timeHolder.set(timeHolder.get().plusSeconds(1))
+        collectDataCycle()
+        assertTrue(s1.contactorOn)
+        assertEquals(chargeRateToPwmPercent(32), s1.pwmPercent)
+        assertFalse(s2.contactorOn)
+        assertEquals(100, s2.pwmPercent)
+
+        timeHolder.set(timeHolder.get().plusSeconds(10))
+        collectDataCycle()
+        assertFalse(s1.contactorOn)
+        assertEquals(11, s1.pwmPercent)
+        assertFalse(s2.contactorOn)
+        assertEquals(100, s2.pwmPercent)
+
+        // Car ready to charge (again)
+        s1.pilotVoltage = PilotVoltage.Volt_6
+
+        collectDataCycle()
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(32), s1.pwmPercent)
         assertFalse(s2.contactorOn)

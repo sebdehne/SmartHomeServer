@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+    ChargingState,
     EvChargingMode,
     EvChargingStationClient,
     EvChargingStationDataAndConfig,
@@ -14,7 +15,8 @@ import {
     AccordionSummary,
     Button,
     ButtonGroup,
-    Grid, Link,
+    Grid,
+    Link,
     Paper,
     Switch,
     Table,
@@ -29,6 +31,19 @@ import WebsocketService from "../../Websocket/websocketClient";
 import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 import { FirmwareUpload } from "./FirmwareUpload";
+
+const stateToText = (state: ChargingState) => {
+    if (state === ChargingState.Unconnected) {
+        return "No EV connected";
+    }
+    if (state === ChargingState.ConnectedChargingUnavailable) {
+        return "EV connected; cannot charge"
+    }
+    if (state === ChargingState.ConnectedChargingAvailable) {
+        return "EV connected, can charge";
+    }
+    return state.toString()
+};
 
 type EvChargingStationProps = {
     setSending: (sending: boolean) => void;
@@ -106,7 +121,7 @@ export const EvChargingStation = ({
                         fontWeight: "bold",
                         fontSize: "140%"
                     }
-                    }>{station.clientConnection.displayName}</span> - {station.data.chargingState}
+                    }>{station.clientConnection.displayName}</span> - {stateToText(station.data.chargingState)}
                 </div>
             </div>
         </AccordionSummary>
@@ -129,7 +144,8 @@ export const EvChargingStation = ({
                                 onClick={() => updateModeTo(EvChargingMode.ChargeDuringCheapHours)}
                             >Low-cost</Button>
                         </ButtonGroup>
-                        <Link href={"https://dehnes.com/stats/d/dYYFH4_Mk/ev-charging?orgId=1&refresh=1m&var-clientId=" + station.clientConnection.clientId}>
+                        <Link
+                            href={"https://dehnes.com/stats/d/dYYFH4_Mk/ev-charging?orgId=1&refresh=1m&var-clientId=" + station.clientConnection.clientId}>
                             <Button color="primary" variant="contained" style={{
                                 margin: "10px"
                             }}>Stats</Button>

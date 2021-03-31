@@ -2,6 +2,7 @@ package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.utils.PersistenceService
+import java.time.Clock
 
 
 interface LoadSharing {
@@ -20,8 +21,8 @@ interface LoadSharable {
     val maxChargingRate: Int
     val loadSharingPriorityValue: Int
 
-    fun setNoCapacityAvailable(): LoadSharable
-    fun allowChargingWith(maxChargingRate: Int): LoadSharable
+    fun setNoCapacityAvailable(timestamp: Long): LoadSharable
+    fun allowChargingWith(maxChargingRate: Int, timestamp: Long): LoadSharable
 }
 
 enum class LoadSharingPriority(
@@ -37,7 +38,8 @@ enum class LoadSharingPriority(
  * more capacity is available
  */
 class PriorityLoadSharing(
-    private val persistenceService: PersistenceService
+    private val persistenceService: PersistenceService,
+    private val clock: Clock
 ) : LoadSharing {
 
     override fun calculateLoadSharing(
@@ -73,15 +75,18 @@ class PriorityLoadSharing(
                             val possibleChargeRate = capacityPerStation.coerceAtMost(internalState.proximityPilotAmps)
                             val amps = requestCapability(possibleChargeRate.coerceAtLeast(LOWEST_MAX_CHARGE_RATE))
                             if (amps > 0) {
-                                loadSharableById[clientId] = internalState.allowChargingWith(amps)
+                                loadSharableById[clientId] = internalState.allowChargingWith(amps, clock.millis())
                             } else {
-                                loadSharableById[clientId] = internalState.setNoCapacityAvailable()
+                                loadSharableById[clientId] = internalState.setNoCapacityAvailable(clock.millis())
                             }
                         } else {
                             val headRoom = internalState.proximityPilotAmps - internalState.maxChargingRate
                             val ampsToAdd = requestCapability(capacityPerStation.coerceAtMost(headRoom))
                             loadSharableById[clientId] =
-                                internalState.allowChargingWith(internalState.maxChargingRate + ampsToAdd)
+                                internalState.allowChargingWith(
+                                    internalState.maxChargingRate + ampsToAdd,
+                                    clock.millis()
+                                )
                         }
                     }
                 }
@@ -98,9 +103,9 @@ class PriorityLoadSharing(
             .forEach { (clientId, internalState) ->
                 val amps = requestCapability(LOWEST_MAX_CHARGE_RATE)
                 if (amps > 0) {
-                    loadSharableById[clientId] = internalState.allowChargingWith(amps)
+                    loadSharableById[clientId] = internalState.allowChargingWith(amps, clock.millis())
                 } else {
-                    loadSharableById[clientId] = internalState.setNoCapacityAvailable()
+                    loadSharableById[clientId] = internalState.setNoCapacityAvailable(clock.millis())
                 }
             }
 
@@ -131,7 +136,10 @@ class PriorityLoadSharing(
                         if (madeAvailable > 0) {
                             availableCapacity += madeAvailable
                             loadSharableById[clientId] =
-                                internalState.allowChargingWith(internalState.maxChargingRate - madeAvailable)
+                                internalState.allowChargingWith(
+                                    internalState.maxChargingRate - madeAvailable,
+                                    clock.millis()
+                                )
                         }
                     }
                 }
