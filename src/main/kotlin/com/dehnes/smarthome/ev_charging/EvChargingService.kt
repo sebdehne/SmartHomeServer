@@ -75,9 +75,9 @@ class EvChargingService(
     private val chargingEndingAmpDelta =
         persistenceService["EvChargingService.chargingEndingAmpDelta", "2"]!!.toInt()
     private val stayInStoppingChargingForMS =
-        persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 5).toString()]!!.toLong()
+        persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 15).toString()]!!.toLong()
     private val stayInChargingForMS =
-        persistenceService["EvChargingService.stayInChargingForMS", (1000 * 10).toString()]!!.toLong()
+        persistenceService["EvChargingService.stayInChargingForMS", (1000 * 15).toString()]!!.toLong()
     private val assumeStationLostAfterMs =
         persistenceService["EvChargingService.assumeStationLostAfterMs", (1000 * 60 * 5).toString()]!!.toLong()
 
