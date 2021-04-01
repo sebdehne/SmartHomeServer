@@ -55,7 +55,7 @@ enum class ChargingState {
     }
 
     fun pwmOn() = when (this) {
-        ConnectedChargingAvailable, ChargingRequested, Charging, ChargingEnding, StoppingCharging -> true
+        ConnectedChargingAvailable, ChargingRequested, Charging, ChargingEnding -> true
         else -> false
     }
 }
@@ -75,9 +75,9 @@ class EvChargingService(
     private val chargingEndingAmpDelta =
         persistenceService["EvChargingService.chargingEndingAmpDelta", "2"]!!.toInt()
     private val stayInStoppingChargingForMS =
-        persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 15).toString()]!!.toLong()
+        persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 5).toString()]!!.toLong()
     private val stayInChargingForMS =
-        persistenceService["EvChargingService.stayInChargingForMS", (1000 * 15).toString()]!!.toLong()
+        persistenceService["EvChargingService.stayInChargingForMS", (1000 * 30).toString()]!!.toLong()
     private val assumeStationLostAfterMs =
         persistenceService["EvChargingService.assumeStationLostAfterMs", (1000 * 60 * 5).toString()]!!.toLong()
 
@@ -190,12 +190,12 @@ class EvChargingService(
         val canCharge = when {
             mode == EvChargingMode.ON -> true
             mode == EvChargingMode.OFF -> {
-                reasonCannotCharge = "Manually switched off"
+                reasonCannotCharge = "Switched Off"
                 false
             }
             mode == EvChargingMode.ChargeDuringCheapHours && energyPriceOK -> true
             mode == EvChargingMode.ChargeDuringCheapHours && !energyPriceOK -> {
-                reasonCannotCharge = "Waiting for lower energy prices"
+                reasonCannotCharge = "Price too high"
                 false
             }
             else -> error("Impossible")
@@ -333,12 +333,13 @@ class EvChargingService(
                         }
                     } else {
                         // still charging
+                        // TODO need to improve this - need to look at the trend over time and ignore sudden changes
                         var goesToEnding = false
                         var measuredChargeRatePeak = existingState.measuredChargeRatePeak
                         if (measuredChargeRatePeak == null || dataResponse.measuredCurrentInAmp() >= measuredChargeRatePeak) {
                             measuredChargeRatePeak = dataResponse.measuredCurrentInAmp()
                         } else if (dataResponse.measuredCurrentInAmp() < measuredChargeRatePeak - chargingEndingAmpDelta) {
-                            goesToEnding = true
+                            goesToEnding = false
                         }
 
                         if (canCharge) {
@@ -375,12 +376,7 @@ class EvChargingService(
                     }
                 }
             }
-        }.updateData(evChargingStationClient, dataResponse).let { state ->
-            if (state.reasonChargingUnavailable == "Unknown" && reasonCannotCharge != null)
-                state.copy(reasonChargingUnavailable = reasonCannotCharge)
-            else
-                state
-        }
+        }.updateData(evChargingStationClient, dataResponse).copy(reasonChargingUnavailable = reasonCannotCharge)
 
         currentData[clientId] = updatedState
 

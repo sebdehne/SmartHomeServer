@@ -52,8 +52,13 @@ export const EvChargingStations = () => {
 
         {stations.length > 0 &&
         <div>
-            {stations.map(station => (
+            {stations
+                .sort((a, b) => {
+                    return b.clientConnection.clientId.localeCompare(a.clientConnection.clientId);
+                })
+                .map(station => (
                 <EvChargingStation
+                    key={station.clientConnection.clientId}
                     station={station}
                     setCmdResult={setCmdResult}
                     setSending={setSending}

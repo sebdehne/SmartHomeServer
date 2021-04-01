@@ -32,15 +32,15 @@ import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 import { FirmwareUpload } from "./FirmwareUpload";
 
-const stateToText = (state: ChargingState) => {
+const stateToText = (state: ChargingState, reasonChargingUnavailable: string | null) => {
     if (state === ChargingState.Unconnected) {
         return "No EV connected";
     }
     if (state === ChargingState.ConnectedChargingUnavailable) {
-        return "EV connected; cannot charge"
+        return "EV connected: " + reasonChargingUnavailable;
     }
     if (state === ChargingState.ConnectedChargingAvailable) {
-        return "EV connected, can charge";
+        return "EV connected, ready";
     }
     return state.toString()
 };
@@ -121,7 +121,7 @@ export const EvChargingStation = ({
                         fontWeight: "bold",
                         fontSize: "140%"
                     }
-                    }>{station.clientConnection.displayName}</span> - {stateToText(station.data.chargingState)}
+                    }>{station.clientConnection.displayName}</span> - {stateToText(station.data.chargingState, station.data.reasonChargingUnavailable)}
                 </div>
             </div>
         </AccordionSummary>
