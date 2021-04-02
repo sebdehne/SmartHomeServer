@@ -8,8 +8,6 @@ import org.apache.http.HttpVersion
 import org.apache.http.client.fluent.Request
 import org.apache.http.entity.ContentType
 import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 class TibberPriceClient(
@@ -33,7 +31,7 @@ class TibberPriceClient(
             .version(HttpVersion.HTTP_1_1)
             .addHeader(
                 "Authorization",
-                "Bearer " + persistenceService.get("tibberAuthBearer", "authkeyMangler")
+                "Bearer " + persistenceService["tibberAuthBearer", "authkeyMangler"]
             )
             .bodyString(query, ContentType.APPLICATION_JSON)
             .execute()
@@ -53,7 +51,7 @@ class TibberPriceClient(
         val result = mutableListOf<Price>()
 
         prices.forEachIndexed { i, current ->
-            val startAt = Instant.parse(current["startsAt"] as CharSequence?)
+            val startAt = Instant.parse(current["startsAt"] as CharSequence)
             var endsAt = startAt.plus(30, ChronoUnit.DAYS)
             if (i + 1 < prices.size) {
                 endsAt = Instant.parse(prices[i + 1]["startsAt"] as CharSequence?)
@@ -80,10 +78,4 @@ data class Price(
     var price: Double
 ) {
     fun isValidFor(input: Instant) = (input.isAfter(from) || input == from) && input.isBefore(to)
-
-    fun isValidForDay(input: LocalDate): Boolean {
-        val fromDay = from.atZone(ZoneId.systemDefault()).toLocalDate()
-        val toDay = to.atZone(ZoneId.systemDefault()).toLocalDate()
-        return input == fromDay || input == toDay
-    }
 }

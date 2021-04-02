@@ -7,12 +7,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import java.time.Clock
 import java.time.Instant
-import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.ExecutorService
 
 class TibberService(
     private val clock: Clock,
-    objectMapper: ObjectMapper,
+    private val objectMapper: ObjectMapper,
     persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
     executorService: ExecutorService
@@ -44,20 +44,39 @@ class TibberService(
     override fun logger() = logger
 
     @Synchronized
-    fun isEnergyPriceOK(numberOfHoursRequired: Int): Boolean {
+    fun mustWaitUntil(numberOfHoursRequired: Int): Instant? {
         ensureCacheLoaded()
 
         val now = Instant.now(clock)
-        val today = now.atZone(ZoneId.systemDefault()).toLocalDate()
-        val todaysPrices: List<Price> = priceCache
-            .filter { price: Price -> price.isValidForDay(today) }
-            .sortedBy { p -> p.price }
+        val nowPlus24Hours = now.plus(24, ChronoUnit.HOURS)
 
-        return if (todaysPrices.isEmpty()) {
-            true
-        } else todaysPrices.subList(0, numberOfHoursRequired).any { p: Price ->
-            p.isValidFor(now)
+        val next24Hours = priceCache
+            .sortedBy { it.from }
+            .filter { it.to.isAfter(now) }
+            .filter { it.from.isBefore(nowPlus24Hours) }
+
+        val cheapEnoughHours = next24Hours
+            .sortedBy { it.price }
+            .let {
+                if (it.size >= numberOfHoursRequired) {
+                    it.subList(0, numberOfHoursRequired)
+                } else
+                    it
+            }
+            .sortedBy { it.from }
+
+        val nextCheapHour = cheapEnoughHours.firstOrNull()
+        return when {
+            nextCheapHour == null -> {
+                logger.info { "No cheap enough hour available" }
+                null
+            }
+            nextCheapHour.isValidFor(now) -> {
+                null
+            }
+            else -> nextCheapHour.from
         }
+
     }
 
     private fun getCurrentPrice(): Double? {
@@ -80,7 +99,7 @@ class TibberService(
         lastReload = System.currentTimeMillis()
         if (prices != null) {
             priceCache = prices
-            logger.info("Fetching tibber prices...SUCCESS")
+            logger.info("Fetching tibber prices...SUCCESS. " + objectMapper.writeValueAsString(prices))
         } else {
             logger.info("Fetching tibber prices...FAILED")
         }

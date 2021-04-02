@@ -3,9 +3,9 @@ package com.dehnes.smarthome.service.ev_charging_station
 import com.dehnes.smarthome.api.dtos.EvChargingMode
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
-import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
 import com.dehnes.smarthome.ev_charging.*
+import com.dehnes.smarthome.utils.PersistenceService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,7 +22,7 @@ import kotlin.test.assertFalse
 internal class EvChargingServiceTest {
 
     val timeHolder = AtomicReference(Instant.now())
-    val isEnergyPriceOK = AtomicBoolean(true)
+    var mustWaitUntil: Instant? = null
     val tibberService = mockk<TibberService>()
     val executorService = mockk<ExecutorService>()
     val persistenceService = mockk<PersistenceService>()
@@ -36,9 +35,9 @@ internal class EvChargingServiceTest {
 
     init {
         every {
-            tibberService.isEnergyPriceOK(any())
+            tibberService.mustWaitUntil(any())
         } answers {
-            isEnergyPriceOK.get()
+            mustWaitUntil
         }
 
         val slot = slot<Runnable>()
@@ -201,31 +200,6 @@ internal class EvChargingServiceTest {
         assertEquals(100, s2.pwmPercent)
 
         // Car ready to charge
-        s1.pilotVoltage = PilotVoltage.Volt_6
-
-        collectDataCycle()
-        assertTrue(s1.contactorOn)
-        assertEquals(chargeRateToPwmPercent(32), s1.pwmPercent)
-        assertFalse(s2.contactorOn)
-        assertEquals(100, s2.pwmPercent)
-
-        // simulate Tesla flipping back to 9Volt too soon
-        s1.pilotVoltage = PilotVoltage.Volt_9
-        timeHolder.set(timeHolder.get().plusSeconds(5))
-        collectDataCycle()
-        assertTrue(s1.contactorOn)
-        assertEquals(chargeRateToPwmPercent(32), s1.pwmPercent)
-        assertFalse(s2.contactorOn)
-        assertEquals(100, s2.pwmPercent)
-
-        timeHolder.set(timeHolder.get().plusSeconds(30))
-        collectDataCycle()
-        assertFalse(s1.contactorOn)
-        assertEquals(11, s1.pwmPercent)
-        assertFalse(s2.contactorOn)
-        assertEquals(100, s2.pwmPercent)
-
-        // Car ready to charge (again)
         s1.pilotVoltage = PilotVoltage.Volt_6
 
         collectDataCycle()

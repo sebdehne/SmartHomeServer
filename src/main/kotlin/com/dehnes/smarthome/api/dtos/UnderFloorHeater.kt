@@ -44,7 +44,7 @@ enum class UnderFloorHeaterMode(val mode: Mode) {
 data class UnderFloorHeaterConstantTemperaturStatus(
     val targetTemperature: Int,
     val mostExpensiveHoursToSkip: Int,
-    val energyPriceCurrentlyTooExpensive: Boolean,
+    val waitUntilCheapHour: Long?,
 )
 
 enum class OnOff {

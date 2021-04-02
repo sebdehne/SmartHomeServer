@@ -10,6 +10,7 @@ import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.utils.Sht15Calculator
 import com.dehnes.smarthome.utils.Sht15Calculator.calculateRelativeHumidity
 import mu.KotlinLogging
+import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -28,7 +29,8 @@ class UnderFloorHeaterService(
     executorService: ExecutorService,
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
-    private val tibberService: TibberService
+    private val tibberService: TibberService,
+    private val clock: Clock
 ) : AbstractProcess(executorService, 120) {
 
     private val rfAddr = 27
@@ -67,7 +69,7 @@ class UnderFloorHeaterService(
             return false
         }
 
-        var energyPriceCurrentlyTooExpensive = false
+        var waitUntilCheapHour: Instant? = null
 
         // evaluate state
         when (currentMode) {
@@ -76,13 +78,13 @@ class UnderFloorHeaterService(
             Mode.MANUAL -> {
                 val targetTemperature = getTargetTemperature()
                 logger.info("Evaluating target temperature now: $targetTemperature")
-                energyPriceCurrentlyTooExpensive = !tibberService.isEnergyPriceOK(24 - getMostExpensiveHoursToSkip())
-                if (!energyPriceCurrentlyTooExpensive && sensorData.temperature < targetTemperature) {
+                waitUntilCheapHour = tibberService.mustWaitUntil(24 - getMostExpensiveHoursToSkip())
+                if (waitUntilCheapHour == null && sensorData.temperature < targetTemperature) {
                     logger.info("Setting heater to on")
                     persistenceService[HEATER_STATUS_KEY] = "on"
                 } else {
                     logger.info {
-                        "Setting heater to off. energyPriceCurrentlyTooExpensive=$energyPriceCurrentlyTooExpensive"
+                        "Setting heater to off. waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
                     }
                     persistenceService[HEATER_STATUS_KEY] = "off"
                 }
@@ -113,7 +115,7 @@ class UnderFloorHeaterService(
             UnderFloorHeaterConstantTemperaturStatus(
                 getTargetTemperature(),
                 getMostExpensiveHoursToSkip(),
-                energyPriceCurrentlyTooExpensive
+                waitUntilCheapHour?.toEpochMilli()
             )
         )
 

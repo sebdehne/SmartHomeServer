@@ -14,6 +14,7 @@ import {
 } from "../../Websocket/types/UnderFloorHeater";
 import { Notify, SubscriptionType } from "../../Websocket/types/Subscription";
 import { RequestType, RpcRequest, RpcResponse } from "../../Websocket/types/Rpc";
+import { formateDateTime } from "../Utils/dateUtils";
 
 const HeaterController = () => {
     const [underFloorHeaterStatus, setUnderFloorHeaterStatus] = useState<UnderFloorHeaterStatus | null>(null);
@@ -109,8 +110,8 @@ const HeaterController = () => {
                     <li>Current status: {underFloorHeaterStatus.status}</li>
                     <li>Current mode: {underFloorHeaterStatus.mode}</li>
                     <li>Current temperature: {underFloorHeaterStatus.currentTemperature / 100}&deg;C</li>
-                    <li>Current energy price too
-                        expensive: {underFloorHeaterStatus.constantTemperatureStatus.energyPriceCurrentlyTooExpensive ? 'Yes' : 'No'}</li>
+                    <li>Waiting for low energy
+                        price: {underFloorHeaterStatus.constantTemperatureStatus.waitUntilCheapHour === null ? "No" : formateDateTime(underFloorHeaterStatus.constantTemperatureStatus.waitUntilCheapHour)}</li>
                 </ul>
             </div>
             }

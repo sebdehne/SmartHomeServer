@@ -76,8 +76,6 @@ class EvChargingService(
         persistenceService["EvChargingService.chargingEndingAmpDelta", "2"]!!.toInt()
     private val stayInStoppingChargingForMS =
         persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 5).toString()]!!.toLong()
-    private val stayInChargingForMS =
-        persistenceService["EvChargingService.stayInChargingForMS", (1000 * 30).toString()]!!.toLong()
     private val assumeStationLostAfterMs =
         persistenceService["EvChargingService.assumeStationLostAfterMs", (1000 * 60 * 5).toString()]!!.toLong()
 
@@ -185,7 +183,7 @@ class EvChargingService(
          * B) Figure out if the charging stations is allowed to charge at this point in time
          */
         val mode = getMode(clientId)
-        val energyPriceOK = tibberService.isEnergyPriceOK(getNumberOfHoursRequiredFor(clientId))
+        val nextCheapHour = tibberService.mustWaitUntil(getNumberOfHoursRequiredFor(clientId))
         var reasonCannotCharge: String? = null
         val canCharge = when {
             mode == EvChargingMode.ON -> true
@@ -193,9 +191,9 @@ class EvChargingService(
                 reasonCannotCharge = "Switched Off"
                 false
             }
-            mode == EvChargingMode.ChargeDuringCheapHours && energyPriceOK -> true
-            mode == EvChargingMode.ChargeDuringCheapHours && !energyPriceOK -> {
-                reasonCannotCharge = "Price too high"
+            mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour == null -> true
+            mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour != null -> {
+                reasonCannotCharge = "starting @ " + nextCheapHour.atZone(clock.zone).toLocalTime()
                 false
             }
             else -> error("Impossible")
@@ -282,7 +280,7 @@ class EvChargingService(
                         )
                     }
                 } else {
-                    if (clock.millis() - existingState.chargingStateOrRateChangedAt >= stayInStoppingChargingForMS) {
+                    if (clock.millis() - existingState.chargingStateChangedAt >= stayInStoppingChargingForMS) {
                         if (canCharge) {
                             existingState.changeState(ConnectedChargingAvailable, LOWEST_MAX_CHARGE_RATE)
                         } else {
@@ -315,42 +313,36 @@ class EvChargingService(
                 }
             }
             Charging -> {
-                val timeBeenHere = clock.millis() - existingState.chargingStateOrRateChangedAt
-                if (timeBeenHere <= stayInChargingForMS) {
-                    logger.info { "Ignoring event and staying in Charging for clientId=$clientId" }
-                    existingState
+                if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
+                    existingState.changeState(Unconnected)
+                } else if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
+                    existingState.changeState(Error)
+                } else if (dataResponse.pilotVoltage == PilotVoltage.Volt_9) {
+                    if (canCharge) {
+                        existingState.changeState(ConnectedChargingAvailable, LOWEST_MAX_CHARGE_RATE)
+                    } else {
+                        existingState.changeState(ConnectedChargingUnavailable)
+                            .setReasonChargingUnavailable(reasonCannotCharge)
+                    }
                 } else {
-                    if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
-                        existingState.changeState(Unconnected)
-                    } else if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
-                        existingState.changeState(Error)
-                    } else if (dataResponse.pilotVoltage == PilotVoltage.Volt_9) {
-                        if (canCharge) {
-                            existingState.changeState(ConnectedChargingAvailable, LOWEST_MAX_CHARGE_RATE)
+                    // still charging
+                    // TODO need to improve this - need to look at the trend over time and ignore sudden changes
+                    var goesToEnding = false
+                    var measuredChargeRatePeak = existingState.measuredChargeRatePeak
+                    if (measuredChargeRatePeak == null || dataResponse.measuredCurrentInAmp() >= measuredChargeRatePeak) {
+                        measuredChargeRatePeak = dataResponse.measuredCurrentInAmp()
+                    } else if (dataResponse.measuredCurrentInAmp() < measuredChargeRatePeak - chargingEndingAmpDelta) {
+                        goesToEnding = false
+                    }
+
+                    if (canCharge) {
+                        if (goesToEnding) {
+                            existingState.changeState(ChargingEnding, existingState.maxChargingRate)
                         } else {
-                            existingState.changeState(ConnectedChargingUnavailable)
-                                .setReasonChargingUnavailable(reasonCannotCharge)
+                            existingState.copy(measuredChargeRatePeak = measuredChargeRatePeak)
                         }
                     } else {
-                        // still charging
-                        // TODO need to improve this - need to look at the trend over time and ignore sudden changes
-                        var goesToEnding = false
-                        var measuredChargeRatePeak = existingState.measuredChargeRatePeak
-                        if (measuredChargeRatePeak == null || dataResponse.measuredCurrentInAmp() >= measuredChargeRatePeak) {
-                            measuredChargeRatePeak = dataResponse.measuredCurrentInAmp()
-                        } else if (dataResponse.measuredCurrentInAmp() < measuredChargeRatePeak - chargingEndingAmpDelta) {
-                            goesToEnding = false
-                        }
-
-                        if (canCharge) {
-                            if (goesToEnding) {
-                                existingState.changeState(ChargingEnding, existingState.maxChargingRate)
-                            } else {
-                                existingState.copy(measuredChargeRatePeak = measuredChargeRatePeak)
-                            }
-                        } else {
-                            existingState.changeState(StoppingCharging, LOWEST_MAX_CHARGE_RATE)
-                        }
+                        existingState.changeState(StoppingCharging, LOWEST_MAX_CHARGE_RATE)
                     }
                 }
             }
@@ -489,7 +481,7 @@ class EvChargingService(
             this.copy(
                 maxChargingRate = newMaxChargeRate,
                 chargingState = chargingState,
-                chargingStateOrRateChangedAt = clock.millis(),
+                chargingStateChangedAt = clock.millis(),
                 reasonChargingUnavailable = if (chargingState == ConnectedChargingUnavailable) reasonChargingUnavailable else null,
                 measuredChargeRatePeak = null,
             )
@@ -512,7 +504,7 @@ data class InternalState(
     override val powerConnectionId: String,
     val evChargingStationClient: EvChargingStationClient,
     override val chargingState: ChargingState,
-    val chargingStateOrRateChangedAt: Long,
+    val chargingStateChangedAt: Long,
     val loadSharingPriority: LoadSharingPriority,
 
     val dataResponse: DataResponse,
@@ -530,16 +522,24 @@ data class InternalState(
     override val loadSharingPriorityValue: Int
         get() = loadSharingPriority.value
 
-    override fun setNoCapacityAvailable(timestamp: Long) = copy(
-        chargingState = ConnectedChargingUnavailable,
-        chargingStateOrRateChangedAt = if (chargingState != ConnectedChargingUnavailable) timestamp else this.chargingStateOrRateChangedAt,
-        reasonChargingUnavailable = "No capacity available"
-    )
+    override fun setNoCapacityAvailable(timestamp: Long) = if (chargingState != ConnectedChargingUnavailable)
+        copy(
+            chargingState = ConnectedChargingUnavailable,
+            chargingStateChangedAt = timestamp,
+            reasonChargingUnavailable = "No capacity available"
+        )
+    else
+        this
 
-    override fun allowChargingWith(maxChargingRate: Int, timestamp: Long) =
-        if (maxChargingRate == this.maxChargingRate && this.chargingState != ChargingRequested) this else copy(
-            chargingState = if (this.chargingState == ChargingRequested) Charging else this.chargingState,
-            chargingStateOrRateChangedAt = timestamp,
+    override fun allowChargingWith(maxChargingRate: Int, timestamp: Long) = if (this.chargingState == ChargingRequested)
+        copy(
+            chargingState = Charging,
+            chargingStateChangedAt = timestamp,
+            maxChargingRate = maxChargingRate,
+            measuredChargeRatePeak = null
+        )
+    else
+        copy(
             maxChargingRate = maxChargingRate,
             measuredChargeRatePeak = null
         )
@@ -562,7 +562,7 @@ data class InternalState(
     fun export() = EvChargingStationData(
         chargingState,
         reasonChargingUnavailable,
-        chargingStateOrRateChangedAt,
+        chargingStateChangedAt,
         dataResponse.proximityPilotAmps,
         maxChargingRate,
         dataResponse.phase1Millivolts,

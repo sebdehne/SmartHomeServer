@@ -69,13 +69,12 @@ export enum UnderFloorHeaterMode {
 export class UnderFloorHeaterConstantTemperaturStatus {
     public targetTemperature: number;
     public mostExpensiveHoursToSkip: number;
-    public energyPriceCurrentlyTooExpensive: boolean;
+    public waitUntilCheapHour: number | null;
 
-
-    public constructor(targetTemperature: number, mostExpensiveHoursToSkip: number, energyPriceCurrentlyTooExpensive: boolean) {
+    public constructor(targetTemperature: number, mostExpensiveHoursToSkip: number, waitUntilCheapHour: number | null) {
         this.targetTemperature = targetTemperature;
         this.mostExpensiveHoursToSkip = mostExpensiveHoursToSkip;
-        this.energyPriceCurrentlyTooExpensive = energyPriceCurrentlyTooExpensive;
+        this.waitUntilCheapHour = waitUntilCheapHour;
     }
 }
 

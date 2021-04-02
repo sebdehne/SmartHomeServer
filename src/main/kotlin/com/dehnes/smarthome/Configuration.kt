@@ -13,18 +13,25 @@ import com.dehnes.smarthome.rf433.Rf433Client
 import com.dehnes.smarthome.room_sensors.ChipCap2SensorService
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Clock
+import java.time.ZoneId
 import java.util.concurrent.Executors
 import kotlin.reflect.KClass
 
 class Configuration {
     private var beans = mutableMapOf<KClass<*>, Any>()
 
+    fun objectMapper() = jacksonObjectMapper()
+        .registerModule(JavaTimeModule())
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+
     fun init() {
 
         val executorService = Executors.newCachedThreadPool()
-        val objectMapper = jacksonObjectMapper()
+        val objectMapper = objectMapper()
 
         val influxDBClient = InfluxDBClient(objectMapper, System.getProperty("DST_HOST"))
         val persistenceService = PersistenceService()
@@ -35,7 +42,7 @@ class Configuration {
         val garageDoorService = GarageDoorService(serialConnection, influxDBClient)
         val chipCap2SensorService = ChipCap2SensorService(influxDBClient)
 
-        val clock = Clock.systemDefaultZone()
+        val clock = Clock.system(ZoneId.of("Europe/Oslo"))
 
         val tibberService = TibberService(
             clock,
@@ -51,11 +58,18 @@ class Configuration {
             executorService,
             persistenceService,
             influxDBClient,
-            tibberService
+            tibberService,
+            clock
         )
         heaterService.start()
 
-        val evChargingStationConnection = EvChargingStationConnection(9091, executorService, persistenceService, influxDBClient)
+        val evChargingStationConnection = EvChargingStationConnection(
+            9091,
+            executorService,
+            persistenceService,
+            influxDBClient,
+            objectMapper
+        )
         evChargingStationConnection.start()
 
         val evChargingService = EvChargingService(

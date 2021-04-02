@@ -5,7 +5,7 @@ import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.garage_door.toInt
 import com.dehnes.smarthome.utils.PersistenceService
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
 import java.lang.Integer.max
@@ -21,7 +21,8 @@ class EvChargingStationConnection(
     private val port: Int,
     private val executorService: ExecutorService,
     private val persistenceService: PersistenceService,
-    private val influxDBClient: InfluxDBClient
+    private val influxDBClient: InfluxDBClient,
+    private val objectMapper: ObjectMapper
 ) {
     private val logger = KotlinLogging.logger { }
     private val chargerStationLogger = KotlinLogging.logger("ChargerStationLogger")
@@ -291,9 +292,9 @@ class EvChargingStationConnection(
     }
 
     private fun getCalibrationData(clientId: String): CalibrationData {
-        val default = jacksonObjectMapper().writeValueAsString(CalibrationData())
+        val default = objectMapper.writeValueAsString(CalibrationData())
         return persistenceService["Charger.calibrationData.$clientId", default].let {
-            jacksonObjectMapper().readValue(it!!)
+            objectMapper.readValue(it!!)
         }
     }
 
