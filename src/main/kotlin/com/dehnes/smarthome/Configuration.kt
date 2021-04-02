@@ -68,7 +68,8 @@ class Configuration {
             executorService,
             persistenceService,
             influxDBClient,
-            objectMapper
+            objectMapper,
+            clock
         )
         evChargingStationConnection.start()
 

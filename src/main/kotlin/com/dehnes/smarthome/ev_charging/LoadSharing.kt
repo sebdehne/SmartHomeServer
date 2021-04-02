@@ -17,9 +17,11 @@ interface LoadSharable {
     val powerConnectionId: String
     val chargingState: ChargingState
     val proximityPilotAmps: Int
-    val measuredCurrentInAmp: Int
     val maxChargingRate: Int
     val loadSharingPriorityValue: Int
+
+    val measuredCurrentInAmps: Int?
+    val measuredCurrentPeakAt: Long?
 
     fun setNoCapacityAvailable(timestamp: Long): LoadSharable
     fun allowChargingWith(maxChargingRate: Int, timestamp: Long): LoadSharable
@@ -94,7 +96,7 @@ class PriorityLoadSharing(
         }
 
         /*
-         * States in which capacity is needed: StoppingCharging, ChargingRequested, Charging & ChargingEnding
+         * States in which capacity is needed: StoppingCharging, ChargingRequested, Charging
          */
 
         // Those which are in StoppingCharging state - set to lowest maxChargingRate - no matter which priority
@@ -112,18 +114,21 @@ class PriorityLoadSharing(
         // initially: for each priority-level, spread the capacity evenly
         spreadAvailableCapacity(true, sortByPriority(
             loadSharableById.filter {
-                it.value.chargingState in listOf(Charging, ChargingEnding, ChargingRequested)
+                it.value.chargingState in listOf(Charging, ChargingRequested)
             }
         ))
 
-        // Then reclaim capacity from ChargingEnding stations
+        // Then reclaim capacity from unused capacity
+        val stationsNotUsingTheirCapacity = mutableSetOf<String>()
         loadSharableById
-            .filter { it.value.chargingState == ChargingEnding }
+            .filter { it.value.chargingState == Charging }
+            .filter { it.value.measuredCurrentInAmps != null && it.value.measuredCurrentPeakAt != null }
+            .filter { clock.millis() - it.value.measuredCurrentPeakAt!! > 60 * 1000 }
             .forEach { (clientId, internalState) ->
 
                 if (internalState.maxChargingRate > LOWEST_MAX_CHARGE_RATE) {
                     val breakpoint = internalState.maxChargingRate - chargingEndingAmpDelta
-                    val capacityNotUsing = breakpoint - internalState.measuredCurrentInAmp
+                    val capacityNotUsing = breakpoint - internalState.measuredCurrentInAmps!!
                     if (capacityNotUsing > 0) {
 
                         val newRate = if (internalState.maxChargingRate - capacityNotUsing < LOWEST_MAX_CHARGE_RATE) {
@@ -135,6 +140,7 @@ class PriorityLoadSharing(
 
                         if (madeAvailable > 0) {
                             availableCapacity += madeAvailable
+                            stationsNotUsingTheirCapacity.add(clientId)
                             loadSharableById[clientId] =
                                 internalState.allowChargingWith(
                                     internalState.maxChargingRate - madeAvailable,
@@ -148,10 +154,9 @@ class PriorityLoadSharing(
         // At last: give reclaimed capacity to those which are capable of getting more
         while (true) {
             val stationsWhichWantMore = loadSharableById.filter {
-                it.value.chargingState in listOf(
-                    Charging,
-                    ChargingRequested
-                ) && it.value.proximityPilotAmps > it.value.maxChargingRate
+                it.value.chargingState in listOf(Charging, ChargingRequested)
+                        && it.value.proximityPilotAmps > it.value.maxChargingRate
+                        && it.key !in stationsNotUsingTheirCapacity
             }
 
             if (stationsWhichWantMore.isEmpty() || availableCapacity == 0) {

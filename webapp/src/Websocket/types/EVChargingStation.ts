@@ -142,7 +142,6 @@ export enum ChargingState {
     ConnectedChargingAvailable = "ConnectedChargingAvailable",
     ChargingRequested = "ChargingRequested",
     Charging = "Charging",
-    ChargingEnding = "ChargingEnding",
     StoppingCharging = "StoppingCharging",
     Error = "Error"
 }

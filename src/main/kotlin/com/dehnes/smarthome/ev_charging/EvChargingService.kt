@@ -28,9 +28,6 @@ enum class ChargingState {
     // 3V/6V, PWM on, Contactor on - charging
     Charging,
 
-    // 3V/6V, PWM on, Contactor on - detected a decline on charging rate - able to move available capacity to others
-    ChargingEnding,
-
     // 3V/6V, PWM on, Contactor on - Car is charging, but charging is not allowed anymore, maxCharging rate is at minimum to allow protect Contactor
     StoppingCharging,
 
@@ -50,12 +47,12 @@ enum class ChargingState {
     }
 
     fun contactorOn() = when (this) {
-        Charging, ChargingEnding, StoppingCharging -> true
+        Charging, StoppingCharging -> true
         else -> false
     }
 
     fun pwmOn() = when (this) {
-        ConnectedChargingAvailable, ChargingRequested, Charging, ChargingEnding -> true
+        ConnectedChargingAvailable, ChargingRequested, Charging -> true
         else -> false
     }
 }
@@ -78,6 +75,7 @@ class EvChargingService(
         persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 5).toString()]!!.toLong()
     private val assumeStationLostAfterMs =
         persistenceService["EvChargingService.assumeStationLostAfterMs", (1000 * 60 * 5).toString()]!!.toLong()
+    private val rollingAverageDepth = 5
 
     val logger = KotlinLogging.logger { }
 
@@ -168,6 +166,7 @@ class EvChargingService(
                 getPriorityFor(clientId),
                 dataResponse,
                 if (chargingState.pwmOn()) dataResponse.pwmPercentToChargingRate() else LOWEST_MAX_CHARGE_RATE,
+                null,
                 null,
                 if (chargingState == ConnectedChargingUnavailable) "Unknown" else null
             )
@@ -325,50 +324,31 @@ class EvChargingService(
                             .setReasonChargingUnavailable(reasonCannotCharge)
                     }
                 } else {
-                    // still charging
-                    // TODO need to improve this - need to look at the trend over time and ignore sudden changes
-                    var goesToEnding = false
-                    var measuredChargeRatePeak = existingState.measuredChargeRatePeak
-                    if (measuredChargeRatePeak == null || dataResponse.measuredCurrentInAmp() >= measuredChargeRatePeak) {
-                        measuredChargeRatePeak = dataResponse.measuredCurrentInAmp()
-                    } else if (dataResponse.measuredCurrentInAmp() < measuredChargeRatePeak - chargingEndingAmpDelta) {
-                        goesToEnding = false
-                    }
-
                     if (canCharge) {
-                        if (goesToEnding) {
-                            existingState.changeState(ChargingEnding, existingState.maxChargingRate)
-                        } else {
-                            existingState.copy(measuredChargeRatePeak = measuredChargeRatePeak)
+                        val measuredCurrentInAmps = (
+                                existingState.measuredCurrentInAmps
+                                    ?: dataResponse.currentInAmps()).let { avg ->
+                            ((avg * rollingAverageDepth) + dataResponse.currentInAmps()) / (rollingAverageDepth + 1)
                         }
-                    } else {
-                        existingState.changeState(StoppingCharging, LOWEST_MAX_CHARGE_RATE)
-                    }
-                }
-            }
-            ChargingEnding -> {
-                if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
-                    existingState.changeState(Unconnected)
-                } else if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
-                    existingState.changeState(Error)
-                } else if (dataResponse.pilotVoltage == PilotVoltage.Volt_9) {
-                    if (canCharge) {
-                        existingState.changeState(ConnectedChargingAvailable, LOWEST_MAX_CHARGE_RATE)
-                    } else {
-                        existingState.changeState(
-                            ConnectedChargingUnavailable,
-                            reasonChargingUnavailable = reasonCannotCharge
+
+                        val measuredCurrentPeakAt =
+                            if (existingState.measuredCurrentInAmps == null || measuredCurrentInAmps > existingState.measuredCurrentInAmps)
+                                clock.millis()
+                            else
+                                existingState.measuredCurrentPeakAt
+
+                        existingState.copy(
+                            measuredCurrentInAmps = measuredCurrentInAmps,
+                            measuredCurrentPeakAt = measuredCurrentPeakAt
                         )
-                    }
-                } else {
-                    if (canCharge) {
-                        existingState
                     } else {
                         existingState.changeState(StoppingCharging, LOWEST_MAX_CHARGE_RATE)
                     }
                 }
             }
-        }.updateData(evChargingStationClient, dataResponse).copy(reasonChargingUnavailable = reasonCannotCharge)
+        }
+            .updateData(evChargingStationClient, dataResponse)
+            .copy(reasonChargingUnavailable = reasonCannotCharge)
 
         currentData[clientId] = updatedState
 
@@ -388,10 +368,8 @@ class EvChargingService(
         /*
          * E) Rebalance loadsharing between active charging stations
          */
-        val loadSharingAlgorithmId = persistenceService.get(
-            "EvChargingService.powerConnection.loadSharingAlgorithm.$powerConnectionId",
-            PriorityLoadSharing::class.java.simpleName
-        )!!
+        val loadSharingAlgorithmId =
+            persistenceService["EvChargingService.powerConnection.loadSharingAlgorithm.$powerConnectionId", PriorityLoadSharing::class.java.simpleName]!!
         val loadSharingAlgorithm = loadSharingAlgorithms[loadSharingAlgorithmId]
             ?: error("Could not find loadSharingAlgorithmId=$loadSharingAlgorithmId")
         val changedStates = loadSharingAlgorithm.calculateLoadSharing(
@@ -483,7 +461,8 @@ class EvChargingService(
                 chargingState = chargingState,
                 chargingStateChangedAt = clock.millis(),
                 reasonChargingUnavailable = if (chargingState == ConnectedChargingUnavailable) reasonChargingUnavailable else null,
-                measuredChargeRatePeak = null,
+                measuredCurrentInAmps = null,
+                measuredCurrentPeakAt = null
             )
         }
     }
@@ -510,38 +489,38 @@ data class InternalState(
     val dataResponse: DataResponse,
     override val maxChargingRate: Int, // a value in the range og 6..32
 
-    val measuredChargeRatePeak: Int?,
+    override val measuredCurrentPeakAt: Long?,
+    override val measuredCurrentInAmps: Int?,
 
     val reasonChargingUnavailable: String?
 ) : LoadSharable {
 
     override val proximityPilotAmps: Int
         get() = dataResponse.proximityPilotAmps.toAmps()
-    override val measuredCurrentInAmp: Int
-        get() = dataResponse.measuredCurrentInAmp()
     override val loadSharingPriorityValue: Int
         get() = loadSharingPriority.value
 
     override fun setNoCapacityAvailable(timestamp: Long) = if (chargingState != ConnectedChargingUnavailable)
         copy(
             chargingState = ConnectedChargingUnavailable,
+            reasonChargingUnavailable = "No capacity available",
             chargingStateChangedAt = timestamp,
-            reasonChargingUnavailable = "No capacity available"
+            measuredCurrentPeakAt = null,
+            measuredCurrentInAmps = null
         )
     else
         this
 
-    override fun allowChargingWith(maxChargingRate: Int, timestamp: Long) = if (this.chargingState == ChargingRequested)
-        copy(
+    override fun allowChargingWith(maxChargingRate: Int, timestamp: Long) =
+        if (this.chargingState == ChargingRequested) copy(
             chargingState = Charging,
             chargingStateChangedAt = timestamp,
             maxChargingRate = maxChargingRate,
-            measuredChargeRatePeak = null
+            measuredCurrentInAmps = null,
+            measuredCurrentPeakAt = null
         )
-    else
-        copy(
-            maxChargingRate = maxChargingRate,
-            measuredChargeRatePeak = null
+        else copy(
+            maxChargingRate = maxChargingRate
         )
 
     fun desiredPwmPercent() = if (chargingState.pwmOn()) {
@@ -550,10 +529,16 @@ data class InternalState(
         100
     }
 
-    fun updateData(evChargingStationClient: EvChargingStationClient, dataResponse: DataResponse) = copy(
-        evChargingStationClient = evChargingStationClient,
-        dataResponse = dataResponse
-    )
+    fun updateData(evChargingStationClient: EvChargingStationClient, dataResponse: DataResponse) =
+        if (dataResponse.pwmPercent > this.dataResponse.pwmPercent) copy(
+            evChargingStationClient = evChargingStationClient,
+            dataResponse = dataResponse,
+            measuredCurrentPeakAt = null,
+            measuredCurrentInAmps = null
+        ) else copy(
+            evChargingStationClient = evChargingStationClient,
+            dataResponse = dataResponse
+        )
 
     fun setReasonChargingUnavailable(reasonChargingUnavailable: String?) = copy(
         reasonChargingUnavailable = reasonChargingUnavailable

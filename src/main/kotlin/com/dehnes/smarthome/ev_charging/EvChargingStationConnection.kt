@@ -12,7 +12,7 @@ import java.lang.Integer.max
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.ByteBuffer
-import java.time.Instant
+import java.time.Clock
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
@@ -22,7 +22,8 @@ class EvChargingStationConnection(
     private val executorService: ExecutorService,
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val clock: Clock
 ) {
     private val logger = KotlinLogging.logger { }
     private val chargerStationLogger = KotlinLogging.logger("ChargerStationLogger")
@@ -232,7 +233,7 @@ class EvChargingStationConnection(
                             bytesRead += read
                         }
 
-                        val inboundPacket = responseType.parser(msg, getCalibrationData(clientIdStr), evChargingStationClient.firmwareVersion)
+                        val inboundPacket = responseType.parser(msg, getCalibrationData(clientIdStr), evChargingStationClient.firmwareVersion, clock.millis())
 
                         if (inboundPacket.type == InboundType.notifyDataChanged) {
                             executorService.submit {
@@ -357,7 +358,7 @@ enum class RequestType(val value: Int) {
     setContactorState(5),
 }
 
-enum class InboundType(val value: Int, val parser: (ByteArray, CalibrationData, Int) -> InboundPacket) {
+enum class InboundType(val value: Int, val parser: (ByteArray, CalibrationData, Int, Long) -> InboundPacket) {
     pongResponse(1, PongResponse.Companion::parse),
     collectDataResponse(2, DataResponse.Companion::parse),
     setPwmPercentResponse(3, SetPwmPercentResponse.Companion::parse),
@@ -375,25 +376,25 @@ sealed class InboundPacket(
 
 class PongResponse : InboundPacket(InboundType.pongResponse) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int) = PongResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int, timestamp: Long) = PongResponse()
     }
 }
 
 class NotifyDataChanged : InboundPacket(InboundType.notifyDataChanged) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int) = NotifyDataChanged()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int, timestamp: Long) = NotifyDataChanged()
     }
 }
 
 class SetPwmPercentResponse : InboundPacket(InboundType.setPwmPercentResponse) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int) = SetPwmPercentResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int, timestamp: Long) = SetPwmPercentResponse()
     }
 }
 
 class SetContactorStateResponse : InboundPacket(InboundType.setContactorStateResponse) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int) = SetContactorStateResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int, timestamp: Long) = SetContactorStateResponse()
     }
 }
 
@@ -420,13 +421,14 @@ data class DataResponse(
     val pilotControlAdc: Int,
     val proximityPilotAdc: Int,
     val logMessages: List<String>,
-    val utcTimestampInMs: Long = Instant.now().toEpochMilli()
+    val utcTimestampInMs: Long
 ) : InboundPacket(InboundType.pongResponse) {
     companion object {
         fun parse(
             msg: ByteArray,
             calibrationData: CalibrationData,
-            version: Int
+            version: Int,
+            timestamp: Long
         ): DataResponse {
 
             /*
@@ -483,7 +485,8 @@ data class DataResponse(
                 readInt32Bits(msg, 32), // uptime
                 if (version < 3) 0 else readInt32Bits(msg, 36), // PilotControlAdc
                 if (version < 3) 0 else readInt32Bits(msg, 40), // ProximityAdc
-                logMessages
+                logMessages,
+                timestamp
             )
         }
 
@@ -494,9 +497,8 @@ data class DataResponse(
             max((((adcValue - offsetAndSlopeAndDivider.offset) * offsetAndSlopeAndDivider.slope) / offsetAndSlopeAndDivider.divider), 0)
     }
 
+    fun currentInAmps() = listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!! / 1000
 
-
-    fun measuredCurrentInAmp() = listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!! / 1000
     override fun toString(): String {
         return "DataResponse(" +
                 "conactorOn=$conactorOn, " +
