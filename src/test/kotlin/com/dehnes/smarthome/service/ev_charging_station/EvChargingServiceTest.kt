@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
@@ -245,14 +244,14 @@ internal class EvChargingServiceTest {
         s2.setMeasuredCurrent(16)
         collectDataCycle(secondsToAdd = 10)
         assertTrue(s1.contactorOn)
-        assertEquals(26, s1.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(16), s1.pwmPercent)
         assertTrue(s2.contactorOn)
-        assertEquals(26, s2.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
 
         // Car 1 rate declining below threshold
-        s1.setMeasuredCurrent(13)
+        s1.setMeasuredCurrent(12)
         s2.setMeasuredCurrent(16)
-        collectDataCycle(10, secondsToAdd = 10)
+        collectDataCycle(20, secondsToAdd = 2)
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(15), s1.pwmPercent)
         assertTrue(s2.contactorOn)
@@ -263,9 +262,9 @@ internal class EvChargingServiceTest {
         s2.setMeasuredCurrent(16)
         collectDataCycle(10, secondsToAdd = 10)
         assertTrue(s1.contactorOn)
-        assertEquals(chargeRateToPwmPercent(12), s1.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(13), s1.pwmPercent)
         assertTrue(s2.contactorOn)
-        assertEquals(chargeRateToPwmPercent(20), s2.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(19), s2.pwmPercent)
 
         // Car 1 rate declining below threshold even more
         s1.setMeasuredCurrent(1)
@@ -305,9 +304,9 @@ internal class EvChargingServiceTest {
         currentModes[s1.clientId] = EvChargingMode.OFF
         collectDataCycle()
         assertTrue(s1.contactorOn)
-        assertEquals(100, s1.pwmPercent)
+        assertEquals(PWM_NO_CHARGING, s1.pwmPercent)
         assertTrue(s2.contactorOn)
-        assertEquals(chargeRateToPwmPercent(26), s2.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(32), s2.pwmPercent)
 
         // 5 seconds later ...
         collectDataCycle(5, 10)

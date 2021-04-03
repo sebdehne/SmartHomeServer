@@ -16,6 +16,8 @@ import java.time.Clock
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 class EvChargingStationConnection(
     private val port: Int,
@@ -255,7 +257,7 @@ class EvChargingStationConnection(
                     collectDataAndDistribute(evChargingStationClient.clientId)
                 },
                 0,
-                5,
+                2,
                 TimeUnit.SECONDS
             )
 
@@ -497,7 +499,7 @@ data class DataResponse(
             max((((adcValue - offsetAndSlopeAndDivider.offset) * offsetAndSlopeAndDivider.slope) / offsetAndSlopeAndDivider.divider), 0)
     }
 
-    fun currentInAmps() = listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!! / 1000
+    fun currentInAmps() = ceil(listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!!.toDouble() / 1000).roundToInt()
 
     override fun toString(): String {
         return "DataResponse(" +
