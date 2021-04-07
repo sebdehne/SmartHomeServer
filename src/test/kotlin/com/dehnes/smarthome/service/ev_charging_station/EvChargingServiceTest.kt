@@ -249,7 +249,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
 
         // Car 1 rate declining below threshold
-        s1.setMeasuredCurrent(12)
+        s1.setMeasuredCurrent(13)
         s2.setMeasuredCurrent(16)
         collectDataCycle(20, secondsToAdd = 2)
         assertTrue(s1.contactorOn)
