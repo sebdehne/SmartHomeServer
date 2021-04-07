@@ -199,7 +199,6 @@ class LoRaConnection(
     }
 
     private fun cmd(connection: Connection, cmd: String, match: Regex, logSuccess: Boolean = true): String? {
-        logger.info { "Sending $cmd" }
         connection.outputStream.write("$cmd\r\n".toByteArray())
 
         connection.read(Duration.ofSeconds(readTimeInSeconds)) { false }
@@ -212,7 +211,7 @@ class LoRaConnection(
 
         return if (response.matches(match)) {
             if (logSuccess) {
-                logger.info { "success: $cmd: $response" }
+                logger.info { "success: $cmd: '$response'" }
             }
             response
         } else {
