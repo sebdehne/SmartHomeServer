@@ -3,7 +3,7 @@ package com.dehnes.smarthome.utils
 object HexUtils {
 
     fun decodeHexString(hexString: String): ByteArray {
-        require(hexString.length % 2 != 1) { "Invalid hexadecimal String supplied." }
+        require(hexString.length % 2 != 1) { "Invalid hexadecimal String supplied: $hexString" }
         val bytes = ByteArray(hexString.length / 2)
         var i = 0
         while (i < hexString.length) {

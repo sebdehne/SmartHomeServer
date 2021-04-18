@@ -52,7 +52,7 @@ class LoRaConnection(
                 } catch (e: Exception) {
                     logger.error("", e)
                 }
-                Thread.sleep(30 * 1000)
+                Thread.sleep(10 * 1000)
             }
         }.start()
     }
@@ -123,10 +123,12 @@ class LoRaConnection(
     private fun readLoop() {
         connect().use { conn ->
 
-            // consume "ready" and "RN2483....."
-            sinkText(conn, 2)
+            // reset RN2483
+            conn.outputStream.write("!".toByteArray())
+            // consume "RN2483....."
+            sinkText(conn, 1)
 
-            while (cmd(conn, "mac pause", "\\d+".toRegex()) == null) {
+            while (cmd(conn, "mac pause", listOf("\\d+".toRegex())) == null) {
                 Thread.sleep(1000)
             }
 
@@ -137,10 +139,12 @@ class LoRaConnection(
                     if (line == "radio_err") {
                         logger.debug { "Ignoring radio_err" }
                     } else {
+                        logger.info { "Received: '$line' (${line.toByteArray().contentToString()})" }
                         val packet = LoRaInboundPacket(
-                            cmd(conn, "radio get rssi", ".*".toRegex())?.toInt() ?: error("could not read rssi"),
-                            if (line.startsWith("radio_rx ")) {
-                                HexUtils.decodeHexString(line.replace("radio_rx ", ""))
+                            cmd(conn, "radio get rssi", listOf(".*".toRegex()))?.toInt()
+                                ?: error("could not read rssi"),
+                            if (line.startsWith("radio_rx")) {
+                                HexUtils.decodeHexString(line.replace("radio_rx\\s+".toRegex(), ""))
                             } else {
                                 error("Unexpected response=$line")
                             },
@@ -177,50 +181,71 @@ class LoRaConnection(
                 while (outQueue.peek() != null) {
                     val nextOutPacket = outQueue.poll()
 
-                    val result = cmd(conn, "radio tx " + nextOutPacket.toHex(), "ok".toRegex()) != null
+                    val result = cmd(
+                        conn, "radio tx " + nextOutPacket.toHex(),
+                        listOf("ok".toRegex(), "invalid_param".toRegex(), "busy".toRegex()),
+                        listOf("radio_tx_ok".toRegex(), "radio_err".toRegex())
+                    ) != null
                     executorService.submit {
                         nextOutPacket.onResult(result)
                     }
                 }
 
-                if (cmd(conn, "radio rx 0", "ok".toRegex(), false) == null) {
+                // switch to receive mode
+                if (cmd(
+                        conn,
+                        "radio rx 0",
+                        listOf("ok".toRegex(), "invalid_param".toRegex(), "busy".toRegex())
+                    ) == null
+                ) {
                     Thread.sleep(1000)
                     continue
                 }
 
                 conn.read(Duration.ofMinutes(10), this::isInterrupted)
                 if (!conn.hasCompleteText && !conn.isCurrentlyReading()) {
-                    logger.info { "Interrupted while in RX-mode" }
+                    logger.info { "timeout or interrupted while in RX-mode" }
                     // timeout or interrupt
-                    cmd(conn, "radio rxstop", ".*".toRegex())
+                    cmd(
+                        conn,
+                        "radio rxstop",
+                        listOf("ok".toRegex())
+                    )
                 }
             }
         }
     }
 
-    private fun cmd(connection: Connection, cmd: String, match: Regex, logSuccess: Boolean = true): String? {
+    private fun cmd(connection: Connection, cmd: String, vararg expectedResponses: List<Regex>): String? {
+        logger.info { "Sending: $cmd" }
         connection.outputStream.write("$cmd\r\n".toByteArray())
 
-        connection.read(Duration.ofSeconds(readTimeInSeconds)) { false }
+        var response: String? = null
 
-        val response = if (connection.hasCompleteText) {
-            connection.getText()
-        } else {
-            error("No response received while waiting for $cmd")
+        val allMatch = expectedResponses.all { possibleResponses ->
+            logger.info { "Trying to read one of: $possibleResponses" }
+            while (true) {
+                connection.read(Duration.ofSeconds(5)) { false }
+                response = if (connection.hasCompleteText) {
+                    connection.getText()
+                } else {
+                    error("No response received while waiting for $cmd")
+                }
+                if (possibleResponses.none { response!!.matches(it) }) {
+                    logger.info { "Sinked text: $response" }
+                } else
+                    break
+            }
+            logger.info { "Got: $response" }
+            possibleResponses.first().matches(response!!)
         }
 
-        return if (response.matches(match)) {
-            if (logSuccess) {
-                logger.info { "success: $cmd: '$response'" }
-            }
+        return if (allMatch) {
             response
         } else {
-            logger.warn { "Command failed: $cmd, got: $response" }
-            sinkText(connection, Int.MAX_VALUE, Duration.ofSeconds(2))
             null
         }
     }
-
 }
 
 val headerLength = 7
@@ -306,25 +331,22 @@ enum class LoRaPacketType(
 class Connection(
     val inputStream: InputStream,
     val outputStream: OutputStream,
-    var hasCompleteText: Boolean = false
+    var hasCompleteText: Boolean = false,
 ) : Closeable {
 
     private val byteBuffer = ByteBuffer.allocate(1024)
 
-    // timeout - 0 bytes
-    // timeout > 0 bytes
-    // finished reading text
     fun read(timeout: Duration, isinterrupted: () -> Boolean) {
         val deadLineNanos = System.nanoTime() + timeout.toNanos()
 
         while (System.nanoTime() < deadLineNanos) {
+            if (isinterrupted() && byteBuffer.position() == 0) {
+                break
+            }
+
             if (inputStream.available() < 1) {
                 Thread.sleep(100) // lazy man non-blocking mode ;)
                 continue
-            }
-
-            if (isinterrupted() && byteBuffer.position() == 0) {
-                break
             }
 
             val i = inputStream.read()
