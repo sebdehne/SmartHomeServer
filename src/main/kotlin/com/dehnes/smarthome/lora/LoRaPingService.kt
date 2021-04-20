@@ -11,10 +11,10 @@ class LoRaPingService(
 
     init {
         loRaConnection.listeners.add { packet ->
-            if (packet.getType() == LoRaPacketType.REQUEST_PING) {
-                logger.info { "Ping from ${packet.getFromAddr()} with payload=${packet.getPayload().toHexString()}" }
+            if (packet.type == LoRaPacketType.REQUEST_PING) {
+                logger.info { "Ping from ${packet.from} with payload=${packet.payload.toHexString()}" }
 
-                loRaConnection.send(packet.getFromAddr(), LoRaPacketType.RESPONSE_PONG, packet.getPayload()) {
+                loRaConnection.send(packet.keyId, packet.from, LoRaPacketType.RESPONSE_PONG, packet.payload) {
                     if (!it) {
                         logger.info { "Could not send pong response" }
                     }

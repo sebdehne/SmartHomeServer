@@ -1,7 +1,10 @@
 package com.dehnes.smarthome.lora
 
 import com.dehnes.smarthome.ev_charging.readInt32Bits
+import com.dehnes.smarthome.ev_charging.readLong32Bits
+import com.dehnes.smarthome.ev_charging.to32Bit
 import com.dehnes.smarthome.ev_charging.toHexString
+import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.HexUtils
 import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
@@ -10,6 +13,7 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
+import java.time.Clock
 import java.time.Duration
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -21,14 +25,16 @@ import javax.annotation.PreDestroy
 
 class LoRaConnection(
     private val persistenceService: PersistenceService,
-    private val executorService: ExecutorService
+    private val executorService: ExecutorService,
+    private val aes265GCM: AES265GCM,
+    private val clock: Clock
 ) {
 
     private val readTimeInSeconds = 10L
 
     private val logger = KotlinLogging.logger { }
 
-    val listeners = CopyOnWriteArrayList<(LoRaInboundPacket) -> Boolean>()
+    val listeners = CopyOnWriteArrayList<(LoRaInboundPacketDecrypted) -> Boolean>()
 
     @Volatile
     private var isStarted = false
@@ -66,9 +72,10 @@ class LoRaConnection(
         isStarted = false
     }
 
-    fun send(toAddr: Int, type: LoRaPacketType, payload: ByteArray, onResult: (Boolean) -> Unit) {
+    fun send(keyId: Int, toAddr: Int, type: LoRaPacketType, payload: ByteArray, onResult: (Boolean) -> Unit) {
         outQueue.add(
             LoRaOutboundPacketRequest(
+                keyId,
                 toAddr,
                 type,
                 payload,
@@ -131,6 +138,9 @@ class LoRaConnection(
             while (cmd(conn, "mac pause", listOf("\\d+".toRegex())) == null) {
                 Thread.sleep(1000)
             }
+            while (cmd(conn, "radio set sf sf7", listOf("ok".toRegex(), "invalid_param".toRegex())) == null) {
+                Thread.sleep(1000)
+            }
 
             while (isStarted) {
 
@@ -140,7 +150,7 @@ class LoRaConnection(
                         logger.debug { "Ignoring radio_err" }
                     } else {
                         logger.info { "Received: '$line' (${line.toByteArray().contentToString()})" }
-                        val packet = LoRaInboundPacket(
+                        val encryptedPacket = LoRaInboundPacket(
                             cmd(conn, "radio get rssi", listOf(".*".toRegex()))?.toInt()
                                 ?: error("could not read rssi"),
                             if (line.startsWith("radio_rx")) {
@@ -151,16 +161,18 @@ class LoRaConnection(
                             line
                         )
 
-                        if (packet.getToAddr() != localAddr) {
-                            logger.info { "Ignoring packet not for me. $packet" }
+                        val inboundPacket = decrypt(encryptedPacket)
+
+                        if (inboundPacket?.to != localAddr) {
+                            logger.info { "Ignoring packet not for me. $inboundPacket" }
                         } else {
                             executorService.submit {
                                 try {
                                     val wasAccepted = listeners.any { listener ->
-                                        listener(packet)
+                                        listener(inboundPacket)
                                     }
                                     if (!wasAccepted) {
-                                        logger.warn { "No listener handled message $packet" }
+                                        logger.warn { "No listener handled message $inboundPacket" }
                                     }
                                 } catch (e: Exception) {
                                     logger.error("Error handling LoRa response $line", e)
@@ -181,8 +193,11 @@ class LoRaConnection(
                 while (outQueue.peek() != null) {
                     val nextOutPacket = outQueue.poll()
 
+                    val data = nextOutPacket.toByteArray(timestampSecondsSince2000())
+                    val cipherTextWithIv = aes265GCM.encrypt(data, nextOutPacket.keyId)
+
                     val result = cmd(
-                        conn, "radio tx " + nextOutPacket.toHex(),
+                        conn, "radio tx " + cipherTextWithIv.toHexString(),
                         listOf("ok".toRegex(), "invalid_param".toRegex(), "busy".toRegex()),
                         listOf("radio_tx_ok".toRegex(), "radio_err".toRegex())
                     ) != null
@@ -246,38 +261,113 @@ class LoRaConnection(
             null
         }
     }
+
+    fun timestampSecondsSince2000(): Long {
+        return (clock.millis() / 1000) - 946_684_800L
+    }
+
+    fun decrypt(inboundPacket: LoRaInboundPacket) = aes265GCM.decrypt(inboundPacket.data)?.let {
+        /*
+         * Header(11 bytes):
+         * to[1]
+         * from[1]
+         * type[1]
+         * timestamp[4]
+         * len[4]
+         * payload(0...len bytes)
+         */
+        val length = readInt32Bits(it.second, 7)
+        LoRaInboundPacketDecrypted(
+            inboundPacket,
+            it.first,
+            it.second[0].toInt(),
+            it.second[1].toInt(),
+            LoRaPacketType.fromByte(it.second[2]),
+            readLong32Bits(it.second, 3),
+            it.second.copyOfRange(11, 11 + length)
+        )
+    }
+
 }
 
-val headerLength = 7
-val maxPayload = 255 - headerLength
+val headerLength = 11
+val maxPayload = 255 - headerLength - AES265GCM.overhead()
 val localAddr = 1
 
 data class LoRaOutboundPacketRequest(
+    val keyId: Int,
     val toAddr: Int,
     val type: LoRaPacketType,
     val payload: ByteArray,
     val onResult: (Boolean) -> Unit
 ) {
-    fun toHex(): String {
-        val data = ByteArray(7 + payload.size)
+    fun toByteArray(timestamp: Long): ByteArray {
+        val data = ByteArray(11 + payload.size)
         data[0] = toAddr.toByte()
         data[1] = localAddr.toByte()
         data[2] = type.value.toByte()
 
         System.arraycopy(
-            ByteBuffer.allocate(4).putInt(payload.size).array(),
+            timestamp.to32Bit(),
             0,
             data,
             3,
             4
         )
-        System.arraycopy(payload, 0, data, 7, payload.size)
 
-        return data.toHexString()
+        System.arraycopy(
+            payload.size.to32Bit(),
+            0,
+            data,
+            7,
+            4
+        )
+
+        System.arraycopy(payload, 0, data, 11, payload.size)
+
+        return data
     }
 
     init {
         check(payload.size <= maxPayload) { "Payload too large" }
+    }
+}
+
+data class LoRaInboundPacketDecrypted(
+    val originalPacket: LoRaInboundPacket,
+    val keyId: Int,
+    val to: Int,
+    val from: Int,
+    val type: LoRaPacketType,
+    val timestamp: Long,
+    val payload: ByteArray
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as LoRaInboundPacketDecrypted
+
+        if (originalPacket != other.originalPacket) return false
+        if (keyId != other.keyId) return false
+        if (to != other.to) return false
+        if (from != other.from) return false
+        if (type != other.type) return false
+        if (timestamp != other.timestamp) return false
+        if (!payload.contentEquals(other.payload)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = originalPacket.hashCode()
+        result = 31 * result + keyId
+        result = 31 * result + to
+        result = 31 * result + from
+        result = 31 * result + type.hashCode()
+        result = 31 * result + timestamp.hashCode()
+        result = 31 * result + payload.contentHashCode()
+        return result
     }
 }
 
@@ -286,13 +376,6 @@ data class LoRaInboundPacket(
     val data: ByteArray,
     val originalText: String
 ) {
-
-    // format: <to: uint_8><from: uint_8><type: uint_8><len: uint_32><data: uint_8[len]> (255 - 7)
-    fun getToAddr() = data[0].toInt()
-    fun getFromAddr() = data[1].toInt()
-    fun getType() = LoRaPacketType.fromByte(data[2])
-    fun getLength() = readInt32Bits(data, 3)
-    fun getPayload() = data.copyOfRange(7, 7 + getLength())
 
     override fun toString(): String {
         return "LoRaPacket(rssi=$rssi, originalText='$originalText')"
@@ -321,7 +404,14 @@ enum class LoRaPacketType(
     val value: Int
 ) {
     REQUEST_PING(0),
-    RESPONSE_PONG(1);
+    RESPONSE_PONG(1),
+
+    SENSOR_DATA_REQUEST(2),
+    SENSOR_DATA_RESPONSE(3),
+    SENSOR_FIRMWARE_REQUEST(4),
+    SENSOR_FIRMWARE_RESPONSE(5),
+
+    ;
 
     companion object {
         fun fromByte(byte: Byte) = values().first { it.value == byte.toInt() }

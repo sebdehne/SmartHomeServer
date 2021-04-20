@@ -12,6 +12,7 @@ import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.lora.LoRaPingService
 import com.dehnes.smarthome.rf433.Rf433Client
 import com.dehnes.smarthome.room_sensors.ChipCap2SensorService
+import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -92,7 +93,7 @@ class Configuration {
         serialConnection.listeners.add(garageDoorService::handleIncoming)
         serialConnection.listeners.add(chipCap2SensorService::handleIncoming)
 
-        val loRaConnection = LoRaConnection(persistenceService, executorService)
+        val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
         loRaConnection.start()
 
         LoRaPingService(loRaConnection)

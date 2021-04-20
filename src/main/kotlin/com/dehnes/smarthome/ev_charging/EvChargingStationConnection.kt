@@ -235,7 +235,12 @@ class EvChargingStationConnection(
                             bytesRead += read
                         }
 
-                        val inboundPacket = responseType.parser(msg, getCalibrationData(clientIdStr), evChargingStationClient.firmwareVersion, clock.millis())
+                        val inboundPacket = responseType.parser(
+                            msg,
+                            getCalibrationData(clientIdStr),
+                            evChargingStationClient.firmwareVersion,
+                            clock.millis()
+                        )
 
                         if (inboundPacket.type == InboundType.notifyDataChanged) {
                             executorService.submit {
@@ -390,13 +395,15 @@ class NotifyDataChanged : InboundPacket(InboundType.notifyDataChanged) {
 
 class SetPwmPercentResponse : InboundPacket(InboundType.setPwmPercentResponse) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int, timestamp: Long) = SetPwmPercentResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int, timestamp: Long) =
+            SetPwmPercentResponse()
     }
 }
 
 class SetContactorStateResponse : InboundPacket(InboundType.setContactorStateResponse) {
     companion object {
-        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int, timestamp: Long) = SetContactorStateResponse()
+        fun parse(msg: ByteArray, calibrationData: CalibrationData, version: Int, timestamp: Long) =
+            SetContactorStateResponse()
     }
 }
 
@@ -496,10 +503,14 @@ data class DataResponse(
             adcValue: Int,
             offsetAndSlopeAndDivider: OffsetAndSlopeAndDivider
         ) =
-            max((((adcValue - offsetAndSlopeAndDivider.offset) * offsetAndSlopeAndDivider.slope) / offsetAndSlopeAndDivider.divider), 0)
+            max(
+                (((adcValue - offsetAndSlopeAndDivider.offset) * offsetAndSlopeAndDivider.slope) / offsetAndSlopeAndDivider.divider),
+                0
+            )
     }
 
-    fun currentInAmps() = ceil(listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!!.toDouble() / 1000).roundToInt()
+    fun currentInAmps() =
+        ceil(listOf(phase1Milliamps, phase2Milliamps, phase3Milliamps).maxOrNull()!!.toDouble() / 1000).roundToInt()
 
     override fun toString(): String {
         return "DataResponse(" +
@@ -548,6 +559,14 @@ fun readInt32Bits(buf: ByteArray, offset: Int): Int {
     byteBuffer.put(buf, offset, 4)
     byteBuffer.flip()
     return byteBuffer.getInt(0)
+}
+
+fun readLong32Bits(buf: ByteArray, offset: Int): Long {
+    val byteBuffer = ByteBuffer.allocate(8)
+    byteBuffer.put(byteArrayOf(0, 0, 0, 0), 0, 4)
+    byteBuffer.put(buf, offset, 4)
+    byteBuffer.flip()
+    return byteBuffer.getLong(0)
 }
 
 enum class PilotVoltage(
@@ -606,6 +625,11 @@ fun Long.to32Bit(): ByteArray {
     val bytes = ByteArray(8)
     ByteBuffer.wrap(bytes).putLong(this)
     return bytes.copyOfRange(4, 8)
+}
+fun Int.to32Bit(): ByteArray {
+    val bytes = ByteArray(4)
+    ByteBuffer.wrap(bytes).putInt(this)
+    return bytes
 }
 
 fun ByteArray.toHexString() = joinToString("") { "%02x".format(it) }
