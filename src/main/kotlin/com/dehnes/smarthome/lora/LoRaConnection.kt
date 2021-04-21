@@ -1,12 +1,6 @@
 package com.dehnes.smarthome.lora
 
-import com.dehnes.smarthome.ev_charging.readInt32Bits
-import com.dehnes.smarthome.ev_charging.readLong32Bits
-import com.dehnes.smarthome.ev_charging.to32Bit
-import com.dehnes.smarthome.ev_charging.toHexString
-import com.dehnes.smarthome.utils.AES265GCM
-import com.dehnes.smarthome.utils.HexUtils
-import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.io.Closeable
 import java.io.File
@@ -154,7 +148,7 @@ class LoRaConnection(
                             cmd(conn, "radio get rssi", listOf(".*".toRegex()))?.toInt()
                                 ?: error("could not read rssi"),
                             if (line.startsWith("radio_rx")) {
-                                HexUtils.decodeHexString(line.replace("radio_rx\\s+".toRegex(), ""))
+                                decodeHexString(line.replace("radio_rx\\s+".toRegex(), ""))
                             } else {
                                 error("Unexpected response=$line")
                             },
@@ -193,7 +187,7 @@ class LoRaConnection(
                 while (outQueue.peek() != null) {
                     val nextOutPacket = outQueue.poll()
 
-                    val data = nextOutPacket.toByteArray(timestampSecondsSince2000())
+                    val data = nextOutPacket.toByteArray(clock.timestampSecondsSince2000())
                     val cipherTextWithIv = aes265GCM.encrypt(data, nextOutPacket.keyId)
 
                     val result = cmd(
@@ -260,10 +254,6 @@ class LoRaConnection(
         } else {
             null
         }
-    }
-
-    fun timestampSecondsSince2000(): Long {
-        return (clock.millis() / 1000) - 946_684_800L
     }
 
     fun decrypt(inboundPacket: LoRaInboundPacket) = aes265GCM.decrypt(inboundPacket.data)?.let {
@@ -339,7 +329,7 @@ data class LoRaInboundPacketDecrypted(
     val to: Int,
     val from: Int,
     val type: LoRaPacketType,
-    val timestamp: Long,
+    val timestampSecondsSince2000: Long,
     val payload: ByteArray
 ) {
     override fun equals(other: Any?): Boolean {
@@ -353,7 +343,7 @@ data class LoRaInboundPacketDecrypted(
         if (to != other.to) return false
         if (from != other.from) return false
         if (type != other.type) return false
-        if (timestamp != other.timestamp) return false
+        if (timestampSecondsSince2000 != other.timestampSecondsSince2000) return false
         if (!payload.contentEquals(other.payload)) return false
 
         return true
@@ -365,7 +355,7 @@ data class LoRaInboundPacketDecrypted(
         result = 31 * result + to
         result = 31 * result + from
         result = 31 * result + type.hashCode()
-        result = 31 * result + timestamp.hashCode()
+        result = 31 * result + timestampSecondsSince2000.hashCode()
         result = 31 * result + payload.contentHashCode()
         return result
     }

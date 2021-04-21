@@ -5,6 +5,9 @@ import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.garage_door.toInt
 import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.utils.readInt32Bits
+import com.dehnes.smarthome.utils.to32Bit
+import com.dehnes.smarthome.utils.toHexString
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
@@ -554,21 +557,6 @@ data class OffsetAndSlopeAndDivider(
     val divider: Int = 1
 )
 
-fun readInt32Bits(buf: ByteArray, offset: Int): Int {
-    val byteBuffer = ByteBuffer.allocate(4)
-    byteBuffer.put(buf, offset, 4)
-    byteBuffer.flip()
-    return byteBuffer.getInt(0)
-}
-
-fun readLong32Bits(buf: ByteArray, offset: Int): Long {
-    val byteBuffer = ByteBuffer.allocate(8)
-    byteBuffer.put(byteArrayOf(0, 0, 0, 0), 0, 4)
-    byteBuffer.put(buf, offset, 4)
-    byteBuffer.flip()
-    return byteBuffer.getLong(0)
-}
-
 enum class PilotVoltage(
     val value: Int,
     val voltValue: Int
@@ -621,15 +609,3 @@ class Firmware(
     }
 }
 
-fun Long.to32Bit(): ByteArray {
-    val bytes = ByteArray(8)
-    ByteBuffer.wrap(bytes).putLong(this)
-    return bytes.copyOfRange(4, 8)
-}
-fun Int.to32Bit(): ByteArray {
-    val bytes = ByteArray(4)
-    ByteBuffer.wrap(bytes).putInt(this)
-    return bytes
-}
-
-fun ByteArray.toHexString() = joinToString("") { "%02x".format(it) }

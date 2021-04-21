@@ -9,7 +9,7 @@ import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.garage_door.GarageDoorService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
-import com.dehnes.smarthome.lora.LoRaPingService
+import com.dehnes.smarthome.lora.LoRaSensorBoardService
 import com.dehnes.smarthome.rf433.Rf433Client
 import com.dehnes.smarthome.room_sensors.ChipCap2SensorService
 import com.dehnes.smarthome.utils.AES265GCM
@@ -96,7 +96,7 @@ class Configuration {
         val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
         loRaConnection.start()
 
-        LoRaPingService(loRaConnection)
+        LoRaSensorBoardService(loRaConnection, clock, persistenceService)
 
         beans[Rf433Client::class] = serialConnection
         beans[UnderFloorHeaterService::class] = heaterService
