@@ -31,6 +31,11 @@ const App = () => {
                     </Button>
                 </li>
                 <li>
+                    <Button variant="contained" color="primary" onClick={relative("/environmentSensors")}>
+                        Environment Sensors
+                    </Button>
+                </li>
+                <li>
                     <Button variant="contained" color="primary" onClick={relative("/webcams")}>
                         Cameras
                     </Button>

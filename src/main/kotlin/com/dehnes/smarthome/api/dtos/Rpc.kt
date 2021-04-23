@@ -6,7 +6,8 @@ enum class RequestType {
 
     garageRequest,
     underFloorHeaterRequest,
-    evChargingStationRequest
+    evChargingStationRequest,
+    environmentSensorRequest
 }
 
 data class RpcRequest(
@@ -16,7 +17,8 @@ data class RpcRequest(
 
     val garageRequest: GarageRequest?,
     val underFloorHeaterRequest: UnderFloorHeaterRequest?,
-    val evChargingStationRequest: EvChargingStationRequest?
+    val evChargingStationRequest: EvChargingStationRequest?,
+    val environmentSensorRequest: EnvironmentSensorRequest?
 )
 
 data class RpcResponse(
@@ -25,5 +27,6 @@ data class RpcResponse(
 
     val garageResponse: GarageResponse? = null,
     val underFloorHeaterResponse: UnderFloorHeaterResponse? = null,
-    val evChargingStationResponse: EvChargingStationResponse? = null
+    val evChargingStationResponse: EvChargingStationResponse? = null,
+    val environmentSensorResponse: EnvironmentSensorResponse? = null
 )

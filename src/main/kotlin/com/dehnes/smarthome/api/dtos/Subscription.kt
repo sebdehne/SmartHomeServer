@@ -3,7 +3,8 @@ package com.dehnes.smarthome.api.dtos
 enum class SubscriptionType {
     getGarageStatus,
     getUnderFloorHeaterStatus,
-    evChargingStationEvents
+    evChargingStationEvents,
+    environmentSensorEvents
 }
 
 data class Subscribe(
@@ -19,5 +20,6 @@ data class Notify(
     val subscriptionId: String,
     val garageStatus: GarageStatus?,
     val underFloorHeaterStatus: UnderFloorHeaterStatus?,
-    val evChargingStationEvent: EvChargingEvent?
+    val evChargingStationEvent: EvChargingEvent?,
+    val environmentSensorEvent: EnvironmentSensorEvent?
 )

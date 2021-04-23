@@ -7,6 +7,7 @@ import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.garage_door.GarageDoorService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
+import com.dehnes.smarthome.lora.LoRaSensorBoardService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
@@ -30,6 +31,8 @@ class WebSocketServer {
         configuration.getBean<EvChargingService>(EvChargingService::class)
     private val firmwareUploadService =
         configuration.getBean<FirmwareUploadService>(FirmwareUploadService::class)
+    private val loRaSensorBoardService =
+        configuration.getBean<LoRaSensorBoardService>(LoRaSensorBoardService::class)
 
     @OnOpen
     fun onWebSocketConnect(sess: Session) {
@@ -67,6 +70,12 @@ class WebSocketServer {
                         ).apply {
                             evChargingService.listeners[subscriptionId] = this::onEvent
                         }
+                        SubscriptionType.environmentSensorEvents -> EnvironmentSensorSubscription(
+                            subscriptionId,
+                            argSession
+                        ).apply {
+                            loRaSensorBoardService.listeners[subscriptionId] = this::onEvent
+                        }
                     }
 
                     subscriptions.put(subscriptionId, sub)?.close()
@@ -86,6 +95,7 @@ class WebSocketServer {
             garageRequest -> RpcResponse(garageResponse = garageRequest(rpcRequest.garageRequest!!))
             underFloorHeaterRequest -> RpcResponse(underFloorHeaterResponse = underFloorHeaterRequest(rpcRequest.underFloorHeaterRequest!!))
             evChargingStationRequest -> RpcResponse(evChargingStationResponse = evChargingStationRequest(rpcRequest.evChargingStationRequest!!))
+            environmentSensorRequest -> RpcResponse(environmentSensorResponse = environmentSensorRequest(rpcRequest.environmentSensorRequest!!))
         }
 
         argSession.basicRemote.sendText(
@@ -99,6 +109,34 @@ class WebSocketServer {
                 )
             )
         )
+    }
+
+    private fun environmentSensorRequest(request: EnvironmentSensorRequest) = when (request.type) {
+        EnvironmentSensorRequestType.getAllEnvironmentSensorData -> EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+        EnvironmentSensorRequestType.scheduleFirmwareUpgrade -> {
+            loRaSensorBoardService.firmwareUpgrade(request.sensorId!!, true)
+            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+        }
+        EnvironmentSensorRequestType.cancelFirmwareUpgrade -> {
+            loRaSensorBoardService.firmwareUpgrade(request.sensorId!!, false)
+            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+        }
+        EnvironmentSensorRequestType.scheduleTimeAdjustment -> {
+            loRaSensorBoardService.timeAdjustment(request.sensorId!!, true)
+            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+        }
+        EnvironmentSensorRequestType.cancelTimeAdjustment -> {
+            loRaSensorBoardService.timeAdjustment(request.sensorId!!, false)
+            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+        }
+        EnvironmentSensorRequestType.adjustSleepTimeInSeconds -> {
+            loRaSensorBoardService.adjustSleepTimeInSeconds(request.sensorId!!, request.sleepTimeInSeconds!!)
+            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+        }
+        EnvironmentSensorRequestType.uploadFirmware -> {
+            loRaSensorBoardService.setFirmware(request.firmwareFilename!!, request.firmwareBased64Encoded!!)
+            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+        }
     }
 
     private fun evChargingStationRequest(request: EvChargingStationRequest) = when (request.type) {
@@ -189,7 +227,7 @@ class WebSocketServer {
                     WebsocketMessage(
                         UUID.randomUUID().toString(),
                         WebsocketMessageType.notify,
-                        notify = Notify(subscriptionId, e, null, null)
+                        notify = Notify(subscriptionId, e, null, null, null)
                     )
                 )
             )
@@ -197,6 +235,29 @@ class WebSocketServer {
 
         override fun close() {
             garageDoorService.listeners.remove(subscriptionId)
+            subscriptions.remove(subscriptionId)
+        }
+    }
+
+    inner class EnvironmentSensorSubscription(
+        subscriptionId: String,
+        sess: Session
+    ) : Subscription<EnvironmentSensorEvent>(subscriptionId, sess) {
+        override fun onEvent(e: EnvironmentSensorEvent) {
+            logger.info("$instanceId onEvent EnvironmentSensorSubscription $subscriptionId ")
+            sess.basicRemote.sendText(
+                objectMapper.writeValueAsString(
+                    WebsocketMessage(
+                        UUID.randomUUID().toString(),
+                        WebsocketMessageType.notify,
+                        notify = Notify(subscriptionId, null, null, null, e)
+                    )
+                )
+            )
+        }
+
+        override fun close() {
+            loRaSensorBoardService.listeners.remove(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }
@@ -212,7 +273,7 @@ class WebSocketServer {
                     WebsocketMessage(
                         UUID.randomUUID().toString(),
                         WebsocketMessageType.notify,
-                        notify = Notify(subscriptionId, null, null, e)
+                        notify = Notify(subscriptionId, null, null, e, null)
                     )
                 )
             )
@@ -235,7 +296,7 @@ class WebSocketServer {
                     WebsocketMessage(
                         UUID.randomUUID().toString(),
                         WebsocketMessageType.notify,
-                        notify = Notify(subscriptionId, null, e, null)
+                        notify = Notify(subscriptionId, null, e, null, null)
                     )
                 )
             )

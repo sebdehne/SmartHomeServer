@@ -50,6 +50,7 @@ const HeaterController = () => {
                         UnderFloorHeaterRequestType.getUnderFloorHeaterStatus,
                         null
                     ),
+                    null,
                     null))
                     .then(response => onNewStatus(response.underFloorHeaterResponse!!.underFloorHeaterStatus));
             }
@@ -73,6 +74,7 @@ const HeaterController = () => {
                     null
                 )
             ),
+            null,
             null
         )).then((response: RpcResponse) => {
             setCmdResult(response.underFloorHeaterResponse!!.updateUnderFloorHeaterModeSuccess);
@@ -91,6 +93,7 @@ const HeaterController = () => {
                     UnderFloorHeaterRequestType.getUnderFloorHeaterStatus,
                     null
                 ),
+                null,
                 null))
                 .then(response => onNewStatus(response.underFloorHeaterResponse!!.underFloorHeaterStatus));
 

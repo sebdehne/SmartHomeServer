@@ -50,7 +50,7 @@ type EvChargingStationProps = {
     setCmdResult: (sending: boolean | null) => void;
     station: EvChargingStationDataAndConfig;
     setStations: (stations: EvChargingStationDataAndConfig[]) => void;
-    currentSeconds: number;
+    currentMilliSeconds: number;
 };
 
 export const EvChargingStation = ({
@@ -58,7 +58,7 @@ export const EvChargingStation = ({
                                       setCmdResult,
                                       station,
                                       setStations,
-                                      currentSeconds
+                                      currentMilliSeconds
                                   }: EvChargingStationProps) => {
 
     const [showData, setShowData] = useState<boolean>(false);
@@ -71,7 +71,8 @@ export const EvChargingStation = ({
             null,
             null,
             null,
-            req))
+            req,
+            null))
             .then(response => {
                 setCmdResult(response.evChargingStationResponse!!.configUpdated!!);
                 setStations(response.evChargingStationResponse!!.chargingStationsDataAndConfig);
@@ -234,7 +235,7 @@ export const EvChargingStation = ({
                                 systemUptime={station.data.systemUptime}
                                 utcTimestampInMs={station.data.utcTimestampInMs}
                                 wifiRSSI={station.data.wifiRSSI}
-                                currentSeconds={currentSeconds}
+                                currentSeconds={currentMilliSeconds}
                                 clientConnection={station.clientConnection}
                                 setSending={setSending}
                                 setCmdResult={setCmdResult}

@@ -2,8 +2,8 @@ package com.dehnes.smarthome
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
-import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.EvChargingService
+import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.garage_door.GarageDoorService
@@ -96,7 +96,7 @@ class Configuration {
         val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
         loRaConnection.start()
 
-        LoRaSensorBoardService(loRaConnection, clock, persistenceService)
+        val loRaSensorBoardService = LoRaSensorBoardService(loRaConnection, clock, executorService, persistenceService)
 
         beans[Rf433Client::class] = serialConnection
         beans[UnderFloorHeaterService::class] = heaterService
@@ -105,6 +105,7 @@ class Configuration {
         beans[EvChargingStationConnection::class] = evChargingStationConnection
         beans[FirmwareUploadService::class] = firmwareUploadService
         beans[EvChargingService::class] = evChargingService
+        beans[LoRaSensorBoardService::class] = loRaSensorBoardService
     }
 
     fun <T> getBean(klass: KClass<*>): T {

@@ -2,16 +2,15 @@ import { Button } from "@material-ui/core";
 import React from "react";
 import WebsocketService from "../../Websocket/websocketClient";
 import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
-import { EvChargingStationRequest, EvChargingStationRequestType } from "../../Websocket/types/EVChargingStation";
+import { EnvironmentSensorRequest, EnvironmentSensorRequestType } from "../../Websocket/types/EnvironmentSensors";
 import { arrayBufferToBase64 } from "../Utils/utils";
 
 type FirmwareUploadProps = {
     setSending: (sending: boolean) => void;
     setCmdResult: (sending: boolean | null) => void;
-    clientId: string;
 }
 
-export const FirmwareUpload = ({ setSending, setCmdResult, clientId }: FirmwareUploadProps) => {
+export const FirmwareUpload = ({ setSending, setCmdResult }: FirmwareUploadProps) => {
 
     const uploadFirmware = (file: File) => {
         setSending(true);
@@ -28,15 +27,14 @@ export const FirmwareUpload = ({ setSending, setCmdResult, clientId }: FirmwareU
                 null,
                 null,
                 null,
-                new EvChargingStationRequest(
-                    EvChargingStationRequestType.uploadFirmwareToClient,
-                    clientId,
+                null,
+                new EnvironmentSensorRequest(
+                    EnvironmentSensorRequestType.uploadFirmware,
+                    null,
+                    file.name,
                     firmwareBased64Encoded,
-                    null,
-                    null,
                     null
-                ),
-                null
+                )
             )).then(response => {
                 setCmdResult(response.evChargingStationResponse!!.uploadFirmwareToClientResult!!);
                 setTimeout(() => {

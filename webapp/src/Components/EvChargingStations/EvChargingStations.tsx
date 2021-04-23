@@ -13,14 +13,14 @@ import { EvChargingStation } from "./EvChargingStation";
 
 export const EvChargingStations = () => {
 
-    const [currentSeconds, setCurrentSeconds] = useState(Date.now());
+    const [currentMilliSeconds, setCurrentSeconds] = useState(Date.now());
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
     const [stations, setStations] = useState<EvChargingStationDataAndConfig[]>([]);
 
     useEffect(() => {
         setTimeout(() => setCurrentSeconds(Date.now()), 1000)
-    }, [currentSeconds]);
+    }, [currentMilliSeconds]);
 
     useEffect(() => {
         const subId = WebsocketService.subscribe(SubscriptionType.evChargingStationEvents, notify =>
@@ -38,7 +38,8 @@ export const EvChargingStations = () => {
                     null,
                     null,
                     null
-                )
+                ),
+                null
             )).then(response => setStations(response.evChargingStationResponse!!.chargingStationsDataAndConfig)));
 
         return () => WebsocketService.unsubscribe(subId);
@@ -63,7 +64,7 @@ export const EvChargingStations = () => {
                     setCmdResult={setCmdResult}
                     setSending={setSending}
                     setStations={setStations}
-                    currentSeconds={currentSeconds}
+                    currentMilliSeconds={currentMilliSeconds}
                 />
             ))}
         </div>

@@ -10,6 +10,7 @@ import HeaterController from "./Components/Heater/HeaterController";
 import { EvChargingStations } from "./Components/EvChargingStations/EvChargingStations";
 import Webcams from "./Components/Webcams/Webcams";
 import theme from "./theme";
+import { EnvironmentSensors } from "./Components/EnvironmentSensors/EnvironmentSensors";
 
 ReactDOM.render(
     <React.StrictMode>
@@ -28,6 +29,9 @@ ReactDOM.render(
                     </Route>
                     <Route path="/evChargingStations">
                         <EvChargingStations/>
+                    </Route>
+                    <Route path="/environmentSensors">
+                        <EnvironmentSensors/>
                     </Route>
                     <Route path="/webcams">
                         <Webcams/>

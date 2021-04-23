@@ -1,11 +1,15 @@
 package com.dehnes.smarthome.lora
 
+import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.garage_door.toInt
 import com.dehnes.smarthome.lora.LoRaPacketType.*
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.lang.Integer.min
 import java.time.Clock
+import java.util.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.zip.CRC32
@@ -13,11 +17,14 @@ import java.util.zip.CRC32
 class LoRaSensorBoardService(
     private val loRaConnection: LoRaConnection,
     private val clock: Clock,
+    private val executorService: ExecutorService,
     private val persistenceService: PersistenceService
 ) {
 
+    val listeners = ConcurrentHashMap<String, (EnvironmentSensorEvent) -> Unit>()
+
     private val logger = KotlinLogging.logger { }
-    private val sensors = mutableMapOf<Int, SensorState>()
+    private val sensors = ConcurrentHashMap<Int, SensorState>()
 
     private var firmwareHolder: FirmwareHolder? = null
 
@@ -25,10 +32,12 @@ class LoRaSensorBoardService(
         loRaConnection.listeners.add { packet ->
             synchronized(this) {
                 val currentState = sensors[packet.from] ?: SensorState(
-                    packet.from,
-                    0,
-                    false,
-                    null
+                    id = packet.from,
+                    firmwareVersion = 0,
+                    sleepTimeInSeconds = 300,
+                    triggerFirmwareUpdate = false,
+                    triggerTimeAdjustment = false,
+                    lastReceivedMessage = null
                 )
 
                 val updatedState = when (packet.type) {
@@ -41,11 +50,110 @@ class LoRaSensorBoardService(
 
                 if (updatedState != null) {
                     sensors[packet.from] = updatedState
+
+                    // notify listeners
+                    executorService.submit {
+                        listeners.forEach { (_, fn) ->
+                            fn(
+                                EnvironmentSensorEvent(
+                                    EnvironmentSensorEventType.update,
+                                    getAllState()
+                                )
+                            )
+                        }
+                    }
+
                     true
                 } else {
                     false
                 }
             }
+        }
+    }
+
+    fun getAllState() = sensors.map { (sensorId, sensorState) ->
+        val lastReceivedMessage = sensorState.lastReceivedMessage
+        val firmwareUpgradeState = firmwareHolder?.let {
+            when (lastReceivedMessage) {
+                is FirmwareInfoRequest -> FirmwareUpgradeState(
+                    it.data.size,
+                    0,
+                    lastReceivedMessage.timestampDelta,
+                    lastReceivedMessage.receivedAt
+                )
+                is FirmwareDataRequest -> FirmwareUpgradeState(
+                    it.data.size,
+                    lastReceivedMessage.offset,
+                    lastReceivedMessage.timestampDelta,
+                    lastReceivedMessage.receivedAt
+                )
+                else -> null
+            }
+        }
+
+        EnvironmentSensorState(
+            sensorId,
+            persistenceService["EnvironmentSensor.$sensorId.displayName", sensorId.toString()]!!,
+            sensorState.sleepTimeInSeconds,
+            if (lastReceivedMessage is SensorData) EnvironmentSensorData(
+                lastReceivedMessage.temperature,
+                lastReceivedMessage.humidity,
+                lastReceivedMessage.adcBattery, // TODO
+                lastReceivedMessage.adcLight,
+                lastReceivedMessage.sleepTimeInSeconds,
+                lastReceivedMessage.timestampDelta,
+                lastReceivedMessage.receivedAt
+            ) else null,
+            firmwareUpgradeState,
+            sensorState.firmwareVersion,
+            sensorState.triggerFirmwareUpdate,
+            sensorState.triggerTimeAdjustment
+        )
+    }
+
+    fun adjustSleepTimeInSeconds(sensorId: Int, sleepTimeInSeconds: Long) = synchronized(this) {
+        check(sleepTimeInSeconds in 1..599) { "Invalid sleepTimeInSeconds=$sleepTimeInSeconds" }
+        val sensorState = sensors[sensorId]
+        if (sensorState == null) {
+            false
+        } else {
+            sensors[sensorId] = sensorState.copy(
+                sleepTimeInSeconds = sleepTimeInSeconds
+            )
+            true
+        }
+    }
+
+    fun firmwareUpgrade(sensorId: Int, scheduled: Boolean) = synchronized(this) {
+        val sensorState = sensors[sensorId]
+        if (sensorState == null) {
+            false
+        } else {
+            sensors[sensorId] = sensorState.copy(
+                triggerFirmwareUpdate = scheduled
+            )
+            true
+        }
+    }
+
+    fun timeAdjustment(sensorId: Int, scheduled: Boolean) = synchronized(this) {
+        val sensorState = sensors[sensorId]
+        if (sensorState == null) {
+            false
+        } else {
+            sensors[sensorId] = sensorState.copy(
+                triggerTimeAdjustment = scheduled
+            )
+            true
+        }
+    }
+
+    fun setFirmware(filename: String, firmwareBased64Encoded: String) {
+        synchronized(this) {
+            firmwareHolder = FirmwareHolder(
+                filename,
+                Base64.getDecoder().decode(firmwareBased64Encoded)
+            )
         }
     }
 
@@ -110,6 +218,7 @@ class LoRaSensorBoardService(
                 if (sent == true) {
                     messagesSent++
                     offset += data.size
+                    // TODO delay?
                 } else {
                     logger.info { "Could not send firmware chunk, giving up" }
                     break
@@ -170,15 +279,26 @@ class LoRaSensorBoardService(
             readLong32Bits(packet.payload, 4),
             readLong32Bits(packet.payload, 8),
             readLong32Bits(packet.payload, 12),
+            readLong32Bits(packet.payload, 16),
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
             clock.millis()
         )
         val firmwareVersion = packet.payload[16].toInt()
         logger.info { "Handling sensorData from ${packet.from}: $sensorData" }
 
-        val responsePayload = ByteArray(2)
+        val responsePayload = ByteArray(6) { 0 }
         responsePayload[0] = existingState.triggerFirmwareUpdate.toInt().toByte()
-        responsePayload[1] = 0 // timeAdjustmentRequired TODO
+        responsePayload[1] = existingState.triggerTimeAdjustment.toInt().toByte()
+        if (sensorData.sleepTimeInSeconds != existingState.sleepTimeInSeconds) {
+            logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> ${existingState.sleepTimeInSeconds}" }
+            System.arraycopy(
+                existingState.sleepTimeInSeconds.to32Bit(),
+                0,
+                responsePayload,
+                2,
+                4
+            )
+        }
 
         loRaConnection.send(packet.keyId, packet.from, SENSOR_DATA_RESPONSE, responsePayload) {
             if (!it) {
@@ -187,6 +307,8 @@ class LoRaSensorBoardService(
         }
 
         return existingState.copy(
+            triggerTimeAdjustment = false,
+            sleepTimeInSeconds = sensorData.sleepTimeInSeconds,
             firmwareVersion = firmwareVersion,
             lastReceivedMessage = sensorData
         )
@@ -213,12 +335,15 @@ class LoRaSensorBoardService(
             lastReceivedMessage = ping
         )
     }
+
 }
 
 data class SensorState(
     val id: Int,
     val firmwareVersion: Int,
+    val sleepTimeInSeconds: Long,
     val triggerFirmwareUpdate: Boolean,
+    val triggerTimeAdjustment: Boolean,
     val lastReceivedMessage: ReceivedMessage? = null
 )
 
@@ -232,6 +357,7 @@ data class SensorData(
     val humidity: Long,
     val adcBattery: Long,
     val adcLight: Long,
+    val sleepTimeInSeconds: Long,
     override val timestampDelta: Long,
     override val receivedAt: Long
 ) : ReceivedMessage()

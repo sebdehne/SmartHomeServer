@@ -1,9 +1,9 @@
-import {plainToClass, serialize} from 'class-transformer';
+import { plainToClass, serialize } from 'class-transformer';
 
-import {v4 as uuidv4} from 'uuid';
-import {RequestType, RpcRequest, RpcResponse} from "./types/Rpc";
-import {Notify, Subscribe, SubscriptionType, Unsubscribe} from "./types/Subscription";
-import {WebsocketMessage, WebsocketMessageType} from "./types/WebsocketMessage";
+import { v4 as uuidv4 } from 'uuid';
+import { RequestType, RpcRequest, RpcResponse } from "./types/Rpc";
+import { Notify, Subscribe, SubscriptionType, Unsubscribe } from "./types/Subscription";
+import { WebsocketMessage, WebsocketMessageType } from "./types/WebsocketMessage";
 
 export enum ConnectionStatus {
     connected = "connected",
@@ -22,7 +22,7 @@ function subscribe(type: SubscriptionType, onNotify: (notify: Notify) => void, o
 
     SubscriptionsById.set(subscriptionId, new Subscription(type, onNotify, onOpened));
 
-    rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null, null, null, null)).then(() => {
+    rpc(new RpcRequest(RequestType.subscribe, new Subscribe(subscriptionId, type), null, null, null, null, null)).then(() => {
         onOpened();
     });
 
@@ -36,7 +36,7 @@ function unsubscribe(subscriptionId: string) {
         return;
     }
 
-    rpc(new RpcRequest(RequestType.unsubscribe, null, new Unsubscribe(subscriptionId), null, null, null)).then(() => {
+    rpc(new RpcRequest(RequestType.unsubscribe, null, new Unsubscribe(subscriptionId), null, null, null, null)).then(() => {
         SubscriptionsById.delete(subscriptionId);
     });
 
@@ -104,7 +104,7 @@ function reconnect() {
         SubscriptionsById.forEach((sub, key) => {
             console.log("onopen - re-subscribe: " + key)
             if (subscriptions.indexOf(key) < 0) {
-                rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null, null, null, null)).then(() => {
+                rpc(new RpcRequest(RequestType.subscribe, new Subscribe(key, sub.type), null, null, null, null, null)).then(() => {
                     sub.onOpened();
                 });
             }
@@ -171,7 +171,7 @@ class Subscription {
     public onOpened: () => void;
 
 
-   public constructor(type: SubscriptionType, onNotify: (notify: Notify) => void, onOpened: () => void) {
+    public constructor(type: SubscriptionType, onNotify: (notify: Notify) => void, onOpened: () => void) {
         this.type = type;
         this.onNotify = onNotify;
         this.onOpened = onOpened;
