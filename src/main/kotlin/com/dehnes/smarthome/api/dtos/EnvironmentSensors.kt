@@ -16,11 +16,17 @@ data class EnvironmentSensorRequest(
     val sensorId: Int?,
     val firmwareFilename: String?,
     val firmwareBased64Encoded: String?,
-    val sleepTimeInSeconds: Long?
+    val sleepTimeInSecondsDelta: Long?
 )
 
 data class EnvironmentSensorResponse(
-    val sensors: List<EnvironmentSensorState>
+    val sensors: List<EnvironmentSensorState>,
+    val firmwareInfo: FirmwareInfo?
+)
+
+data class FirmwareInfo(
+    val filename: String,
+    val size: Int
 )
 
 data class EnvironmentSensorState(
@@ -57,5 +63,6 @@ enum class EnvironmentSensorEventType {
 
 data class EnvironmentSensorEvent(
     val type: EnvironmentSensorEventType,
-    val sensors: List<EnvironmentSensorState>
+    val sensors: List<EnvironmentSensorState>,
+    val firmwareInfo: FirmwareInfo?
 )

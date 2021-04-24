@@ -129,7 +129,12 @@ class LoRaConnection(
             // consume "RN2483....."
             sinkText(conn, 1)
 
-            while (cmd(conn, "mac pause", listOf("\\d+".toRegex())) == null) {
+            while (cmd(
+                    conn,
+                    "mac pause",
+                    listOf("\\d+".toRegex())
+                ) == null
+            ) { // TODO re-do this when time is up (OR send reset)
                 Thread.sleep(1000)
             }
             while (cmd(conn, "radio set sf sf7", listOf("ok".toRegex(), "invalid_param".toRegex())) == null) {
@@ -159,7 +164,15 @@ class LoRaConnection(
 
                         if (inboundPacket?.to != localAddr) {
                             logger.info { "Ignoring packet not for me. $inboundPacket" }
+                        } else if (inboundPacket.type != LoRaPacketType.REQUEST_PING && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
+                            logger.warn { "Ignoring received packet because of invalid timestampDelta. $inboundPacket" }
                         } else {
+
+                            // do not send out any scheduled packets for this sensor
+                            while (outQueue.peek()?.toAddr == inboundPacket.from) {
+                                logger.info { "Dropping outbound packet ${outQueue.poll()}" }
+                            }
+
                             executorService.submit {
                                 try {
                                     val wasAccepted = listeners.any { listener ->
@@ -198,6 +211,7 @@ class LoRaConnection(
                     executorService.submit {
                         nextOutPacket.onResult(result)
                     }
+                    Thread.sleep(400) // receive needs some time to process and message + switch to receive mode again
                 }
 
                 // switch to receive mode
@@ -267,13 +281,15 @@ class LoRaConnection(
          * payload(0...len bytes)
          */
         val length = readInt32Bits(it.second, 7)
+        val timestampSecondsSince2000 = readLong32Bits(it.second, 3)
         LoRaInboundPacketDecrypted(
             inboundPacket,
             it.first,
             it.second[0].toInt(),
             it.second[1].toInt(),
             LoRaPacketType.fromByte(it.second[2]),
-            readLong32Bits(it.second, 3),
+            timestampSecondsSince2000,
+            clock.timestampSecondsSince2000() - timestampSecondsSince2000,
             it.second.copyOfRange(11, 11 + length)
         )
     }
@@ -330,6 +346,7 @@ data class LoRaInboundPacketDecrypted(
     val from: Int,
     val type: LoRaPacketType,
     val timestampSecondsSince2000: Long,
+    val timestampDelta: Long,
     val payload: ByteArray
 ) {
     override fun equals(other: Any?): Boolean {

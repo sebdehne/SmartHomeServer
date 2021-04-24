@@ -85,11 +85,10 @@ class AES265GCM(
 
 fun main() {
 
-    val value = "Hello world".toByteArray()
+    val decodeHexString =
+        decodeHexString("E76CE8FDCF40A2C23A0F218932A7ABAD0B19D4276CC7F8A22FE668CC92993E175E157A314DC72D692F185D0C1F0F5A1B")
 
     val aeS265GCM = AES265GCM(PersistenceService())
-    val cipherTextWithIv = aeS265GCM.encrypt(value, 1)
-    println("${cipherTextWithIv.contentToString()} (${cipherTextWithIv.size})")
-    val (keyId, plainText) = aeS265GCM.decrypt(cipherTextWithIv) ?: error("Could not decrypt")
+    val (keyId, plainText) = aeS265GCM.decrypt(decodeHexString) ?: error("Could not decrypt")
     println("Done with keyId=$keyId: ${plainText.toString(Charset.defaultCharset())}")
 }

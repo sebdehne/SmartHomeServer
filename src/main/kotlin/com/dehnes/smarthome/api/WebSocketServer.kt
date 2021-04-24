@@ -112,30 +112,30 @@ class WebSocketServer {
     }
 
     private fun environmentSensorRequest(request: EnvironmentSensorRequest) = when (request.type) {
-        EnvironmentSensorRequestType.getAllEnvironmentSensorData -> EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+        EnvironmentSensorRequestType.getAllEnvironmentSensorData -> loRaSensorBoardService.getEnvironmentSensorResponse()
         EnvironmentSensorRequestType.scheduleFirmwareUpgrade -> {
             loRaSensorBoardService.firmwareUpgrade(request.sensorId!!, true)
-            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+            loRaSensorBoardService.getEnvironmentSensorResponse()
         }
         EnvironmentSensorRequestType.cancelFirmwareUpgrade -> {
             loRaSensorBoardService.firmwareUpgrade(request.sensorId!!, false)
-            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+            loRaSensorBoardService.getEnvironmentSensorResponse()
         }
         EnvironmentSensorRequestType.scheduleTimeAdjustment -> {
             loRaSensorBoardService.timeAdjustment(request.sensorId!!, true)
-            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+            loRaSensorBoardService.getEnvironmentSensorResponse()
         }
         EnvironmentSensorRequestType.cancelTimeAdjustment -> {
             loRaSensorBoardService.timeAdjustment(request.sensorId!!, false)
-            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+            loRaSensorBoardService.getEnvironmentSensorResponse()
         }
         EnvironmentSensorRequestType.adjustSleepTimeInSeconds -> {
-            loRaSensorBoardService.adjustSleepTimeInSeconds(request.sensorId!!, request.sleepTimeInSeconds!!)
-            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+            loRaSensorBoardService.adjustSleepTimeInSeconds(request.sensorId!!, request.sleepTimeInSecondsDelta!!)
+            loRaSensorBoardService.getEnvironmentSensorResponse()
         }
         EnvironmentSensorRequestType.uploadFirmware -> {
             loRaSensorBoardService.setFirmware(request.firmwareFilename!!, request.firmwareBased64Encoded!!)
-            EnvironmentSensorResponse(loRaSensorBoardService.getAllState())
+            loRaSensorBoardService.getEnvironmentSensorResponse()
         }
     }
 

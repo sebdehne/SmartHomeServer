@@ -25,7 +25,7 @@ import { timeToDelta } from "../GarageDoor/GarageDoor";
 
 const stateToText = (currentMilliSeconds: number, sensor: EnvironmentSensorState) => {
     if (sensor.firmwareUpgradeState != null) {
-        return "Upgrade: " + firmwareUpgradeProgress(sensor) + "% completed";
+        return "Firmware upgrade: " + firmwareUpgradeProgress(sensor) + "% completed";
     } else if (sensor.sensorData != null) {
         return timeToDelta(currentMilliSeconds, sensor.sensorData!!.receivedAt) + " ago";
     }
@@ -59,7 +59,7 @@ export const EnvironmentSensor = ({
     const sendUpdate = (req: EnvironmentSensorRequest) => {
         setSending(true);
         WebsocketService.rpc(new RpcRequest(
-            RequestType.evChargingStationRequest,
+            RequestType.environmentSensorRequest,
             null,
             null,
             null,
@@ -108,7 +108,7 @@ export const EnvironmentSensor = ({
         sensor.sensorId,
         null,
         null,
-        sensor.sensorData!!.sleepTimeInSeconds + delta
+        delta
     ));
 
     return <Accordion key={sensor.sensorId}>
@@ -155,11 +155,11 @@ export const EnvironmentSensor = ({
                     <Grid item xs={12}>
                         <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
 
-                            <Grid item xs={4}>
-                                <span>Sleep seconds: </span>
-                                <span>{sensor.sleepTimeInSeconds}</span>
-                            </Grid>
                             <Grid item xs={8}>
+                                <span>Set sleep time: </span>
+                                <span>{sensor.sleepTimeInSeconds} seconds</span>
+                            </Grid>
+                            <Grid item xs={4}>
                                 <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
                                     margin: "10px"
                                 }}>
@@ -183,11 +183,12 @@ export const EnvironmentSensor = ({
                                     <TableBody>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Temperature</TableCell>
-                                            <TableCell align="right">{sensor.sensorData!!.temperature}</TableCell>
+                                            <TableCell align="right">{(sensor.sensorData!!.temperature / 100).toFixed(2)} &deg;C</TableCell>
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Humidity</TableCell>
-                                            <TableCell align="right">{sensor.sensorData!!.humidity}</TableCell>
+                                            <TableCell
+                                                align="right">{(sensor.sensorData!!.humidity / 100).toFixed(2)} %</TableCell>
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Light</TableCell>
@@ -195,11 +196,13 @@ export const EnvironmentSensor = ({
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Battery</TableCell>
-                                            <TableCell align="right">{sensor.sensorData!!.batteryMilliVolts}</TableCell>
+                                            <TableCell
+                                                align="right">{(sensor.sensorData!!.batteryMilliVolts / 1000).toFixed(2)} V</TableCell>
                                         </TableRow>
                                         <TableRow>
-                                            <TableCell component="th" scope="row">Sleep seconds</TableCell>
-                                            <TableCell align="right">{sensor.sensorData!!.sleepTimeInSeconds}</TableCell>
+                                            <TableCell component="th" scope="row">Actual sleep time</TableCell>
+                                            <TableCell
+                                                align="right">{sensor.sensorData!!.sleepTimeInSeconds} seconds</TableCell>
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Firmware version</TableCell>

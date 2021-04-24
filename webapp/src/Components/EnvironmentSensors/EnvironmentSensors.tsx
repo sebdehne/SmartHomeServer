@@ -7,7 +7,7 @@ import Header from "../Header";
 import {
     EnvironmentSensorRequest,
     EnvironmentSensorRequestType,
-    EnvironmentSensorState
+    EnvironmentSensorState, FirmwareInfo
 } from "../../Websocket/types/EnvironmentSensors";
 import { EnvironmentSensor } from "./EnvironmentSensor";
 import { FirmwareUpload } from "./FirmwareUpload";
@@ -18,14 +18,17 @@ export const EnvironmentSensors = () => {
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
     const [sensors, setSensors] = useState<EnvironmentSensorState[]>([]);
+    const [firmwareInfo, setFirmwareInfo] = useState<FirmwareInfo | null>(null);
 
     useEffect(() => {
         setTimeout(() => setCurrentSeconds(Date.now()), 1000)
     }, [currentSeconds]);
 
     useEffect(() => {
-        const subId = WebsocketService.subscribe(SubscriptionType.environmentSensorEvents, notify =>
-                setSensors(notify.environmentSensorEvent!!.sensors),
+        const subId = WebsocketService.subscribe(SubscriptionType.environmentSensorEvents, notify => {
+                setSensors(notify.environmentSensorEvent!!.sensors);
+                setFirmwareInfo(notify.environmentSensorEvent!!.firmwareInfo);
+            },
             () => WebsocketService.rpc(new RpcRequest(
                 RequestType.environmentSensorRequest,
                 null,
@@ -40,7 +43,10 @@ export const EnvironmentSensors = () => {
                     null,
                     null
                 )
-            )).then(response => setSensors(response.environmentSensorResponse!!.sensors)));
+            )).then(response => {
+                setSensors(response.environmentSensorResponse!!.sensors);
+                setFirmwareInfo(response.environmentSensorResponse!!.firmwareInfo);
+            }));
 
         return () => WebsocketService.unsubscribe(subId);
     }, []);
@@ -75,7 +81,10 @@ export const EnvironmentSensors = () => {
 
         <FirmwareUpload
             setSending={setSending}
-            setCmdResult={setCmdResult}/>
+            setCmdResult={setCmdResult}
+            setFirmwareInfo={setFirmwareInfo}
+            firmwareInfo={firmwareInfo}
+        />
 
         {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}
         {cmdResult != null && !cmdResult && <p>Failed &#128078;!</p>}

@@ -14,14 +14,14 @@ export class EnvironmentSensorRequest {
     public sensorId: number | null;
     public firmwareFilename: string | null;
     public firmwareBased64Encoded: string | null;
-    public sleepTimeInSeconds: number | null;
+    public sleepTimeInSecondsDelta: number | null;
 
-    public constructor(type: EnvironmentSensorRequestType, sensorId: number | null, firmwareFilename: string | null, firmwareBased64Encoded: string | null, sleepTimeInSeconds: number | null) {
+    public constructor(type: EnvironmentSensorRequestType, sensorId: number | null, firmwareFilename: string | null, firmwareBased64Encoded: string | null, sleepTimeInSecondsDelta: number | null) {
         this.type = type;
         this.sensorId = sensorId;
         this.firmwareFilename = firmwareFilename;
         this.firmwareBased64Encoded = firmwareBased64Encoded;
-        this.sleepTimeInSeconds = sleepTimeInSeconds;
+        this.sleepTimeInSecondsDelta = sleepTimeInSecondsDelta;
     }
 }
 
@@ -82,11 +82,24 @@ export class EnvironmentSensorState {
     }
 }
 
+export class FirmwareInfo{
+    public filename: string;
+    public size: number;
+
+    public constructor(filename: string, size: number) {
+        this.filename = filename;
+        this.size = size;
+    }
+}
+
+
 export class EnvironmentSensorResponse {
     public sensors: EnvironmentSensorState[];
+    public firmwareInfo: FirmwareInfo | null;
 
-    public constructor(sensors: EnvironmentSensorState[]) {
+    public constructor(sensors: EnvironmentSensorState[], firmwareInfo: FirmwareInfo | null) {
         this.sensors = sensors;
+        this.firmwareInfo = firmwareInfo;
     }
 }
 
@@ -97,10 +110,12 @@ export enum EnvironmentSensorEventType {
 export class EnvironmentSensorEvent {
     public type: EnvironmentSensorEventType;
     public sensors: EnvironmentSensorState[];
+    public firmwareInfo: FirmwareInfo | null;
 
-    public constructor(type: EnvironmentSensorEventType, sensors: EnvironmentSensorState[]) {
+    public constructor(type: EnvironmentSensorEventType, sensors: EnvironmentSensorState[], firmwareInfo: FirmwareInfo | null) {
         this.type = type;
         this.sensors = sensors;
+        this.firmwareInfo = firmwareInfo;
     }
 }
 

@@ -5,14 +5,13 @@ import com.dehnes.smarthome.garage_door.toInt
 import com.dehnes.smarthome.lora.LoRaPacketType.*
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
-import java.lang.Integer.min
 import java.time.Clock
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 import java.util.zip.CRC32
+import kotlin.math.max
+import kotlin.math.min
 
 class LoRaSensorBoardService(
     private val loRaConnection: LoRaConnection,
@@ -26,6 +25,7 @@ class LoRaSensorBoardService(
     private val logger = KotlinLogging.logger { }
     private val sensors = ConcurrentHashMap<Int, SensorState>()
 
+    @Volatile
     private var firmwareHolder: FirmwareHolder? = null
 
     init {
@@ -34,7 +34,6 @@ class LoRaSensorBoardService(
                 val currentState = sensors[packet.from] ?: SensorState(
                     id = packet.from,
                     firmwareVersion = 0,
-                    sleepTimeInSeconds = 300,
                     triggerFirmwareUpdate = false,
                     triggerTimeAdjustment = false,
                     lastReceivedMessage = null
@@ -57,7 +56,8 @@ class LoRaSensorBoardService(
                             fn(
                                 EnvironmentSensorEvent(
                                     EnvironmentSensorEventType.update,
-                                    getAllState()
+                                    getAllState(),
+                                    getFirmwareInfo()
                                 )
                             )
                         }
@@ -71,7 +71,19 @@ class LoRaSensorBoardService(
         }
     }
 
-    fun getAllState() = sensors.map { (sensorId, sensorState) ->
+    fun getEnvironmentSensorResponse() = EnvironmentSensorResponse(
+        getAllState(),
+        getFirmwareInfo()
+    )
+
+    private fun getFirmwareInfo() = firmwareHolder?.let {
+        FirmwareInfo(
+            it.filename,
+            it.data.size
+        )
+    }
+
+    private fun getAllState() = sensors.map { (sensorId, sensorState) ->
         val lastReceivedMessage = sensorState.lastReceivedMessage
         val firmwareUpgradeState = firmwareHolder?.let {
             when (lastReceivedMessage) {
@@ -94,11 +106,11 @@ class LoRaSensorBoardService(
         EnvironmentSensorState(
             sensorId,
             persistenceService["EnvironmentSensor.$sensorId.displayName", sensorId.toString()]!!,
-            sensorState.sleepTimeInSeconds,
+            getSleepTimeInSeconds(sensorId),
             if (lastReceivedMessage is SensorData) EnvironmentSensorData(
                 lastReceivedMessage.temperature,
                 lastReceivedMessage.humidity,
-                lastReceivedMessage.adcBattery, // TODO
+                batteryAdcToMv(sensorId, lastReceivedMessage.adcBattery),
                 lastReceivedMessage.adcLight,
                 lastReceivedMessage.sleepTimeInSeconds,
                 lastReceivedMessage.timestampDelta,
@@ -111,15 +123,25 @@ class LoRaSensorBoardService(
         )
     }
 
-    fun adjustSleepTimeInSeconds(sensorId: Int, sleepTimeInSeconds: Long) = synchronized(this) {
-        check(sleepTimeInSeconds in 1..599) { "Invalid sleepTimeInSeconds=$sleepTimeInSeconds" }
+    private fun batteryAdcToMv(sensorId: Int, adcBattery: Long): Long {
+        val fiveVadc = persistenceService["EnvironmentSensor.$sensorId.5vADC", "3000"]!!.toLong()
+        val slope = (5000 * 1000) / fiveVadc
+        return (adcBattery * slope) / 1000
+    }
+
+    fun adjustSleepTimeInSeconds(sensorId: Int, sleepTimeInSecondsDelta: Long) = synchronized(this) {
         val sensorState = sensors[sensorId]
         if (sensorState == null) {
             false
         } else {
-            sensors[sensorId] = sensorState.copy(
-                sleepTimeInSeconds = sleepTimeInSeconds
+            val newSleepTimeInSeconds = min(
+                max(
+                    1,
+                    getSleepTimeInSeconds(sensorId) + sleepTimeInSecondsDelta
+                ),
+                10 * 60
             )
+            setSleepTimeInSeconds(sensorId, newSleepTimeInSeconds)
             true
         }
     }
@@ -161,9 +183,9 @@ class LoRaSensorBoardService(
 
         val firmwareDataRequest = FirmwareDataRequest(
             readInt32Bits(packet.payload, 0),
-            packet.payload[4].toInt(),
-            packet.payload[5].toInt(),
-            clock.timestampSecondsSince2000() - clock.millis(),
+            readInt32Bits(packet.payload, 4),
+            packet.payload[8].toUnsignedInt(),
+            packet.timestampDelta,
             clock.millis()
         )
 
@@ -175,54 +197,36 @@ class LoRaSensorBoardService(
                 error("Requested offset too large")
             }
 
-            val maxBytesPerResponse = min(firmwareDataRequest.bytesPerResponse, maxPayload - 4)
-            var offset = firmwareDataRequest.offset
-            var messagesSent = 0
-            while (messagesSent < firmwareDataRequest.numberResponses) {
+            var bytesSent = 0
+            var sequentNumber = 0
+            while (bytesSent < firmwareDataRequest.length) {
                 val nextChunkSize = min(
-                    maxBytesPerResponse,
-                    it.data.size - offset
+                    min(
+                        maxPayload - 1, // sequentNumber 1 byte
+                        firmwareDataRequest.maxBytesPerResponse
+                    ),
+                    firmwareDataRequest.length - bytesSent
                 )
-                if (nextChunkSize <= 0) {
-                    logger.info { "No more data to send" }
-                    break
-                }
-                val data = ByteArray(nextChunkSize + 4)
 
-                // write offset
-                System.arraycopy(
-                    offset.to32Bit(),
-                    0,
-                    data,
-                    0,
-                    4
-                )
+                val data = ByteArray(nextChunkSize + 1)
+
+                // write sequentNumber
+                data[0] = sequentNumber.toByte()
 
                 // write firmware bytes
                 System.arraycopy(
                     it.data,
-                    offset,
+                    firmwareDataRequest.offset + bytesSent,
                     data,
-                    4, // after offset
+                    1, // after sequentNumber
                     nextChunkSize
                 )
 
                 // send chunk
-                val sync = LinkedBlockingQueue<Boolean>()
-                loRaConnection.send(packet.keyId, packet.from, SENSOR_DATA_RESPONSE, data) { sent ->
-                    sync.offer(sent)
-                }
+                loRaConnection.send(packet.keyId, packet.from, SENSOR_FIRMWARE_DATA_RESPONSE, data) { }
 
-                val sent = sync.poll(5, TimeUnit.SECONDS)
-
-                if (sent == true) {
-                    messagesSent++
-                    offset += data.size
-                    // TODO delay?
-                } else {
-                    logger.info { "Could not send firmware chunk, giving up" }
-                    break
-                }
+                bytesSent += nextChunkSize
+                sequentNumber++
             }
 
         } ?: logger.error { "No firmware present" }
@@ -274,6 +278,10 @@ class LoRaSensorBoardService(
     }
 
     private fun onSensorData(existingState: SensorState, packet: LoRaInboundPacketDecrypted): SensorState {
+        if (packet.payload.size != 21) {
+            logger.warn { "Forced to ignore packet with invalid payloadSize=${packet.payload.size} != 21" }
+            return existingState
+        }
         val sensorData = SensorData(
             readLong32Bits(packet.payload, 0),
             readLong32Bits(packet.payload, 4),
@@ -283,16 +291,17 @@ class LoRaSensorBoardService(
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
             clock.millis()
         )
-        val firmwareVersion = packet.payload[16].toInt()
+        val firmwareVersion = packet.payload[20].toInt()
         logger.info { "Handling sensorData from ${packet.from}: $sensorData" }
 
         val responsePayload = ByteArray(6) { 0 }
         responsePayload[0] = existingState.triggerFirmwareUpdate.toInt().toByte()
         responsePayload[1] = existingState.triggerTimeAdjustment.toInt().toByte()
-        if (sensorData.sleepTimeInSeconds != existingState.sleepTimeInSeconds) {
-            logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> ${existingState.sleepTimeInSeconds}" }
+        val sleepTimeInSeconds = getSleepTimeInSeconds(existingState.id)
+        if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
+            logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> $sleepTimeInSeconds" }
             System.arraycopy(
-                existingState.sleepTimeInSeconds.to32Bit(),
+                sleepTimeInSeconds.to32Bit(),
                 0,
                 responsePayload,
                 2,
@@ -308,7 +317,6 @@ class LoRaSensorBoardService(
 
         return existingState.copy(
             triggerTimeAdjustment = false,
-            sleepTimeInSeconds = sensorData.sleepTimeInSeconds,
             firmwareVersion = firmwareVersion,
             lastReceivedMessage = sensorData
         )
@@ -336,12 +344,18 @@ class LoRaSensorBoardService(
         )
     }
 
+    private fun getSleepTimeInSeconds(sensorId: Int) =
+        persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds", "20"]!!.toLong()
+
+    private fun setSleepTimeInSeconds(sensorId: Int, sleepTimeInSeconds: Long) {
+        persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds"] = sleepTimeInSeconds.toString()
+    }
+
 }
 
 data class SensorState(
     val id: Int,
     val firmwareVersion: Int,
-    val sleepTimeInSeconds: Long,
     val triggerFirmwareUpdate: Boolean,
     val triggerTimeAdjustment: Boolean,
     val lastReceivedMessage: ReceivedMessage? = null
@@ -374,8 +388,8 @@ data class FirmwareInfoRequest(
 
 data class FirmwareDataRequest(
     val offset: Int,
-    val bytesPerResponse: Int,
-    val numberResponses: Int,
+    val length: Int,
+    val maxBytesPerResponse: Int,
     override val timestampDelta: Long,
     override val receivedAt: Long
 ) : ReceivedMessage()
