@@ -48,7 +48,7 @@ class LoRaSensorBoardService(
                 }
 
                 if (updatedState != null) {
-                    sensors[packet.from] = updatedState
+                    sensors[updatedState.id] = updatedState
 
                     // notify listeners
                     executorService.submit {
@@ -298,7 +298,7 @@ class LoRaSensorBoardService(
         responsePayload[0] = existingState.triggerFirmwareUpdate.toInt().toByte()
         responsePayload[1] = existingState.triggerTimeAdjustment.toInt().toByte()
         val sleepTimeInSeconds = getSleepTimeInSeconds(existingState.id)
-        if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
+        val updatedSensorData = if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
             logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> $sleepTimeInSeconds" }
             System.arraycopy(
                 sleepTimeInSeconds.to32Bit(),
@@ -307,6 +307,11 @@ class LoRaSensorBoardService(
                 2,
                 4
             )
+            sensorData.copy(
+                sleepTimeInSeconds = sleepTimeInSeconds
+            )
+        } else {
+            sensorData
         }
 
         loRaConnection.send(packet.keyId, packet.from, SENSOR_DATA_RESPONSE, responsePayload) {
@@ -318,31 +323,43 @@ class LoRaSensorBoardService(
         return existingState.copy(
             triggerTimeAdjustment = false,
             firmwareVersion = firmwareVersion,
-            lastReceivedMessage = sensorData
+            lastReceivedMessage = updatedSensorData
         )
     }
 
-    private fun onPing(existingState: SensorState, packet: LoRaInboundPacketDecrypted): SensorState {
-        // no need to validate timestamp because ping is used for initial setup of the RTC
-        logger.info { "Handling ping from ${packet.from}" }
-
+    private fun onPing(existingState: SensorState, packet: LoRaInboundPacketDecrypted): SensorState? {
+        val serialId = ByteArray(16)
+        serialId.indices.forEach { i ->
+            serialId[i] = packet.payload[i + 1]
+        }
         val ping = Ping(
+            packet.payload[0].toInt(),
+            serialId.toHexString(),
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
             clock.millis()
         )
-        val firmwareVersion = packet.payload[0].toInt()
 
-        loRaConnection.send(packet.keyId, packet.from, RESPONSE_PONG, packet.payload) {
-            if (!it) {
-                logger.info { "Could not send pong response" }
+        logger.info { "Handling ping=$ping" }
+
+        val loraAddr = getLoRaAddr(ping.serialIdHex)
+        return if (loraAddr != null) {
+            loRaConnection.send(packet.keyId, loraAddr, RESPONSE_PONG, packet.payload) {
+                if (!it) {
+                    logger.info { "Could not send pong response" }
+                }
             }
+            existingState.copy(
+                id = loraAddr,
+                firmwareVersion = ping.firmwareVersion,
+                lastReceivedMessage = ping
+            )
+        } else {
+            logger.error { "No loraAddr configured for ${ping.serialIdHex}" }
+            null
         }
-
-        return existingState.copy(
-            firmwareVersion = firmwareVersion,
-            lastReceivedMessage = ping
-        )
     }
+
+    private fun getLoRaAddr(serialId: String) = persistenceService["EnvironmentSensor.loraAddr.$serialId", null]?.toInt()
 
     private fun getSleepTimeInSeconds(sensorId: Int) =
         persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds", "20"]!!.toLong()
@@ -377,6 +394,8 @@ data class SensorData(
 ) : ReceivedMessage()
 
 data class Ping(
+    val firmwareVersion: Int,
+    val serialIdHex: String,
     override val timestampDelta: Long,
     override val receivedAt: Long
 ) : ReceivedMessage()

@@ -211,7 +211,10 @@ class LoRaConnection(
                     executorService.submit {
                         nextOutPacket.onResult(result)
                     }
-                    Thread.sleep(400) // receive needs some time to process and message + switch to receive mode again
+
+                    if (outQueue.peek() != null) {
+                        Thread.sleep(300) // receive needs some time to process and message + switch to receive mode again
+                    }
                 }
 
                 // switch to receive mode
