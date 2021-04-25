@@ -36,7 +36,7 @@ class Configuration {
         val objectMapper = objectMapper()
 
         val influxDBClient = InfluxDBClient(objectMapper, System.getProperty("DST_HOST"))
-        val persistenceService = PersistenceService()
+        val persistenceService = PersistenceService(objectMapper)
 
         val serialConnection = Rf433Client(executorService, System.getProperty("DST_HOST"))
         serialConnection.start()
