@@ -164,7 +164,7 @@ class LoRaConnection(
 
                         if (inboundPacket?.to != localAddr) {
                             logger.info { "Ignoring packet not for me. $inboundPacket" }
-                        } else if (inboundPacket.type != LoRaPacketType.REQUEST_PING && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
+                        } else if (inboundPacket.type != LoRaPacketType.SENSOR_SETUP_REQUEST && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
                             logger.warn { "Ignoring received packet because of invalid timestampDelta. $inboundPacket" }
                         } else {
 
@@ -413,8 +413,8 @@ data class LoRaInboundPacket(
 enum class LoRaPacketType(
     val value: Int
 ) {
-    REQUEST_PING(0),
-    RESPONSE_PONG(1),
+    SENSOR_SETUP_REQUEST(0),
+    SENSOR_SETUP_RESPONSE(1),
 
     SENSOR_DATA_REQUEST(2),
     SENSOR_DATA_RESPONSE(3),

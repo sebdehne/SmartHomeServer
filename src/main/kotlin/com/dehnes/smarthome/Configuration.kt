@@ -96,7 +96,13 @@ class Configuration {
         val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
         loRaConnection.start()
 
-        val loRaSensorBoardService = LoRaSensorBoardService(loRaConnection, clock, executorService, persistenceService)
+        val loRaSensorBoardService = LoRaSensorBoardService(
+            loRaConnection,
+            clock,
+            executorService,
+            persistenceService,
+            influxDBClient
+        )
 
         beans[Rf433Client::class] = serialConnection
         beans[UnderFloorHeaterService::class] = heaterService

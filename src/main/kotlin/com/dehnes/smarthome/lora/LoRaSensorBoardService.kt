@@ -1,6 +1,7 @@
 package com.dehnes.smarthome.lora
 
 import com.dehnes.smarthome.api.dtos.*
+import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.garage_door.toInt
 import com.dehnes.smarthome.lora.LoRaPacketType.*
 import com.dehnes.smarthome.utils.*
@@ -17,7 +18,8 @@ class LoRaSensorBoardService(
     private val loRaConnection: LoRaConnection,
     private val clock: Clock,
     private val executorService: ExecutorService,
-    private val persistenceService: PersistenceService
+    private val persistenceService: PersistenceService,
+    private val influxDBClient: InfluxDBClient
 ) {
 
     val listeners = ConcurrentHashMap<String, (EnvironmentSensorEvent) -> Unit>()
@@ -40,7 +42,7 @@ class LoRaSensorBoardService(
                 )
 
                 val updatedState = when (packet.type) {
-                    REQUEST_PING -> onPing(currentState, packet)
+                    SENSOR_SETUP_REQUEST -> onPing(currentState, packet)
                     SENSOR_DATA_REQUEST -> onSensorData(currentState, packet)
                     SENSOR_FIRMWARE_INFO_REQUEST -> onFirmwareInfoRequest(currentState, packet)
                     SENSOR_FIRMWARE_DATA_REQUEST -> onFirmwareDataRequest(currentState, packet)
@@ -105,7 +107,7 @@ class LoRaSensorBoardService(
 
         EnvironmentSensorState(
             sensorId,
-            persistenceService["EnvironmentSensor.$sensorId.displayName", sensorId.toString()]!!,
+            getDisplayName(sensorId),
             getSleepTimeInSeconds(sensorId),
             if (lastReceivedMessage is SensorData) EnvironmentSensorData(
                 lastReceivedMessage.temperature,
@@ -122,6 +124,12 @@ class LoRaSensorBoardService(
             sensorState.triggerTimeAdjustment
         )
     }
+
+    private fun getDisplayName(sensorId: Int) =
+        persistenceService["EnvironmentSensor.$sensorId.displayName", sensorId.toString()]!!
+
+    private fun getName(sensorId: Int) =
+        persistenceService["EnvironmentSensor.$sensorId.name", sensorId.toString()]!!
 
     private fun batteryAdcToMv(sensorId: Int, adcBattery: Long): Long {
         val fiveVadc = persistenceService["EnvironmentSensor.$sensorId.5vADC", "3000"]!!.toLong()
@@ -288,10 +296,10 @@ class LoRaSensorBoardService(
             readLong32Bits(packet.payload, 8),
             readLong32Bits(packet.payload, 12),
             readLong32Bits(packet.payload, 16),
+            packet.payload[20].toInt(),
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
             clock.millis()
         )
-        val firmwareVersion = packet.payload[20].toInt()
         logger.info { "Handling sensorData from ${packet.from}: $sensorData" }
 
         val responsePayload = ByteArray(6) { 0 }
@@ -320,9 +328,15 @@ class LoRaSensorBoardService(
             }
         }
 
+        influxDBClient.recordSensorData(
+            "sensor",
+            updatedSensorData.toInfluxDbFields(batteryAdcToMv(existingState.id, updatedSensorData.adcBattery)),
+            "room" to getName(existingState.id)
+        )
+
         return existingState.copy(
             triggerTimeAdjustment = false,
-            firmwareVersion = firmwareVersion,
+            firmwareVersion = sensorData.firmwareVersion,
             lastReceivedMessage = updatedSensorData
         )
     }
@@ -343,7 +357,7 @@ class LoRaSensorBoardService(
 
         val loraAddr = getLoRaAddr(ping.serialIdHex)
         return if (loraAddr != null) {
-            loRaConnection.send(packet.keyId, loraAddr, RESPONSE_PONG, packet.payload) {
+            loRaConnection.send(packet.keyId, loraAddr, SENSOR_SETUP_RESPONSE, packet.payload) {
                 if (!it) {
                     logger.info { "Could not send pong response" }
                 }
@@ -359,7 +373,8 @@ class LoRaSensorBoardService(
         }
     }
 
-    private fun getLoRaAddr(serialId: String) = persistenceService["EnvironmentSensor.loraAddr.$serialId", null]?.toInt()
+    private fun getLoRaAddr(serialId: String) =
+        persistenceService["EnvironmentSensor.loraAddr.$serialId", null]?.toInt()
 
     private fun getSleepTimeInSeconds(sensorId: Int) =
         persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds", "20"]!!.toLong()
@@ -389,9 +404,20 @@ data class SensorData(
     val adcBattery: Long,
     val adcLight: Long,
     val sleepTimeInSeconds: Long,
+    val firmwareVersion: Int,
     override val timestampDelta: Long,
     override val receivedAt: Long
-) : ReceivedMessage()
+) : ReceivedMessage() {
+    fun toInfluxDbFields(batteryAdcToMv: Long) = listOf(
+        "temperature" to (temperature.toFloat() / 100).toString(),
+        "humidity" to (humidity.toFloat() / 100).toString(),
+        "light" to adcLight,
+        "battery_volt" to (batteryAdcToMv.toFloat() / 1000).toString(),
+        "sleeptime_seconds" to sleepTimeInSeconds.toString(),
+        "firmware_version" to firmwareVersion.toString(),
+        "clock_delta_seconds" to timestampDelta.toString()
+    )
+}
 
 data class Ping(
     val firmwareVersion: Int,
