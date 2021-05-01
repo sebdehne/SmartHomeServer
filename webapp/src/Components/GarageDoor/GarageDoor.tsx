@@ -181,10 +181,10 @@ export function timeToDelta(left: number, right: number): string {
     const deltaInSeconds = (left - right) / 1000;
     if (deltaInSeconds < 60) {
         return `${Math.round(deltaInSeconds)} seconds`;
-    } else if (deltaInSeconds < 120) {
-        return "1 minute";
     } else {
-        return `${Math.round(deltaInSeconds / 60)} minutes`;
+        const min = deltaInSeconds / 60;
+        const seconds = deltaInSeconds % 60;
+        return `${Math.floor(min)} minutes, ${Math.floor(seconds)} seconds`;
     }
 }
 

@@ -1,7 +1,8 @@
 import {
     EnvironmentSensorRequest,
     EnvironmentSensorRequestType,
-    EnvironmentSensorState
+    EnvironmentSensorState,
+    FirmwareInfo
 } from "../../Websocket/types/EnvironmentSensors";
 import React from "react";
 import {
@@ -25,11 +26,12 @@ import { timeToDelta } from "../GarageDoor/GarageDoor";
 
 const stateToText = (currentMilliSeconds: number, sensor: EnvironmentSensorState) => {
     if (sensor.firmwareUpgradeState != null) {
-        return "Firmware upgrade: " + firmwareUpgradeProgress(sensor) + "% completed";
+        return <span>{"Firmware upgrade: " + firmwareUpgradeProgress(sensor) + "%"}</span>
     } else if (sensor.sensorData != null) {
-        return timeToDelta(currentMilliSeconds, sensor.sensorData!!.receivedAt) + " ago";
+        return <span>{(sensor.sensorData!!.temperature / 100).toFixed(2)} &deg;C</span>
     }
-    return "";
+
+    return <span/>;
 }
 
 const firmwareUpgradeProgress = (sensor: EnvironmentSensorState) => {
@@ -46,6 +48,7 @@ type EnvironmentSensorProps = {
     sensor: EnvironmentSensorState;
     setSensors: (sensors: EnvironmentSensorState[]) => void;
     currentMilliSeconds: number;
+    firmwareInfo: FirmwareInfo | null;
 };
 
 export const EnvironmentSensor = ({
@@ -53,7 +56,8 @@ export const EnvironmentSensor = ({
                                       setCmdResult,
                                       sensor,
                                       setSensors,
-                                      currentMilliSeconds
+                                      currentMilliSeconds,
+                                      firmwareInfo
                                   }: EnvironmentSensorProps) => {
 
     const sendUpdate = (req: EnvironmentSensorRequest) => {
@@ -75,29 +79,8 @@ export const EnvironmentSensor = ({
             })
             .finally(() => setSending(false));
     };
-    const scheduleTimeAdjustment = () => sendUpdate(new EnvironmentSensorRequest(
-        EnvironmentSensorRequestType.scheduleTimeAdjustment,
-        sensor.sensorId,
-        null,
-        null,
-        null
-    ));
-    const cancelTimeAdjustment = () => sendUpdate(new EnvironmentSensorRequest(
-        EnvironmentSensorRequestType.cancelTimeAdjustment,
-        sensor.sensorId,
-        null,
-        null,
-        null
-    ));
-    const scheduleFirmwareUpgrade = () => sendUpdate(new EnvironmentSensorRequest(
-        EnvironmentSensorRequestType.scheduleFirmwareUpgrade,
-        sensor.sensorId,
-        null,
-        null,
-        null
-    ));
-    const cancelFirmwareUpgrade = () => sendUpdate(new EnvironmentSensorRequest(
-        EnvironmentSensorRequestType.cancelFirmwareUpgrade,
+    const sendCommand = (cmd: EnvironmentSensorRequestType) => sendUpdate(new EnvironmentSensorRequest(
+        cmd,
         sensor.sensorId,
         null,
         null,
@@ -110,6 +93,11 @@ export const EnvironmentSensor = ({
         null,
         delta
     ));
+    const isAlive = () => {
+        const receivedAt: number = sensor.sensorData?.receivedAt || sensor.firmwareUpgradeState?.receivedAt || 0;
+        const deltaSeconds = (currentMilliSeconds - receivedAt) / 1000;
+        return deltaSeconds <= sensor.sleepTimeInSeconds;
+    };
 
     return <Accordion key={sensor.sensorId}>
         <AccordionSummary
@@ -117,13 +105,25 @@ export const EnvironmentSensor = ({
             aria-controls="panel1a-content"
             id="panel1a-header"
         >
-            <div>
+            <div style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                width: "100%",
+                justifyContent: "space-between"
+            }}>
+                <div style={{
+                    fontWeight: "bold",
+                    fontSize: "140%"
+                }}>{sensor.displayName}</div>
                 <div>
-                    <span style={{
-                        fontWeight: "bold",
-                        fontSize: "140%"
-                    }
-                    }>{sensor.displayName}</span> - {stateToText(currentMilliSeconds, sensor)}
+                    {stateToText(currentMilliSeconds, sensor)}
+                    <span
+                        style={isAlive()
+                            ? { color: "#00ff07" }
+                            : { color: "#ff0000" }
+                        }
+                    > &#11044;</span>
                 </div>
             </div>
         </AccordionSummary>
@@ -135,18 +135,23 @@ export const EnvironmentSensor = ({
                         <ButtonGroup variant="contained" style={{
                             margin: "10px"
                         }}>
-                            {sensor.timeAdjustmentSchedule &&
-                            <Button color='secondary' onClick={() => cancelTimeAdjustment()}>Adjust time</Button>
-                            }
-                            {!sensor.timeAdjustmentSchedule &&
-                            <Button color='primary' onClick={() => scheduleTimeAdjustment()}>Adjust time</Button>
-                            }
-                            {sensor.firmwareUpgradeScheduled &&
-                            <Button color='secondary' onClick={() => cancelFirmwareUpgrade()}>Upgrade firmware</Button>
-                            }
-                            {!sensor.firmwareUpgradeScheduled &&
-                            <Button color='primary' onClick={() => scheduleFirmwareUpgrade()}>Upgrade firmware</Button>
-                            }
+                            <Button
+                                color={sensor.timeAdjustmentSchedule ? 'secondary' : 'primary'}
+                                onClick={() =>
+                                    sensor.timeAdjustmentSchedule
+                                        ? sendCommand(EnvironmentSensorRequestType.cancelTimeAdjustment)
+                                        : sendCommand(EnvironmentSensorRequestType.scheduleTimeAdjustment)
+                                }
+                            >Adjust time</Button>
+                            <Button
+                                disabled={!firmwareInfo?.filename}
+                                color={sensor.firmwareUpgradeScheduled ? 'secondary' : 'primary'}
+                                onClick={() =>
+                                    sensor.firmwareUpgradeScheduled
+                                        ? sendCommand(EnvironmentSensorRequestType.cancelFirmwareUpgrade)
+                                        : sendCommand(EnvironmentSensorRequestType.scheduleFirmwareUpgrade)
+                                }
+                            >Upgrade firmware</Button>
                         </ButtonGroup>
                     </Grid>
                 </Grid>
@@ -183,7 +188,8 @@ export const EnvironmentSensor = ({
                                     <TableBody>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Temperature</TableCell>
-                                            <TableCell align="right">{(sensor.sensorData!!.temperature / 100).toFixed(2)} &deg;C</TableCell>
+                                            <TableCell
+                                                align="right">{(sensor.sensorData!!.temperature / 100).toFixed(2)} &deg;C</TableCell>
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Humidity</TableCell>

@@ -71,6 +71,7 @@ export const EnvironmentSensors = () => {
                     setSending={setSending}
                     setSensors={setSensors}
                     currentMilliSeconds={currentSeconds}
+                    firmwareInfo={firmwareInfo}
                 />
             ))}
         </div>
