@@ -168,16 +168,30 @@ class WebSocketServer {
     }
 
     private fun underFloorHeaterRequest(request: UnderFloorHeaterRequest) = when (request.type) {
-        UnderFloorHeaterRequestType.updateUnderFloorHeaterMode -> {
-            val update =
-                underFloopHeaterService.update(request.updateUnderFloorHeaterMode!!)
+        UnderFloorHeaterRequestType.updateMode -> {
+            val success = underFloopHeaterService.updateMode(request.newMode!!)
             UnderFloorHeaterResponse(
-                updateUnderFloorHeaterModeSuccess = update,
-                underFloorHeaterStatus = underFloopHeaterService.getCurrentState()
+                underFloopHeaterService.getCurrentState(),
+                success
             )
         }
-        UnderFloorHeaterRequestType.getUnderFloorHeaterStatus -> UnderFloorHeaterResponse(
-            underFloorHeaterStatus = underFloopHeaterService.getCurrentState()
+        UnderFloorHeaterRequestType.updateMostExpensiveHoursToSkip -> {
+            val success = underFloopHeaterService.updateMostExpensiveHoursToSkip(request.newMostExpensiveHoursToSkip!!)
+            UnderFloorHeaterResponse(
+                underFloopHeaterService.getCurrentState(),
+                success
+            )
+        }
+        UnderFloorHeaterRequestType.updateTargetTemperature -> {
+            val success = underFloopHeaterService.updateTargetTemperature(request.newTargetTemperature!!)
+            UnderFloorHeaterResponse(
+                underFloopHeaterService.getCurrentState(),
+                success
+            )
+        }
+        UnderFloorHeaterRequestType.getStatus -> UnderFloorHeaterResponse(
+            underFloopHeaterService.getCurrentState(),
+            null
         )
     }
 

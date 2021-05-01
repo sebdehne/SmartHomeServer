@@ -10,15 +10,10 @@ class PersistenceService(
     private val objectMapper: ObjectMapper
 ) {
     private val filenameJson = System.getProperty("STORAGE_FILE_NAME", "properties.json")
-    private var properties: Properties
-
-    init {
-        properties = loadJsonProperties(filenameJson)
-    }
 
     @Synchronized
     operator fun get(key: String?, persistDefaultValue: String? = null): String? {
-        properties = loadJsonProperties(filenameJson)
+        val properties = loadJsonProperties(filenameJson)
         var value = properties.getProperty(key)
         if (value == null && persistDefaultValue != null) {
             value = persistDefaultValue
@@ -29,15 +24,17 @@ class PersistenceService(
 
     @Synchronized
     operator fun set(key: String?, value: String?) {
+        val properties = loadJsonProperties(filenameJson)
+
         if (value == null) {
             properties.remove(key)
         } else {
             properties.setProperty(key, value)
         }
-        writeAsJson(filenameJson)
+        writeAsJson(filenameJson, properties)
     }
 
-    private fun writeAsJson(filename: String) {
+    private fun writeAsJson(filename: String, properties: Properties) {
         val json = mutableMapOf<String, Any>()
         properties.forEach { (k, value) ->
             val key = k as String

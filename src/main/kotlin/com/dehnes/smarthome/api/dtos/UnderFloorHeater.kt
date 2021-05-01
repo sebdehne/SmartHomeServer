@@ -1,38 +1,40 @@
 package com.dehnes.smarthome.api.dtos
 
-import java.time.Instant
-
 enum class Mode {
     ON, OFF, MANUAL
 }
 
 data class UnderFloorHeaterRequest(
     val type: UnderFloorHeaterRequestType,
-    val updateUnderFloorHeaterMode: UpdateUnderFloorHeaterMode?
+    val newMode: UnderFloorHeaterMode?,
+    val newTargetTemperature: Int?,
+    val newMostExpensiveHoursToSkip: Int?
 )
 
 data class UnderFloorHeaterResponse(
-    val underFloorHeaterStatus: UnderFloorHeaterStatus? = null,
+    val underFloorHeaterStatus: UnderFloorHeaterStatus?,
     val updateUnderFloorHeaterModeSuccess: Boolean? = null
 )
 
 enum class UnderFloorHeaterRequestType {
-    updateUnderFloorHeaterMode,
-    getUnderFloorHeaterStatus
+    getStatus,
+    updateMode,
+    updateTargetTemperature,
+    updateMostExpensiveHoursToSkip
 }
 
 data class UnderFloorHeaterStatus(
     val mode: UnderFloorHeaterMode,
     val status: OnOff,
-    val currentTemperature: Int,
-    val constantTemperatureStatus: UnderFloorHeaterConstantTemperaturStatus,
-    val utcTimestampInMs: Long = Instant.now().toEpochMilli()
+    val targetTemperature: Int,
+    val mostExpensiveHoursToSkip: Int,
+    val waitUntilCheapHour: Long?,
+    val fromController: UnderFloorHeaterStatusFromController?
 )
 
-data class UpdateUnderFloorHeaterMode(
-    val newMode: UnderFloorHeaterMode,
-    val newTargetTemperature: Int?,
-    val newMostExpensiveHoursToSkip: Int?
+data class UnderFloorHeaterStatusFromController(
+    val receivedAt: Long,
+    val currentTemperature: Int
 )
 
 enum class UnderFloorHeaterMode(val mode: Mode) {
@@ -40,12 +42,6 @@ enum class UnderFloorHeaterMode(val mode: Mode) {
     permanentOff(Mode.OFF),
     constantTemperature(Mode.MANUAL)
 }
-
-data class UnderFloorHeaterConstantTemperaturStatus(
-    val targetTemperature: Int,
-    val mostExpensiveHoursToSkip: Int,
-    val waitUntilCheapHour: Long?,
-)
 
 enum class OnOff {
     on,
