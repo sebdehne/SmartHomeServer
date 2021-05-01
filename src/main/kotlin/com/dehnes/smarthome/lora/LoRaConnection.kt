@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
+import kotlin.math.log
 
 class LoRaConnection(
     private val persistenceService: PersistenceService,
@@ -95,7 +96,8 @@ class LoRaConnection(
 
         return Connection(
             file.inputStream(),
-            file.outputStream()
+            file.outputStream(),
+            clock.millis()
         ).apply {
             logger.info("Connected to LoRa serial port")
         }
@@ -134,7 +136,7 @@ class LoRaConnection(
                     "mac pause",
                     listOf("\\d+".toRegex())
                 ) == null
-            ) { // TODO re-do this when time is up (OR send reset)
+            ) {
                 Thread.sleep(1000)
             }
             while (cmd(conn, "radio set sf sf7", listOf("ok".toRegex(), "invalid_param".toRegex())) == null) {
@@ -142,6 +144,11 @@ class LoRaConnection(
             }
 
             while (isStarted) {
+
+                if (clock.millis() - conn.createdAt > Duration.ofDays(10).toMillis()) {
+                    logger.info { "Resetting connection to LoRa bridge" }
+                    break // reset connection
+                }
 
                 if (conn.hasCompleteText) {
                     val line = conn.getText()
@@ -434,6 +441,7 @@ enum class LoRaPacketType(
 class Connection(
     val inputStream: InputStream,
     val outputStream: OutputStream,
+    val createdAt: Long,
     var hasCompleteText: Boolean = false,
 ) : Closeable {
 
