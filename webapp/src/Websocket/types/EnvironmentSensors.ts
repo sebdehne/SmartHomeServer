@@ -30,12 +30,14 @@ export class FirmwareUpgradeState {
     public offsetRequested: number;
     public timestampDelta: number;
     public receivedAt: number;
+    public rssi: number;
 
-    public constructor(firmwareSize: number, offsetRequested: number, timestampDelta: number, receivedAt: number) {
+    public constructor(firmwareSize: number, offsetRequested: number, timestampDelta: number, receivedAt: number, rssi: number) {
         this.firmwareSize = firmwareSize;
         this.offsetRequested = offsetRequested;
         this.timestampDelta = timestampDelta;
         this.receivedAt = receivedAt;
+        this.rssi = rssi;
     }
 }
 
@@ -47,9 +49,9 @@ export class EnvironmentSensorData {
     public sleepTimeInSeconds: number;
     public timestampDelta: number;
     public receivedAt: number;
+    public rssi: number;
 
-
-    public constructor(temperature: number, humidity: number, batteryMilliVolts: number, adcLight: number, sleepTimeInSeconds: number, timestampDelta: number, receivedAt: number) {
+    public constructor(temperature: number, humidity: number, batteryMilliVolts: number, adcLight: number, sleepTimeInSeconds: number, timestampDelta: number, receivedAt: number, rssi: number) {
         this.temperature = temperature;
         this.humidity = humidity;
         this.batteryMilliVolts = batteryMilliVolts;
@@ -57,6 +59,7 @@ export class EnvironmentSensorData {
         this.sleepTimeInSeconds = sleepTimeInSeconds;
         this.timestampDelta = timestampDelta;
         this.receivedAt = receivedAt;
+        this.rssi = rssi;
     }
 }
 

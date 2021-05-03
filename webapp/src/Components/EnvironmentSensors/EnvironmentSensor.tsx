@@ -34,6 +34,12 @@ const stateToText = (currentMilliSeconds: number, sensor: EnvironmentSensorState
     return <span/>;
 }
 
+export const isAlive = (sensor: EnvironmentSensorState, currentMilliSeconds: number) => {
+    const receivedAt: number = sensor.sensorData?.receivedAt || sensor.firmwareUpgradeState?.receivedAt || 0;
+    const deltaSeconds = (currentMilliSeconds - receivedAt) / 1000;
+    return deltaSeconds <= sensor.sleepTimeInSeconds;
+};
+
 const firmwareUpgradeProgress = (sensor: EnvironmentSensorState) => {
     if (sensor.firmwareUpgradeState != null) {
         return (sensor.firmwareUpgradeState!!.offsetRequested * 100 / sensor.firmwareUpgradeState!!.firmwareSize).toFixed(2);
@@ -93,11 +99,6 @@ export const EnvironmentSensor = ({
         null,
         delta
     ));
-    const isAlive = () => {
-        const receivedAt: number = sensor.sensorData?.receivedAt || sensor.firmwareUpgradeState?.receivedAt || 0;
-        const deltaSeconds = (currentMilliSeconds - receivedAt) / 1000;
-        return deltaSeconds <= sensor.sleepTimeInSeconds;
-    };
 
     return <Accordion key={sensor.sensorId}>
         <AccordionSummary
@@ -119,7 +120,7 @@ export const EnvironmentSensor = ({
                 <div>
                     {stateToText(currentMilliSeconds, sensor)}
                     <span
-                        style={isAlive()
+                        style={isAlive(sensor, currentMilliSeconds)
                             ? { color: "#00ff07" }
                             : { color: "#ff0000" }
                         }
@@ -224,7 +225,11 @@ export const EnvironmentSensor = ({
                                             <TableCell
                                                 align="right">{timeToDelta(currentMilliSeconds, sensor.sensorData!!.receivedAt)} ago</TableCell>
                                         </TableRow>
-
+                                        <TableRow>
+                                            <TableCell component="th" scope="row">Rssi:</TableCell>
+                                            <TableCell
+                                                align="right">{sensor.sensorData!!.rssi}dB</TableCell>
+                                        </TableRow>
                                     </TableBody>
                                 </Table>
                             </TableContainer>
@@ -254,6 +259,11 @@ export const EnvironmentSensor = ({
                                         <TableCell component="th" scope="row">Received:</TableCell>
                                         <TableCell
                                             align="right">{timeToDelta(currentMilliSeconds, sensor.firmwareUpgradeState!!.receivedAt)} ago</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell component="th" scope="row">Rssi:</TableCell>
+                                        <TableCell
+                                            align="right">{sensor.firmwareUpgradeState!!.rssi}dB</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>

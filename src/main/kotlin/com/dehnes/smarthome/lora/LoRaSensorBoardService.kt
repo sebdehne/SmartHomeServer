@@ -23,6 +23,7 @@ class LoRaSensorBoardService(
 ) {
 
     val listeners = ConcurrentHashMap<String, (EnvironmentSensorEvent) -> Unit>()
+    val outsideSensorIds = listOf(4, 5)
 
     private val logger = KotlinLogging.logger { }
     private val sensors = ConcurrentHashMap<Int, SensorState>()
@@ -93,13 +94,15 @@ class LoRaSensorBoardService(
                     it.data.size,
                     0,
                     lastReceivedMessage.timestampDelta,
-                    lastReceivedMessage.receivedAt
+                    lastReceivedMessage.receivedAt,
+                    lastReceivedMessage.rssi
                 )
                 is FirmwareDataRequest -> FirmwareUpgradeState(
                     it.data.size,
                     lastReceivedMessage.offset,
                     lastReceivedMessage.timestampDelta,
-                    lastReceivedMessage.receivedAt
+                    lastReceivedMessage.receivedAt,
+                    lastReceivedMessage.rssi
                 )
                 else -> null
             }
@@ -116,7 +119,8 @@ class LoRaSensorBoardService(
                 lastReceivedMessage.adcLight,
                 lastReceivedMessage.sleepTimeInSeconds,
                 lastReceivedMessage.timestampDelta,
-                lastReceivedMessage.receivedAt
+                lastReceivedMessage.receivedAt,
+                lastReceivedMessage.rssi
             ) else null,
             firmwareUpgradeState,
             sensorState.firmwareVersion,
@@ -194,7 +198,8 @@ class LoRaSensorBoardService(
             readInt32Bits(packet.payload, 4),
             packet.payload[8].toUnsignedInt(),
             packet.timestampDelta,
-            clock.millis()
+            clock.millis(),
+            packet.rssi
         )
 
         logger.info { "Handling firmwareDataRequest from ${packet.from} - $firmwareDataRequest" }
@@ -280,7 +285,8 @@ class LoRaSensorBoardService(
             triggerFirmwareUpdate = false,
             lastReceivedMessage = FirmwareInfoRequest(
                 clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
-                clock.millis()
+                clock.millis(),
+                packet.rssi
             )
         )
     }
@@ -298,7 +304,8 @@ class LoRaSensorBoardService(
             readLong32Bits(packet.payload, 16),
             packet.payload[20].toInt(),
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
-            clock.millis()
+            clock.millis(),
+            packet.rssi
         )
         logger.info { "Handling sensorData from ${packet.from}: $sensorData" }
 
@@ -330,9 +337,33 @@ class LoRaSensorBoardService(
 
         influxDBClient.recordSensorData(
             "sensor",
-            updatedSensorData.toInfluxDbFields(batteryAdcToMv(existingState.id, updatedSensorData.adcBattery)),
+            updatedSensorData.toInfluxDbFields(
+                batteryAdcToMv(
+                    existingState.id,
+                    updatedSensorData.adcBattery
+                ),
+                existingState.id == 10 // no light sensor for #10 - "bak knevegg"
+            ),
             "room" to getName(existingState.id)
         )
+
+        if (existingState.id in outsideSensorIds) {
+            // update combined as well
+            val outsideData = sensors
+                .filter { it.key in outsideSensorIds }
+                .filterNot { it.key == existingState.id }
+                .filter { it.value.lastReceivedMessage is SensorData }
+                .map { it.value.lastReceivedMessage as SensorData } + updatedSensorData
+
+            influxDBClient.recordSensorData(
+                "sensor",
+                listOf(
+                    "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
+                    "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
+                ),
+                "room" to "outside_combined"
+            )
+        }
 
         return existingState.copy(
             triggerTimeAdjustment = false,
@@ -350,7 +381,8 @@ class LoRaSensorBoardService(
             packet.payload[0].toInt(),
             serialId.toHexString(),
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
-            clock.millis()
+            clock.millis(),
+            packet.rssi
         )
 
         logger.info { "Handling ping=$ping" }
@@ -396,6 +428,7 @@ data class SensorState(
 sealed class ReceivedMessage {
     abstract val timestampDelta: Long
     abstract val receivedAt: Long
+    abstract val rssi: Int
 }
 
 data class SensorData(
@@ -406,12 +439,13 @@ data class SensorData(
     val sleepTimeInSeconds: Long,
     val firmwareVersion: Int,
     override val timestampDelta: Long,
-    override val receivedAt: Long
+    override val receivedAt: Long,
+    override val rssi: Int
 ) : ReceivedMessage() {
-    fun toInfluxDbFields(batteryAdcToMv: Long) = listOf(
+    fun toInfluxDbFields(batteryAdcToMv: Long, skipLight: Boolean) = listOf(
         "temperature" to (temperature.toFloat() / 100).toString(),
         "humidity" to (humidity.toFloat() / 100).toString(),
-        "light" to adcLight,
+        "light" to if (skipLight) 0 else adcLight,
         "battery_volt" to (batteryAdcToMv.toFloat() / 1000).toString(),
         "sleeptime_seconds" to sleepTimeInSeconds.toString(),
         "firmware_version" to firmwareVersion.toString(),
@@ -423,12 +457,14 @@ data class Ping(
     val firmwareVersion: Int,
     val serialIdHex: String,
     override val timestampDelta: Long,
-    override val receivedAt: Long
+    override val receivedAt: Long,
+    override val rssi: Int
 ) : ReceivedMessage()
 
 data class FirmwareInfoRequest(
     override val timestampDelta: Long,
-    override val receivedAt: Long
+    override val receivedAt: Long,
+    override val rssi: Int
 ) : ReceivedMessage()
 
 data class FirmwareDataRequest(
@@ -436,7 +472,8 @@ data class FirmwareDataRequest(
     val length: Int,
     val maxBytesPerResponse: Int,
     override val timestampDelta: Long,
-    override val receivedAt: Long
+    override val receivedAt: Long,
+    override val rssi: Int
 ) : ReceivedMessage()
 
 data class FirmwareHolder(

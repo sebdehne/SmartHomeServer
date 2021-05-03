@@ -7,9 +7,10 @@ import Header from "../Header";
 import {
     EnvironmentSensorRequest,
     EnvironmentSensorRequestType,
-    EnvironmentSensorState, FirmwareInfo
+    EnvironmentSensorState,
+    FirmwareInfo
 } from "../../Websocket/types/EnvironmentSensors";
-import { EnvironmentSensor } from "./EnvironmentSensor";
+import { EnvironmentSensor, isAlive } from "./EnvironmentSensor";
 import { FirmwareUpload } from "./FirmwareUpload";
 
 export const EnvironmentSensors = () => {
@@ -53,7 +54,7 @@ export const EnvironmentSensors = () => {
 
     return <Container maxWidth="sm" className="App">
         <Header
-            title="Environment Sensors"
+            title={"Environment Sensors (" + sensors.filter(s => isAlive(s, currentSeconds)).length + "/" + sensors.length + ")"}
             sending={sending}
         />
 
@@ -61,19 +62,19 @@ export const EnvironmentSensors = () => {
         <div>
             {sensors
                 .sort((a, b) => {
-                    return a.sensorId - b.sensorId;
+                    return a.displayName.localeCompare(b.displayName);
                 })
                 .map(sensor => (
-                <EnvironmentSensor
-                    key={sensor.sensorId}
-                    sensor={sensor}
-                    setCmdResult={setCmdResult}
-                    setSending={setSending}
-                    setSensors={setSensors}
-                    currentMilliSeconds={currentSeconds}
-                    firmwareInfo={firmwareInfo}
-                />
-            ))}
+                    <EnvironmentSensor
+                        key={sensor.sensorId}
+                        sensor={sensor}
+                        setCmdResult={setCmdResult}
+                        setSending={setSending}
+                        setSensors={setSensors}
+                        currentMilliSeconds={currentSeconds}
+                        firmwareInfo={firmwareInfo}
+                    />
+                ))}
         </div>
         }
         {sensors.length === 0 &&

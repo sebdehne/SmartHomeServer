@@ -44,7 +44,8 @@ data class FirmwareUpgradeState(
     val firmwareSize: Int,
     val offsetRequested: Int,
     val timestampDelta: Long,
-    val receivedAt: Long
+    val receivedAt: Long,
+    val rssi: Int
 )
 
 data class EnvironmentSensorData(
@@ -54,7 +55,8 @@ data class EnvironmentSensorData(
     val adcLight: Long,
     val sleepTimeInSeconds: Long,
     val timestampDelta: Long,
-    val receivedAt: Long
+    val receivedAt: Long,
+    val rssi: Int
 )
 
 enum class EnvironmentSensorEventType {

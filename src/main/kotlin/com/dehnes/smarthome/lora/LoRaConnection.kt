@@ -16,7 +16,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
-import kotlin.math.log
 
 class LoRaConnection(
     private val persistenceService: PersistenceService,
@@ -300,6 +299,7 @@ class LoRaConnection(
             LoRaPacketType.fromByte(it.second[2]),
             timestampSecondsSince2000,
             clock.timestampSecondsSince2000() - timestampSecondsSince2000,
+            inboundPacket.rssi,
             it.second.copyOfRange(11, 11 + length)
         )
     }
@@ -357,6 +357,7 @@ data class LoRaInboundPacketDecrypted(
     val type: LoRaPacketType,
     val timestampSecondsSince2000: Long,
     val timestampDelta: Long,
+    val rssi: Int,
     val payload: ByteArray
 ) {
     override fun equals(other: Any?): Boolean {

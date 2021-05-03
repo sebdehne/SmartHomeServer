@@ -11,7 +11,6 @@ import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.lora.LoRaSensorBoardService
 import com.dehnes.smarthome.rf433.Rf433Client
-import com.dehnes.smarthome.room_sensors.ChipCap2SensorService
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -42,7 +41,6 @@ class Configuration {
         serialConnection.start()
 
         val garageDoorService = GarageDoorService(serialConnection, influxDBClient)
-        val chipCap2SensorService = ChipCap2SensorService(influxDBClient)
 
         val clock = Clock.system(ZoneId.of("Europe/Oslo"))
 
@@ -91,7 +89,6 @@ class Configuration {
 
         serialConnection.listeners.add(heaterService::onRfMessage)
         serialConnection.listeners.add(garageDoorService::handleIncoming)
-        serialConnection.listeners.add(chipCap2SensorService::handleIncoming)
 
         val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
         loRaConnection.start()
