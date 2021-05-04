@@ -57,8 +57,13 @@ export const getSensorStatus = (sensor: EnvironmentSensorState, currentMilliSeco
     const receivedAt: number = sensor.sensorData?.receivedAt || sensor.firmwareUpgradeState?.receivedAt || 0;
     const deltaSeconds = (currentMilliSeconds - receivedAt) / 1000;
 
-    if (sensor.sensorData != null && (sensor.sensorData?.timestampDelta > 10 || sensor.sensorData?.timestampDelta < -10)) {
-        status = SensorStatus.yellow;
+    if (sensor.sensorData != null) {
+        if (sensor.sensorData!!.timestampDelta > 10 || sensor.sensorData!!.timestampDelta < -10) {
+            status = SensorStatus.yellow;
+        }
+        if (sensor.sensorData!!.batteryMilliVolts < 3400) {
+            status = SensorStatus.yellow;
+        }
     }
 
     if (deltaSeconds > sensor.sleepTimeInSeconds) {
