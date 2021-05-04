@@ -10,7 +10,7 @@ import {
     EnvironmentSensorState,
     FirmwareInfo
 } from "../../Websocket/types/EnvironmentSensors";
-import { EnvironmentSensor, isAlive } from "./EnvironmentSensor";
+import { EnvironmentSensor, getSensorStatus, SensorStatus } from "./EnvironmentSensor";
 import { FirmwareUpload } from "./FirmwareUpload";
 
 export const EnvironmentSensors = () => {
@@ -59,7 +59,7 @@ export const EnvironmentSensors = () => {
 
     return <Container maxWidth="sm" className="App">
         <Header
-            title={"Environment Sensors (" + sensors.filter(s => isAlive(s, currentSeconds)).length + "/" + sensors.length + ")"}
+            title={"Environment Sensors (" + sensors.filter(s => getSensorStatus(s, currentSeconds) === SensorStatus.green).length + "/" + sensors.length + ")"}
             sending={sending}
         />
 

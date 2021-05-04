@@ -34,10 +34,38 @@ const stateToText = (currentMilliSeconds: number, sensor: EnvironmentSensorState
     return <span/>;
 }
 
-export const isAlive = (sensor: EnvironmentSensorState, currentMilliSeconds: number) => {
+export enum SensorStatus {
+    green = "green",
+    yellow = "yellow",
+    red = "red"
+}
+
+const statusIcon = (sensor: EnvironmentSensorState, currentMilliSeconds: number) => {
+    const status = getSensorStatus(sensor, currentMilliSeconds);
+    let color;
+    if (status === SensorStatus.yellow) {
+        color = "#ffe61d"
+    } else if (status === SensorStatus.red) {
+        color = "#ff0000"
+    } else {
+        color = "#00ff07";
+    }
+    return <span style={{ color: color }}> &#11044;</span>;
+};
+export const getSensorStatus = (sensor: EnvironmentSensorState, currentMilliSeconds: number) => {
+    let status = SensorStatus.green;
     const receivedAt: number = sensor.sensorData?.receivedAt || sensor.firmwareUpgradeState?.receivedAt || 0;
     const deltaSeconds = (currentMilliSeconds - receivedAt) / 1000;
-    return deltaSeconds <= sensor.sleepTimeInSeconds;
+
+    if (sensor.sensorData != null && (sensor.sensorData?.timestampDelta > 10 || sensor.sensorData?.timestampDelta < -10)) {
+        status = SensorStatus.yellow;
+    }
+
+    if (deltaSeconds > sensor.sleepTimeInSeconds) {
+        status = SensorStatus.red;
+    }
+
+    return status;
 };
 
 const firmwareUpgradeProgress = (sensor: EnvironmentSensorState) => {
@@ -119,12 +147,7 @@ export const EnvironmentSensor = ({
                 }}>{sensor.displayName}</div>
                 <div>
                     {stateToText(currentMilliSeconds, sensor)}
-                    <span
-                        style={isAlive(sensor, currentMilliSeconds)
-                            ? { color: "#00ff07" }
-                            : { color: "#ff0000" }
-                        }
-                    > &#11044;</span>
+                    {statusIcon(sensor, currentMilliSeconds)}
                 </div>
             </div>
         </AccordionSummary>
