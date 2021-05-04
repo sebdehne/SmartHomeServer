@@ -449,7 +449,8 @@ data class SensorData(
         "battery_volt" to (batteryAdcToMv.toFloat() / 1000).toString(),
         "sleeptime_seconds" to sleepTimeInSeconds.toString(),
         "firmware_version" to firmwareVersion.toString(),
-        "clock_delta_seconds" to timestampDelta.toString()
+        "clock_delta_seconds" to timestampDelta.toString(),
+        "rssi" to rssi.toString(),
     )
 }
 

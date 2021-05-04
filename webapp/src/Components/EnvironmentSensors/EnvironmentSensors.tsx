@@ -52,31 +52,43 @@ export const EnvironmentSensors = () => {
         return () => WebsocketService.unsubscribe(subId);
     }, []);
 
+    const byFirmwareVersions: { [key: number]: number; } = {};
+    sensors.forEach(s => {
+        byFirmwareVersions[s.firmwareVersion] = (byFirmwareVersions[s.firmwareVersion] || 0) + 1;
+    });
+
     return <Container maxWidth="sm" className="App">
         <Header
             title={"Environment Sensors (" + sensors.filter(s => isAlive(s, currentSeconds)).length + "/" + sensors.length + ")"}
             sending={sending}
         />
 
-        {sensors.length > 0 &&
-        <div>
-            {sensors
-                .sort((a, b) => {
-                    return a.displayName.localeCompare(b.displayName);
-                })
-                .map(sensor => (
-                    <EnvironmentSensor
-                        key={sensor.sensorId}
-                        sensor={sensor}
-                        setCmdResult={setCmdResult}
-                        setSending={setSending}
-                        setSensors={setSensors}
-                        currentMilliSeconds={currentSeconds}
-                        firmwareInfo={firmwareInfo}
-                    />
-                ))}
-        </div>
+        {
+            Object.keys(byFirmwareVersions).map(v => parseInt(v)).sort().map(version => (
+                <div>
+                    {Object.keys(byFirmwareVersions).length > 1 &&
+                    <h4>Firmware version: {version}</h4>
+                    }
+                    {sensors
+                        .filter(s => s.firmwareVersion === version)
+                        .sort((a, b) => {
+                            return a.displayName.localeCompare(b.displayName);
+                        })
+                        .map(sensor => (
+                            <EnvironmentSensor
+                                key={sensor.sensorId}
+                                sensor={sensor}
+                                setCmdResult={setCmdResult}
+                                setSending={setSending}
+                                setSensors={setSensors}
+                                currentMilliSeconds={currentSeconds}
+                                firmwareInfo={firmwareInfo}
+                            />
+                        ))}
+                </div>
+            ))
         }
+
         {sensors.length === 0 &&
         <h4>Currently no Environment Sensor online</h4>
         }
