@@ -296,6 +296,10 @@ class LoRaSensorBoardService(
             logger.warn { "Forced to ignore packet with invalid payloadSize=${packet.payload.size} != 21" }
             return existingState
         }
+        if (isIgnored(existingState.id)) {
+            logger.warn { "Ignoring $packet" }
+            return existingState
+        }
         val sensorData = SensorData(
             readLong32Bits(packet.payload, 0),
             readLong32Bits(packet.payload, 4),
@@ -415,6 +419,7 @@ class LoRaSensorBoardService(
         persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds"] = sleepTimeInSeconds.toString()
     }
 
+    private fun isIgnored(sensorId: Int): Boolean = persistenceService["EnvironmentSensor.${sensorId}.ignore", "false"]!!.toBoolean()
 }
 
 data class SensorState(
