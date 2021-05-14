@@ -34,8 +34,8 @@ class Configuration {
         val executorService = Executors.newCachedThreadPool()
         val objectMapper = objectMapper()
 
-        val influxDBClient = InfluxDBClient(objectMapper, System.getProperty("DST_HOST"))
         val persistenceService = PersistenceService(objectMapper)
+        val influxDBClient = InfluxDBClient(persistenceService, objectMapper, System.getProperty("DST_HOST"))
 
         val serialConnection = Rf433Client(executorService, System.getProperty("DST_HOST"))
         serialConnection.start()

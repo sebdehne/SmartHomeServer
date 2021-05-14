@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.datalogging
 
+import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
@@ -9,44 +10,19 @@ import org.apache.http.client.fluent.Response
 import org.apache.http.client.utils.URIBuilder
 import org.apache.http.entity.ContentType
 import java.io.IOException
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
+import java.nio.charset.Charset
 import java.util.*
 
 class InfluxDBClient(
+    private val persistenceService: PersistenceService,
     private val objectMapper: ObjectMapper,
-    host: String = "localhost",
+    host: String = "192.168.1.1",
     port: Int = 8086
 ) {
     private val logger = KotlinLogging.logger { }
 
-    private val dbName = "sensor_data"
+    private val bucketName = "sensor_data"
     private val baseUrl = "http://$host:$port"
-
-    @Volatile
-    private var dbCreated = false
-
-
-    init {
-        createDb()
-    }
-
-    private fun createDb() {
-        if (dbCreated) {
-            return
-        }
-        logger.info("About to (re-)create DB in influxDb")
-        val createDbQuery = "CREATE DATABASE $dbName"
-        val retentionPolicy = "alter RETENTION POLICY default ON sensor_data DURATION 260w" // 5 years
-        //
-        try {
-            Request.Get(baseUrl + "/query?q=" + URLEncoder.encode(createDbQuery, StandardCharsets.UTF_8)).execute()
-            Request.Get(baseUrl + "/query?q=" + URLEncoder.encode(retentionPolicy, StandardCharsets.UTF_8)).execute()
-            dbCreated = true
-        } catch (e: IOException) {
-            logger.warn("", e)
-        }
-    }
 
     fun recordSensorData(type: String, fields: List<Pair<String, Any>>, vararg tags: Pair<String, String>) {
         try {
@@ -57,12 +33,14 @@ class InfluxDBClient(
             }
             sb.append(" ").append(fields.joinToString(",") { v -> v.first + "=" + v.second })
             logger.debug("About to send {}", sb)
-            val result: Response = Request.Post("$baseUrl/write?db=$dbName")
+            val result: Response = Request.Post("$baseUrl/api/v2/write?bucket=$bucketName&org=dehnes.com")
+                .addHeader("Authorization", "Token " + persistenceService["influxDbAuthToken", null]!!)
                 .bodyString(sb.toString(), ContentType.TEXT_PLAIN)
                 .execute()
             val httpResponse: HttpResponse? = result.returnResponse()
             if (httpResponse?.statusLine != null && httpResponse.statusLine.statusCode > 299) {
-                throw RuntimeException("Could not write to InFluxDb$httpResponse")
+                throw RuntimeException("Could not write to InFluxDb $httpResponse ${httpResponse.entity.content.readAllBytes().toString(
+                    Charset.defaultCharset())}")
             }
         } catch (e: IOException) {
             throw RuntimeException(e)
@@ -89,7 +67,7 @@ class InfluxDBClient(
         query += " order by time desc LIMIT $limit"
 
         val b = URIBuilder("$baseUrl/query")
-        b.addParameter("db", dbName)
+        b.addParameter("db", bucketName)
         b.addParameter("q", query)
         val execute: Response = Request.Get(b.build()).execute()
         return objectMapper.readValue(execute.returnContent().asString())
@@ -97,7 +75,7 @@ class InfluxDBClient(
 
     fun avgTempDuringLastHour(room: String): Map<String, Any> {
         val b = URIBuilder("$baseUrl/query")
-        b.addParameter("db", dbName)
+        b.addParameter("db", bucketName)
         b.addParameter(
             "q",
             "SELECT mean(temperature) from sensor where room = '" + room + "' and time > " + (System.currentTimeMillis() - 3600 * 1000) / 1000 + "s"
