@@ -3,11 +3,11 @@ package com.dehnes.smarthome.api
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
+import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
-import com.dehnes.smarthome.garage_door.GarageDoorService
+import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
-import com.dehnes.smarthome.lora.LoRaSensorBoardService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
@@ -24,7 +24,7 @@ class WebSocketServer {
 
     private val objectMapper = configuration.getBean<ObjectMapper>(ObjectMapper::class)
     private val logger = KotlinLogging.logger { }
-    private val garageDoorService = configuration.getBean<GarageDoorService>(GarageDoorService::class)
+    private val garageDoorService = configuration.getBean<GarageController>(GarageController::class)
     private val underFloopHeaterService = configuration.getBean<UnderFloorHeaterService>(UnderFloorHeaterService::class)
     private val subscriptions = mutableMapOf<String, Subscription<*>>()
     private val evChargingService =
@@ -32,7 +32,7 @@ class WebSocketServer {
     private val firmwareUploadService =
         configuration.getBean<FirmwareUploadService>(FirmwareUploadService::class)
     private val loRaSensorBoardService =
-        configuration.getBean<LoRaSensorBoardService>(LoRaSensorBoardService::class)
+        configuration.getBean<EnvironmentSensorService>(EnvironmentSensorService::class)
 
     @OnOpen
     fun onWebSocketConnect(sess: Session) {
@@ -198,25 +198,31 @@ class WebSocketServer {
     private fun garageRequest(request: GarageRequest) = when (request.type) {
         GarageRequestType.garageDoorExtendAutoClose -> {
             garageDoorService.updateAutoCloseAfter(request.garageDoorChangeAutoCloseDeltaInSeconds!!)
-            GarageResponse(
-                garageStatus = garageDoorService.getCurrentState()
-            )
+            garageDoorService.getCurrentState()
         }
         GarageRequestType.openGarageDoor -> {
             val sendCommand = garageDoorService.sendCommand(true)
-            GarageResponse(
-                garageCommandSendSuccess = sendCommand,
-                garageStatus = garageDoorService.getCurrentState()
+            garageDoorService.getCurrentState().copy(
+                garageCommandSendSuccess = sendCommand
             )
         }
         GarageRequestType.closeGarageDoor -> {
             val sendCommand = garageDoorService.sendCommand(false)
-            GarageResponse(
+            garageDoorService.getCurrentState().copy(
                 garageCommandSendSuccess = sendCommand,
-                garageStatus = garageDoorService.getCurrentState()
             )
         }
-        GarageRequestType.getGarageStatus -> GarageResponse(garageStatus = garageDoorService.getCurrentState())
+        GarageRequestType.getGarageStatus -> garageDoorService.getCurrentState()
+        GarageRequestType.adjustTime -> {
+            garageDoorService.getCurrentState().copy(
+                garageCommandAdjustTimeSuccess = garageDoorService.adjustTime()
+            )
+        }
+        GarageRequestType.firmwareUpgrade -> {
+            garageDoorService.getCurrentState().copy(
+                firmwareUploadSuccess = garageDoorService.startFirmwareUpgrade(request.firmwareBased64Encoded!!),
+            )
+        }
     }
 
     @OnClose
@@ -233,8 +239,8 @@ class WebSocketServer {
     inner class GarageStatusSubscription(
         subscriptionId: String,
         sess: Session
-    ) : Subscription<GarageStatus>(subscriptionId, sess) {
-        override fun onEvent(e: GarageStatus) {
+    ) : Subscription<GarageResponse>(subscriptionId, sess) {
+        override fun onEvent(e: GarageResponse) {
             logger.info("$instanceId onEvent GarageStatusSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(

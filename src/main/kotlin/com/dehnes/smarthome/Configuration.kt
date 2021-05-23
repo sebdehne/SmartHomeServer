@@ -6,10 +6,10 @@ import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
-import com.dehnes.smarthome.garage_door.GarageDoorService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
-import com.dehnes.smarthome.lora.LoRaSensorBoardService
+import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
+import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.rf433.Rf433Client
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.PersistenceService
@@ -39,8 +39,6 @@ class Configuration {
 
         val serialConnection = Rf433Client(executorService, System.getProperty("DST_HOST"))
         serialConnection.start()
-
-        val garageDoorService = GarageDoorService(serialConnection, influxDBClient)
 
         val clock = Clock.system(ZoneId.of("Europe/Oslo"))
 
@@ -88,12 +86,12 @@ class Configuration {
         val firmwareUploadService = FirmwareUploadService(evChargingStationConnection)
 
         serialConnection.listeners.add(heaterService::onRfMessage)
-        serialConnection.listeners.add(garageDoorService::handleIncoming)
+        //serialConnection.listeners.add(garageDoorService::handleIncoming)
 
         val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
         loRaConnection.start()
 
-        val loRaSensorBoardService = LoRaSensorBoardService(
+        val loRaSensorBoardService = EnvironmentSensorService(
             loRaConnection,
             clock,
             executorService,
@@ -101,14 +99,17 @@ class Configuration {
             influxDBClient
         )
 
+        val garageDoorService = GarageController(loRaConnection, clock, influxDBClient, executorService)
+        garageDoorService.start()
+
         beans[Rf433Client::class] = serialConnection
         beans[UnderFloorHeaterService::class] = heaterService
-        beans[GarageDoorService::class] = garageDoorService
+        beans[GarageController::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
         beans[EvChargingStationConnection::class] = evChargingStationConnection
         beans[FirmwareUploadService::class] = firmwareUploadService
         beans[EvChargingService::class] = evChargingService
-        beans[LoRaSensorBoardService::class] = loRaSensorBoardService
+        beans[EnvironmentSensorService::class] = loRaSensorBoardService
     }
 
     fun <T> getBean(klass: KClass<*>): T {

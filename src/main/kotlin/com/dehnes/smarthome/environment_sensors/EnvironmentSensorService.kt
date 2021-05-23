@@ -1,9 +1,12 @@
-package com.dehnes.smarthome.lora
+package com.dehnes.smarthome.environment_sensors
 
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
-import com.dehnes.smarthome.garage_door.toInt
+import com.dehnes.smarthome.lora.LoRaConnection
+import com.dehnes.smarthome.lora.LoRaInboundPacketDecrypted
 import com.dehnes.smarthome.lora.LoRaPacketType.*
+import com.dehnes.smarthome.lora.ReceivedMessage
+import com.dehnes.smarthome.lora.maxPayload
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.time.Clock
@@ -14,7 +17,7 @@ import java.util.zip.CRC32
 import kotlin.math.max
 import kotlin.math.min
 
-class LoRaSensorBoardService(
+class EnvironmentSensorService(
     private val loRaConnection: LoRaConnection,
     private val clock: Clock,
     private val executorService: ExecutorService,
@@ -34,19 +37,12 @@ class LoRaSensorBoardService(
     init {
         loRaConnection.listeners.add { packet ->
             synchronized(this) {
-                val currentState = sensors[packet.from] ?: SensorState(
-                    id = packet.from,
-                    firmwareVersion = 0,
-                    triggerFirmwareUpdate = false,
-                    triggerTimeAdjustment = false,
-                    lastReceivedMessage = null
-                )
+                val currentState = sensors[packet.from]
 
                 val updatedState = when (packet.type) {
-                    SENSOR_SETUP_REQUEST -> onPing(currentState, packet)
                     SENSOR_DATA_REQUEST -> onSensorData(currentState, packet)
-                    SENSOR_FIRMWARE_INFO_REQUEST -> onFirmwareInfoRequest(currentState, packet)
-                    SENSOR_FIRMWARE_DATA_REQUEST -> onFirmwareDataRequest(currentState, packet)
+                    FIRMWARE_INFO_REQUEST -> if (currentState == null) null else onFirmwareInfoRequest(currentState, packet)
+                    FIRMWARE_DATA_REQUEST -> if (currentState == null) null else onFirmwareDataRequest(currentState, packet)
                     else -> null
                 }
 
@@ -236,7 +232,7 @@ class LoRaSensorBoardService(
                 )
 
                 // send chunk
-                loRaConnection.send(packet.keyId, packet.from, SENSOR_FIRMWARE_DATA_RESPONSE, data) { }
+                loRaConnection.send(packet.keyId, packet.from, FIRMWARE_DATA_RESPONSE, data) { }
 
                 bytesSent += nextChunkSize
                 sequentNumber++
@@ -275,7 +271,7 @@ class LoRaSensorBoardService(
             )
         }
 
-        loRaConnection.send(packet.keyId, packet.from, SENSOR_FIRMWARE_INFO_RESPONSE, byteArray) {
+        loRaConnection.send(packet.keyId, packet.from, FIRMWARE_INFO_RESPONSE, byteArray) {
             if (!it) {
                 logger.info { "Could not send firmware-info-response" }
             }
@@ -291,12 +287,12 @@ class LoRaSensorBoardService(
         )
     }
 
-    private fun onSensorData(existingState: SensorState, packet: LoRaInboundPacketDecrypted): SensorState {
+    private fun onSensorData(existingState: SensorState?, packet: LoRaInboundPacketDecrypted): SensorState? {
         if (packet.payload.size != 21) {
             logger.warn { "Forced to ignore packet with invalid payloadSize=${packet.payload.size} != 21" }
             return existingState
         }
-        if (isIgnored(existingState.id)) {
+        if (isIgnored(packet.from)) {
             logger.warn { "Ignoring $packet" }
             return existingState
         }
@@ -314,9 +310,9 @@ class LoRaSensorBoardService(
         logger.info { "Handling sensorData from ${packet.from}: $sensorData" }
 
         val responsePayload = ByteArray(6) { 0 }
-        responsePayload[0] = existingState.triggerFirmwareUpdate.toInt().toByte()
-        responsePayload[1] = existingState.triggerTimeAdjustment.toInt().toByte()
-        val sleepTimeInSeconds = getSleepTimeInSeconds(existingState.id)
+        responsePayload[0] = (existingState?.triggerFirmwareUpdate ?: false).toInt().toByte()
+        responsePayload[1] = (existingState?.triggerTimeAdjustment ?: false).toInt().toByte()
+        val sleepTimeInSeconds = getSleepTimeInSeconds(packet.from)
         val updatedSensorData = if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
             logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> $sleepTimeInSeconds" }
             System.arraycopy(
@@ -343,19 +339,19 @@ class LoRaSensorBoardService(
             "sensor",
             updatedSensorData.toInfluxDbFields(
                 batteryAdcToMv(
-                    existingState.id,
+                    packet.from,
                     updatedSensorData.adcBattery
                 ),
-                existingState.id == 10 // no light sensor for #10 - "bak knevegg"
+                packet.from == 10 // no light sensor for #10 - "bak knevegg"
             ),
-            "room" to getName(existingState.id)
+            "room" to getName(packet.from)
         )
 
-        if (existingState.id in outsideSensorIds) {
+        if (packet.from in outsideSensorIds) {
             // update combined as well
             val outsideData = sensors
                 .filter { it.key in outsideSensorIds }
-                .filterNot { it.key == existingState.id }
+                .filterNot { it.key == packet.from }
                 .filter { it.value.lastReceivedMessage is SensorData }
                 .map { it.value.lastReceivedMessage as SensorData } + updatedSensorData
 
@@ -369,48 +365,14 @@ class LoRaSensorBoardService(
             )
         }
 
-        return existingState.copy(
-            triggerTimeAdjustment = false,
+        return SensorState(
+            id = packet.from,
             firmwareVersion = sensorData.firmwareVersion,
+            triggerTimeAdjustment = false,
+            triggerFirmwareUpdate = false,
             lastReceivedMessage = updatedSensorData
         )
     }
-
-    private fun onPing(existingState: SensorState, packet: LoRaInboundPacketDecrypted): SensorState? {
-        val serialId = ByteArray(16)
-        serialId.indices.forEach { i ->
-            serialId[i] = packet.payload[i + 1]
-        }
-        val ping = Ping(
-            packet.payload[0].toInt(),
-            serialId.toHexString(),
-            clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
-            clock.millis(),
-            packet.rssi
-        )
-
-        logger.info { "Handling ping=$ping" }
-
-        val loraAddr = getLoRaAddr(ping.serialIdHex)
-        return if (loraAddr != null) {
-            loRaConnection.send(packet.keyId, loraAddr, SENSOR_SETUP_RESPONSE, packet.payload) {
-                if (!it) {
-                    logger.info { "Could not send pong response" }
-                }
-            }
-            existingState.copy(
-                id = loraAddr,
-                firmwareVersion = ping.firmwareVersion,
-                lastReceivedMessage = ping
-            )
-        } else {
-            logger.error { "No loraAddr configured for ${ping.serialIdHex}" }
-            null
-        }
-    }
-
-    private fun getLoRaAddr(serialId: String) =
-        persistenceService["EnvironmentSensor.loraAddr.$serialId", null]?.toInt()
 
     private fun getSleepTimeInSeconds(sensorId: Int) =
         persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds", "20"]!!.toLong()
@@ -419,7 +381,8 @@ class LoRaSensorBoardService(
         persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds"] = sleepTimeInSeconds.toString()
     }
 
-    private fun isIgnored(sensorId: Int): Boolean = persistenceService["EnvironmentSensor.${sensorId}.ignore", "false"]!!.toBoolean()
+    private fun isIgnored(sensorId: Int): Boolean =
+        persistenceService["EnvironmentSensor.${sensorId}.ignore", "false"]!!.toBoolean()
 }
 
 data class SensorState(
@@ -430,11 +393,6 @@ data class SensorState(
     val lastReceivedMessage: ReceivedMessage? = null
 )
 
-sealed class ReceivedMessage {
-    abstract val timestampDelta: Long
-    abstract val receivedAt: Long
-    abstract val rssi: Int
-}
 
 data class SensorData(
     val temperature: Long,
@@ -458,14 +416,6 @@ data class SensorData(
         "rssi" to rssi.toString(),
     )
 }
-
-data class Ping(
-    val firmwareVersion: Int,
-    val serialIdHex: String,
-    override val timestampDelta: Long,
-    override val receivedAt: Long,
-    override val rssi: Int
-) : ReceivedMessage()
 
 data class FirmwareInfoRequest(
     override val timestampDelta: Long,

@@ -1,4 +1,4 @@
-import {GarageStatus} from "./Garage";
+import { GarageResponse, GarageStatus } from "./Garage";
 import {UnderFloorHeaterStatus} from "./UnderFloorHeater";
 import {EvChargingEvent} from "./EVChargingStation";
 import { EnvironmentSensorEvent } from "./EnvironmentSensors";
@@ -30,12 +30,12 @@ export class Unsubscribe {
 
 export class Notify {
     public subscriptionId: string;
-    public garageStatus: GarageStatus | null;
+    public garageStatus: GarageResponse | null;
     public underFloorHeaterStatus: UnderFloorHeaterStatus | null;
     public evChargingStationEvent: EvChargingEvent | null;
     public environmentSensorEvent: EnvironmentSensorEvent | null;
 
-    public constructor(subscriptionId: string, garageStatus: GarageStatus | null, underFloorHeaterStatus: UnderFloorHeaterStatus | null, evChargingStationEvent: EvChargingEvent | null, environmentSensorEvent: EnvironmentSensorEvent | null) {
+    public constructor(subscriptionId: string, garageStatus: GarageResponse | null, underFloorHeaterStatus: UnderFloorHeaterStatus | null, evChargingStationEvent: EvChargingEvent | null, environmentSensorEvent: EnvironmentSensorEvent | null) {
         this.subscriptionId = subscriptionId;
         this.garageStatus = garageStatus;
         this.underFloorHeaterStatus = underFloorHeaterStatus;

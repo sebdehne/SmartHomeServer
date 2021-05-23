@@ -38,7 +38,6 @@ class LoRaConnection(
     @Volatile
     var interrupted: Boolean = false
 
-    @PostConstruct
     @Synchronized
     fun start() {
         if (isStarted) {
@@ -57,7 +56,6 @@ class LoRaConnection(
         }.start()
     }
 
-    @PreDestroy
     @Synchronized
     fun stop() {
         if (!isStarted) {
@@ -170,7 +168,9 @@ class LoRaConnection(
 
                         if (inboundPacket?.to != localAddr) {
                             logger.info { "Ignoring packet not for me. $inboundPacket" }
-                        } else if (inboundPacket.type != LoRaPacketType.SENSOR_SETUP_REQUEST && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
+                        } else if (inboundPacket.type == LoRaPacketType.SETUP_REQUEST) {
+                            onSetupRequest(inboundPacket)
+                        } else if (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30) {
                             logger.warn { "Ignoring received packet because of invalid timestampDelta. $inboundPacket" }
                         } else {
 
@@ -304,6 +304,36 @@ class LoRaConnection(
         )
     }
 
+    private fun onSetupRequest(packet: LoRaInboundPacketDecrypted) {
+        val serialId = ByteArray(16)
+        serialId.indices.forEach { i ->
+            serialId[i] = packet.payload[i + 1]
+        }
+        val setupRequest = SetupRequest(
+            packet.payload[0].toInt(),
+            serialId.toHexString(),
+            clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
+            clock.millis(),
+            packet.rssi
+        )
+
+        logger.info { "Handling setupRequest=$setupRequest" }
+
+        val loraAddr = getLoRaAddr(setupRequest.serialIdHex)
+        if (loraAddr != null) {
+            send(packet.keyId, loraAddr, LoRaPacketType.SETUP_RESPONSE, packet.payload) {
+                if (!it) {
+                    logger.info { "Could not send pong response" }
+                }
+            }
+        } else {
+            logger.error { "No loraAddr configured for ${setupRequest.serialIdHex}" }
+        }
+    }
+
+    private fun getLoRaAddr(serialId: String) =
+        persistenceService["EnvironmentSensor.loraAddr.$serialId", null]?.toInt()
+
 }
 
 val headerLength = 11
@@ -421,16 +451,30 @@ data class LoRaInboundPacket(
 enum class LoRaPacketType(
     val value: Int
 ) {
-    SENSOR_SETUP_REQUEST(0),
-    SENSOR_SETUP_RESPONSE(1),
+    SETUP_REQUEST(0),
+    SETUP_RESPONSE(1),
 
     SENSOR_DATA_REQUEST(2),
     SENSOR_DATA_RESPONSE(3),
 
-    SENSOR_FIRMWARE_INFO_REQUEST(4),
-    SENSOR_FIRMWARE_INFO_RESPONSE(5),
-    SENSOR_FIRMWARE_DATA_REQUEST(6),
-    SENSOR_FIRMWARE_DATA_RESPONSE(7),
+    FIRMWARE_INFO_REQUEST(4),
+    FIRMWARE_INFO_RESPONSE(5),
+    FIRMWARE_DATA_REQUEST(6),
+    FIRMWARE_DATA_RESPONSE(7),
+
+    ADJUST_TIME_REQUEST(8),
+    ADJUST_TIME_RESPONSE(9),
+
+    GARAGE_DOOR_OPEN_REQUEST(10),
+    GARAGE_DOOR_CLOSE_REQUEST(11),
+    GARAGE_DOOR_RESPONSE(12),
+
+    HEATER_ON_REQUEST(13),
+    HEATER_OFF_REQUEST(14),
+    HEATER_RESPONSE(15),
+
+    GARAGE_HEATER_DATA_REQUEST(16),
+    GARAGE_HEATER_DATA_RESPONSE(17),
 
     ;
 
@@ -499,3 +543,17 @@ class Connection(
         }
     }
 }
+
+abstract class ReceivedMessage {
+    abstract val timestampDelta: Long
+    abstract val receivedAt: Long
+    abstract val rssi: Int
+}
+
+data class SetupRequest(
+    val firmwareVersion: Int,
+    val serialIdHex: String,
+    override val timestampDelta: Long,
+    override val receivedAt: Long,
+    override val rssi: Int
+) : ReceivedMessage()

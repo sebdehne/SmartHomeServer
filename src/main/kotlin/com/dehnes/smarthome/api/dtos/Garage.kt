@@ -1,12 +1,12 @@
 package com.dehnes.smarthome.api.dtos
 
-import java.time.Instant
-
 data class GarageStatus(
     val lightIsOn: Boolean,
     val doorStatus: DoorStatus,
     val autoCloseAfter: Long?,
-    val utcTimestampInMs: Long = Instant.now().toEpochMilli()
+    val timestampDelta: Long,
+    val firmwareVersion: Int,
+    val utcTimestampInMs: Long
 )
 
 enum class DoorStatus(
@@ -15,17 +15,30 @@ enum class DoorStatus(
     doorClosed(0),
     doorOpen(1),
     doorClosing(2),
-    doorOpening(3)
+    doorOpening(3),
+    doorMiddle(4);
+
+    companion object {
+        fun parse(ch1: Boolean, ch2: Boolean) = when {
+            !ch1 -> doorOpen
+            !ch2 -> doorClosed
+            else -> doorMiddle
+        }
+    }
 }
 
 data class GarageRequest(
     val type: GarageRequestType,
-    val garageDoorChangeAutoCloseDeltaInSeconds: Long?
+    val garageDoorChangeAutoCloseDeltaInSeconds: Long?,
+    val firmwareBased64Encoded: String?,
 )
 
 data class GarageResponse(
-    val garageStatus: GarageStatus?,
-    val garageCommandSendSuccess: Boolean? = null
+    val garageStatus: GarageStatus? = null,
+    val garageCommandSendSuccess: Boolean? = null,
+    val garageCommandAdjustTimeSuccess: Boolean? = null,
+    val firmwareUploadSuccess: Boolean? = null,
+    val firmwareUpgradeState: FirmwareUpgradeState? = null
 )
 
 enum class GarageRequestType {
@@ -34,4 +47,6 @@ enum class GarageRequestType {
 
     getGarageStatus,
     garageDoorExtendAutoClose,
+    adjustTime,
+    firmwareUpgrade
 }

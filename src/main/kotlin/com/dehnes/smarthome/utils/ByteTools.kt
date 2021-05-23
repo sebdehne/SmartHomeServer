@@ -40,3 +40,5 @@ fun readLong32Bits(buf: ByteArray, offset: Int): Long {
     byteBuffer.flip()
     return byteBuffer.getLong(0)
 }
+
+fun Boolean.toInt() = if (this) 1 else 0

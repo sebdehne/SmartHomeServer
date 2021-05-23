@@ -3,12 +3,14 @@ import { Button, Container, Grid } from "@material-ui/core";
 import WebsocketService from "../../Websocket/websocketClient";
 import Header from "../Header";
 import { ArrowDownward, ArrowUpward } from "@material-ui/icons";
-import { DoorStatus, GarageRequest, GarageRequestType, GarageStatus } from "../../Websocket/types/Garage";
+import { DoorStatus, GarageRequest, GarageRequestType, GarageResponse } from "../../Websocket/types/Garage";
 import { RequestType, RpcRequest, RpcResponse } from "../../Websocket/types/Rpc";
 import { Notify, SubscriptionType } from "../../Websocket/types/Subscription";
+import { FirmwareUpload } from "./FirmwareUpload";
+import { FirmwareUpgradeState } from "../../Websocket/types/EnvironmentSensors";
 
 const GarageDoor = () => {
-    const [garageStatus, setGarageStatus] = useState<GarageStatus | null>(null);
+    const [garageStatus, setGarageStatus] = useState<GarageResponse | null>(null);
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
     const [currentSeconds, setCurrentSeconds] = useState(Date.now());
@@ -28,12 +30,13 @@ const GarageDoor = () => {
                     null,
                     new GarageRequest(
                         GarageRequestType.getGarageStatus,
+                        null,
                         null
                     ),
                     null,
                     null,
                     null))
-                    .then(response => setGarageStatus(response.garageResponse!!.garageStatus));
+                    .then(response => setGarageStatus(response.garageResponse!!));
             }
         )
 
@@ -48,7 +51,8 @@ const GarageDoor = () => {
             null,
             new GarageRequest(
                 GarageRequestType.garageDoorExtendAutoClose,
-                deltaInMinutes * 60
+                deltaInMinutes * 60,
+                null
             ),
             null,
             null,
@@ -58,7 +62,29 @@ const GarageDoor = () => {
             setTimeout(() => {
                 setCmdResult(null);
             }, 2000);
-            setGarageStatus(response.garageResponse!!.garageStatus);
+            setGarageStatus(response.garageResponse!!);
+        }).finally(() => setSending(false));
+    }
+
+    const adjustTime = () => {
+        setSending(true);
+        WebsocketService.rpc(new RpcRequest(
+            RequestType.garageRequest,
+            null,
+            null,
+            new GarageRequest(
+                GarageRequestType.adjustTime,
+                null,
+                null
+            ),
+            null,
+            null,
+            null
+        )).then((response: RpcResponse) => {
+            setCmdResult(response.garageResponse!!.garageCommandAdjustTimeSuccess!!);
+            setTimeout(() => {
+                setCmdResult(null);
+            }, 2000);
         }).finally(() => setSending(false));
     }
 
@@ -68,12 +94,12 @@ const GarageDoor = () => {
             RequestType.garageRequest,
             null,
             null,
-            new GarageRequest(cmd, null),
+            new GarageRequest(cmd, null, null),
             null,
             null,
             null
         )).then((response: RpcResponse) => {
-            setGarageStatus(response.garageResponse!!.garageStatus);
+            setGarageStatus(response.garageResponse!!);
             setCmdResult(response.garageResponse!!.garageCommandSendSuccess);
             setTimeout(() => {
                 setCmdResult(null);
@@ -88,21 +114,34 @@ const GarageDoor = () => {
                 title="Garage door controller"
             />
 
-            {garageStatus &&
+            {garageStatus?.firmwareUpgradeState &&
             <div>
                 <ul>
-                    <li>Door status: <DoorStatusComponent doorStatus={garageStatus.doorStatus}/></li>
-                    <li>Light status: {garageStatus.lightIsOn ? "on" : "off"}</li>
+                    <li>Progress: {firmwareUpgradeProgress(garageStatus.firmwareUpgradeState)}%</li>
+                    <li>Clock slew: {garageStatus.firmwareUpgradeState.timestampDelta} seconds</li>
+                    <li>Received: {timeToDelta(currentSeconds, garageStatus.firmwareUpgradeState.receivedAt)} ago</li>
+                    <li>Rssi: {garageStatus.firmwareUpgradeState.rssi}dB</li>
+                </ul>
+            </div>
+            }
+            {garageStatus?.garageStatus &&
+            <div>
+                <ul>
+                    <li>Door status: <DoorStatusComponent doorStatus={garageStatus.garageStatus.doorStatus}/></li>
+                    <li>Light status: {garageStatus.garageStatus.lightIsOn ? "on" : "off"}</li>
+                    <li>Clock slew: {garageStatus.garageStatus.timestampDelta} seconds</li>
+                    <li>Firmware: {garageStatus.garageStatus.firmwareVersion}</li>
                     <li>Auto closing in: {
-                        !garageStatus.autoCloseAfter ? "disabled" : (
-                            timeToDelta(garageStatus.autoCloseAfter, currentSeconds)
+                        !garageStatus.garageStatus.autoCloseAfter ? "disabled" : (
+                            timeToDelta(garageStatus.garageStatus.autoCloseAfter, currentSeconds)
                         )
                     }</li>
                 </ul>
-                <p>Updated: {timeToDelta(currentSeconds, garageStatus.utcTimestampInMs)} ago</p>
+                <p>Updated: {timeToDelta(currentSeconds, garageStatus.garageStatus.utcTimestampInMs)} ago</p>
             </div>
             }
-            {!garageStatus && <p>Status currently not available</p>}
+            {!garageStatus?.garageStatus && !garageStatus?.firmwareUpgradeState &&
+            <p>Status currently not available</p>}
 
             <Grid
                 container
@@ -140,21 +179,15 @@ const GarageDoor = () => {
                     <Grid item xs={2}>
                         <Button
                             style={{ margin: "10px" }} variant="contained" color="primary"
-                            onClick={() => adjustAutoClose(-10)}>
-                            -10 min
+                            onClick={() => adjustAutoClose(-60)}>
+                            -1 hour
                         </Button>
                     </Grid>
                     <Grid item xs={2}>
                         <Button
                             style={{ margin: "10px" }} variant="contained" color="primary"
-                            onClick={() => adjustAutoClose(-1)}>
-                            -1 min
-                        </Button>
-                    </Grid>
-                    <Grid item xs={2}>
-                        <Button style={{ margin: "10px" }} variant="contained" color="primary"
-                                onClick={() => adjustAutoClose(1)}>
-                            +1 min
+                            onClick={() => adjustAutoClose(-10)}>
+                            -10 min
                         </Button>
                     </Grid>
                     <Grid item xs={2}>
@@ -163,8 +196,31 @@ const GarageDoor = () => {
                             +10 min
                         </Button>
                     </Grid>
+                    <Grid item xs={2}>
+                        <Button style={{ margin: "10px" }} variant="contained" color="primary"
+                                onClick={() => adjustAutoClose(60)}>
+                            +1 hour
+                        </Button>
+                    </Grid>
                 </Grid>
-
+                <Grid
+                    container
+                    direction="row"
+                >
+                    <Grid item xs={4}>
+                        <div style={{ marginTop: "20px" }}>Admin:</div>
+                    </Grid>
+                    <Grid item xs={4}>
+                        <Button
+                            style={{ margin: "10px" }} variant="contained" color="primary"
+                            onClick={() => adjustTime()}>
+                            Adjust time
+                        </Button>
+                    </Grid>
+                    <Grid item xs={4}>
+                        <FirmwareUpload setCmdResult={setCmdResult} setSending={setSending}/>
+                    </Grid>
+                </Grid>
             </Grid>
 
 
@@ -209,5 +265,13 @@ const DoorStatusComponent = ({ doorStatus }: DoorStatusComponentProps) => {
             color: "#00ff07",
             fontWeight: "bold"
         }}>Closing &#11018;</span>}
+        {doorStatus === DoorStatus.doorMiddle && <span style={{
+            color: "#ff0000",
+            fontWeight: "bold"
+        }}>Middle &#11016;</span>}
     </>
 };
+
+const firmwareUpgradeProgress = (firmwareUpgradeState: FirmwareUpgradeState) => {
+    return (firmwareUpgradeState!!.offsetRequested * 100 / firmwareUpgradeState!!.firmwareSize).toFixed(2);
+}

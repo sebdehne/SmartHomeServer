@@ -15,7 +15,7 @@ abstract class AbstractProcess(
     private val runLock = ReentrantLock()
 
     open fun start() {
-        timer.scheduleAtFixedRate({
+        timer.scheduleWithFixedDelay({
             executorService.submit {
                 try {
                     tick()
@@ -34,6 +34,18 @@ abstract class AbstractProcess(
         }
     } else {
         false
+    }
+
+    protected fun <T> asLocked(fn: () -> T): T? {
+        return if (runLock.tryLock(10, TimeUnit.SECONDS)) {
+            try {
+                fn()
+            } finally {
+                runLock.unlock()
+            }
+        } else {
+            null
+        }
     }
 
     abstract fun tickLocked(): Boolean

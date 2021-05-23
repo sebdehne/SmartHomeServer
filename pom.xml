@@ -57,7 +57,7 @@
 
                 </executions>
                 <configuration>
-                    <nodeVersion>v15.13.0</nodeVersion>
+                    <nodeVersion>v16.2.0</nodeVersion>
                     <workingDirectory>webapp</workingDirectory>
                     <installDirectory>target</installDirectory>
                 </configuration>
