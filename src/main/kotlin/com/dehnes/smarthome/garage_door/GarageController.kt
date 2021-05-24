@@ -306,7 +306,7 @@ class GarageController(
                 receivedLightIsOn,
                 receivedDoorStatus,
                 null,
-                clock.timestampSecondsSince2000() - dataResponse.timestampSecondsSince2000,
+                dataResponse.timestampDelta,
                 dataResponse.payload[8].toInt(),
                 clock.millis()
             )

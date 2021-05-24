@@ -51,15 +51,6 @@ class Configuration {
         )
         tibberService.start()
 
-        val heaterService = UnderFloorHeaterService(
-            serialConnection,
-            executorService,
-            persistenceService,
-            influxDBClient,
-            tibberService,
-            clock
-        )
-        heaterService.start()
 
         val evChargingStationConnection = EvChargingStationConnection(
             9091,
@@ -85,9 +76,6 @@ class Configuration {
 
         val firmwareUploadService = FirmwareUploadService(evChargingStationConnection)
 
-        serialConnection.listeners.add(heaterService::onRfMessage)
-        //serialConnection.listeners.add(garageDoorService::handleIncoming)
-
         val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
         loRaConnection.start()
 
@@ -101,6 +89,16 @@ class Configuration {
 
         val garageDoorService = GarageController(loRaConnection, clock, influxDBClient, executorService)
         garageDoorService.start()
+
+        val heaterService = UnderFloorHeaterService(
+            loRaConnection,
+            executorService,
+            persistenceService,
+            influxDBClient,
+            tibberService,
+            clock
+        )
+        heaterService.start()
 
         beans[Rf433Client::class] = serialConnection
         beans[UnderFloorHeaterService::class] = heaterService

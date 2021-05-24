@@ -19,7 +19,7 @@ data class Unsubscribe(
 data class Notify(
     val subscriptionId: String,
     val garageStatus: GarageResponse?,
-    val underFloorHeaterStatus: UnderFloorHeaterStatus?,
+    val underFloorHeaterStatus: UnderFloorHeaterResponse?,
     val evChargingStationEvent: EvChargingEvent?,
     val environmentSensorEvent: EnvironmentSensorEvent?
 )

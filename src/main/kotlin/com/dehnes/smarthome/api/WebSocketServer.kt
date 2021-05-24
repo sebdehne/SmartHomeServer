@@ -170,29 +170,35 @@ class WebSocketServer {
     private fun underFloorHeaterRequest(request: UnderFloorHeaterRequest) = when (request.type) {
         UnderFloorHeaterRequestType.updateMode -> {
             val success = underFloopHeaterService.updateMode(request.newMode!!)
-            UnderFloorHeaterResponse(
-                underFloopHeaterService.getCurrentState(),
-                success
+            underFloopHeaterService.getCurrentState().copy(
+                updateUnderFloorHeaterModeSuccess = success
             )
         }
         UnderFloorHeaterRequestType.updateMostExpensiveHoursToSkip -> {
             val success = underFloopHeaterService.updateMostExpensiveHoursToSkip(request.newMostExpensiveHoursToSkip!!)
-            UnderFloorHeaterResponse(
-                underFloopHeaterService.getCurrentState(),
-                success
+            underFloopHeaterService.getCurrentState().copy(
+                updateUnderFloorHeaterModeSuccess = success
             )
         }
         UnderFloorHeaterRequestType.updateTargetTemperature -> {
             val success = underFloopHeaterService.updateTargetTemperature(request.newTargetTemperature!!)
-            UnderFloorHeaterResponse(
-                underFloopHeaterService.getCurrentState(),
-                success
+            underFloopHeaterService.getCurrentState().copy(
+                updateUnderFloorHeaterModeSuccess = success
             )
         }
-        UnderFloorHeaterRequestType.getStatus -> UnderFloorHeaterResponse(
-            underFloopHeaterService.getCurrentState(),
-            null
-        )
+        UnderFloorHeaterRequestType.getStatus -> underFloopHeaterService.getCurrentState()
+        UnderFloorHeaterRequestType.adjustTime -> {
+            val success = underFloopHeaterService.adjustTime()
+            underFloopHeaterService.getCurrentState().copy(
+                adjustTimeSuccess = success
+            )
+        }
+        UnderFloorHeaterRequestType.firmwareUpgrade -> {
+            val success = underFloopHeaterService.startFirmwareUpgrade(request.firmwareBased64Encoded!!)
+            underFloopHeaterService.getCurrentState().copy(
+                firmwareUploadSuccess = success
+            )
+        }
     }
 
     private fun garageRequest(request: GarageRequest) = when (request.type) {
@@ -308,8 +314,8 @@ class WebSocketServer {
     inner class UnderFloorHeaterSubscription(
         subscriptionId: String,
         sess: Session
-    ) : Subscription<UnderFloorHeaterStatus>(subscriptionId, sess) {
-        override fun onEvent(e: UnderFloorHeaterStatus) {
+    ) : Subscription<UnderFloorHeaterResponse>(subscriptionId, sess) {
+        override fun onEvent(e: UnderFloorHeaterResponse) {
             logger.info("$instanceId onEvent UnderFloorHeaterSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(

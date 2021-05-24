@@ -3,21 +3,21 @@ package com.dehnes.smarthome.heating
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
-import com.dehnes.smarthome.rf433.Rf433Client
-import com.dehnes.smarthome.rf433.RfPacket
-import com.dehnes.smarthome.utils.AbstractProcess
-import com.dehnes.smarthome.utils.PersistenceService
-import com.dehnes.smarthome.utils.Sht15Calculator
-import com.dehnes.smarthome.utils.Sht15Calculator.calculateRelativeHumidity
+import com.dehnes.smarthome.environment_sensors.FirmwareDataRequest
+import com.dehnes.smarthome.environment_sensors.FirmwareHolder
+import com.dehnes.smarthome.lora.LoRaConnection
+import com.dehnes.smarthome.lora.LoRaInboundPacketDecrypted
+import com.dehnes.smarthome.lora.LoRaPacketType
+import com.dehnes.smarthome.lora.maxPayload
+import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
+import java.nio.ByteBuffer
 import java.time.Clock
 import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.math.absoluteValue
+import java.util.*
+import java.util.concurrent.*
+import java.util.zip.CRC32
+import kotlin.math.min
 
 private const val TARGET_TEMP_KEY = "HeatingControllerService.targetTemp"
 private const val HEATER_STATUS_KEY = "HeatingControllerService.heaterTarget"
@@ -25,26 +25,48 @@ private const val OPERATING_MODE = "HeatingControllerService.operatingMode"
 private const val MOSTEXPENSIVEHOURSTOSKIP_KEY = "HeatingControllerService.mostExpensiveHoursToSkip"
 
 class UnderFloorHeaterService(
-    private val rf433Client: Rf433Client,
+    private val loRaConnection: LoRaConnection,
     private val executorService: ExecutorService,
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
     private val tibberService: TibberService,
     private val clock: Clock
-) : AbstractProcess(executorService, 120) {
+) : AbstractProcess(executorService, 42) {
 
-    private val rfAddr = 27
-    private val commandReadStatus = 1
-    private val commandSwitchOnHeater = 2
-    private val commandSwitchOffHeater = 3
+    private val loRaAddr = 18
+
+    @Volatile
+    private var keyId: Int = 1
+
+    @Volatile
+    private var firmwareHolder: FirmwareHolder? = null
+
+    @Volatile
+    private var firmwareDataRequest: FirmwareDataRequest? = null
+
+    private val receiveQueue = LinkedBlockingQueue<LoRaInboundPacketDecrypted>()
 
     private val logger = KotlinLogging.logger { }
-    private val failedAttempts = AtomicInteger(0)
 
-    private var lastTick: Long = 0
-    private var msgListener: ((RfPacket) -> Unit)? = null
+    val listeners = ConcurrentHashMap<String, (UnderFloorHeaterResponse) -> Unit>()
 
-    val listeners = ConcurrentHashMap<String, (UnderFloorHeaterStatus) -> Unit>()
+    init {
+        loRaConnection.listeners.add { packet ->
+            if (packet.from != loRaAddr) {
+                false
+            } else {
+                keyId = packet.keyId
+
+                if (packet.type == LoRaPacketType.FIRMWARE_DATA_REQUEST) {
+                    onFirmwareDataRequest(packet)
+                } else {
+                    receiveQueue.offer(packet)
+                }
+
+                true
+            }
+        }
+    }
 
     @Volatile
     private var lastStatus = UnderFloorHeaterStatus(
@@ -53,28 +75,179 @@ class UnderFloorHeaterService(
         getTargetTemperature(),
         getMostExpensiveHoursToSkip(),
         null,
+        0,
         null
     )
-    private var previousValue: UnderFloorSensorData? = null
 
     override fun logger() = logger
 
     override fun tickLocked(): Boolean {
+        var success = false
+
+        val firmwareDataRequest = this.firmwareDataRequest
+        if (firmwareDataRequest != null && firmwareDataRequest.receivedAt > clock.millis() - (30 * 1000)) {
+            logger.info { "Not requesting data - in firmware upgrade" }
+            success = true
+        } else {
+            this.firmwareDataRequest = null
+
+            // request measurement
+            var retryCount = 5
+            while (--retryCount > 0) {
+                var sent = false
+                val ct = CountDownLatch(1)
+                receiveQueue.clear()
+                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUEST, byteArrayOf()) {
+                    sent = it
+                    ct.countDown()
+                }
+                ct.await(2, TimeUnit.SECONDS)
+
+                if (sent) {
+                    logger.info { "Sent data request" }
+                    val dataResponse = receiveQueue.poll(2, TimeUnit.SECONDS)
+                    if (dataResponse != null) {
+                        handleNewData(dataResponse)
+                        success = true
+                        break
+                    }
+                } else {
+                    logger.info { "Could not send data request" }
+                }
+
+                Thread.sleep(1000)
+            }
+        }
+
+
+        return success
+    }
+
+    fun startFirmwareUpgrade(firmwareBased64Encoded: String) = asLocked {
+        val firmwareHolder = FirmwareHolder(
+            "unknown.file.name",
+            Base64.getDecoder().decode(firmwareBased64Encoded)
+        )
+        this.firmwareHolder = firmwareHolder
+
+        val byteArray = ByteArray(8) { 0 }
+
+        // totalLength: 4 bytes
+        System.arraycopy(
+            (firmwareHolder.data.size).to32Bit(),
+            0,
+            byteArray,
+            0,
+            4
+        )
+
+        // crc32: 4 bytes
+        val crc32 = CRC32()
+        crc32.update(firmwareHolder.data)
+        val crc32Value = crc32.value
+        System.arraycopy(
+            crc32Value.to32Bit(),
+            0,
+            byteArray,
+            4,
+            4
+        )
+
+        var sent = false
+        val ct = CountDownLatch(1)
+        receiveQueue.clear()
+        loRaConnection.send(
+            keyId,
+            loRaAddr,
+            LoRaPacketType.FIRMWARE_INFO_RESPONSE,
+            byteArray,
+        ) {
+            ct.countDown()
+            sent = it
+        }
+        ct.await(2, TimeUnit.SECONDS)
+
+        sent
+    } ?: false
+
+    fun adjustTime() = asLocked {
+        val ct = CountDownLatch(1)
+        receiveQueue.clear()
+        loRaConnection.send(
+            keyId,
+            loRaAddr,
+            LoRaPacketType.ADJUST_TIME_REQUEST,
+            byteArrayOf(),
+        ) {
+            ct.countDown()
+        }
+        ct.await(2, TimeUnit.SECONDS)
+        receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.ADJUST_TIME_RESPONSE
+    } ?: false
+
+    private fun onFirmwareDataRequest(packet: LoRaInboundPacketDecrypted) {
+
+        val firmwareDataRequest = FirmwareDataRequest(
+            readInt32Bits(packet.payload, 0),
+            readInt32Bits(packet.payload, 4),
+            packet.payload[8].toUnsignedInt(),
+            packet.timestampDelta,
+            clock.millis(),
+            packet.rssi
+        )
+
+        logger.info { "Handling firmwareDataRequest from ${packet.from} - $firmwareDataRequest" }
+
+        firmwareHolder?.let {
+
+            if (firmwareDataRequest.offset > it.data.size) {
+                error("Requested offset too large")
+            }
+
+            var bytesSent = 0
+            var sequentNumber = 0
+            while (bytesSent < firmwareDataRequest.length) {
+                val nextChunkSize = min(
+                    min(
+                        maxPayload - 1, // sequentNumber 1 byte
+                        firmwareDataRequest.maxBytesPerResponse
+                    ),
+                    firmwareDataRequest.length - bytesSent
+                )
+
+                val data = ByteArray(nextChunkSize + 1)
+
+                // write sequentNumber
+                data[0] = sequentNumber.toByte()
+
+                // write firmware bytes
+                System.arraycopy(
+                    it.data,
+                    firmwareDataRequest.offset + bytesSent,
+                    data,
+                    1, // after sequentNumber
+                    nextChunkSize
+                )
+
+                // send chunk
+                loRaConnection.send(packet.keyId, packet.from, LoRaPacketType.FIRMWARE_DATA_RESPONSE, data) { }
+
+                bytesSent += nextChunkSize
+                sequentNumber++
+            }
+
+        } ?: logger.error { "No firmware present" }
+
+        this.firmwareDataRequest = firmwareDataRequest
+        onStatusChanged()
+    }
+
+    private fun handleNewData(packet: LoRaInboundPacketDecrypted): Boolean {
         val currentMode: Mode = getCurrentMode()
         logger.info("Current mode: $currentMode")
 
-        if (lastTick > System.currentTimeMillis() - 10000) {
-            return true
-        }
-        lastTick = System.currentTimeMillis()
-
-        // request measurement
-        val rfPacket: RfPacket? = executeCommand(commandReadStatus)
-        recordLocalValues(currentMode, failedAttempts.get())
-        val sensorData = rfPacket?.let { parsePacket(it, true) } ?: return false
-        if (!accept(sensorData)) {
-            return false
-        }
+        recordLocalValues(currentMode)
+        val sensorData = parseAndRecord(packet, clock.millis())
 
         var waitUntilCheapHour: Instant? = null
 
@@ -102,15 +275,19 @@ class UnderFloorHeaterService(
 
         // bring the heater to the desired state
         val executionResult = if (sensorData.heaterIsOn && "off" == getConfiguredHeaterTarget()) {
-            executeCommand(commandSwitchOffHeater)?.let {
-                heaterStatus = parsePacket(it, false).heaterIsOn
+            if (sendOffCommand()) {
+                heaterStatus = false
                 true
-            } ?: false
+            } else {
+                false
+            }
         } else if (!sensorData.heaterIsOn && "on" == getConfiguredHeaterTarget()) {
-            executeCommand(commandSwitchOnHeater)?.let {
-                heaterStatus = parsePacket(it, false).heaterIsOn
+            if (sendOnCommand()) {
+                heaterStatus = true
                 true
-            } ?: false
+            } else {
+                false
+            }
         } else {
             true
         }
@@ -121,38 +298,43 @@ class UnderFloorHeaterService(
             getTargetTemperature(),
             getMostExpensiveHoursToSkip(),
             waitUntilCheapHour?.toEpochMilli(),
+            sensorData.timestampDelta,
             UnderFloorHeaterStatusFromController(
                 clock.millis(),
                 sensorData.temperature
             )
         )
 
+        onStatusChanged()
+
+        return executionResult
+    }
+
+    private fun onStatusChanged() {
         executorService.submit {
             listeners.forEach {
                 try {
-                    it.value(lastStatus)
+                    it.value(getCurrentState())
                 } catch (e: Exception) {
                     logger.error("", e)
                 }
             }
         }
-
-        return executionResult
     }
 
-    fun onRfMessage(rfPacket: RfPacket) {
-        if (rfPacket.remoteAddr != rfAddr) {
-            return
-        }
-
-        msgListener?.let {
-            it(rfPacket)
-        } ?: run {
-            logger.info { "Could not use packet because no listener: $rfPacket" }
-        }
-    }
-
-    fun getCurrentState() = lastStatus
+    fun getCurrentState() = asLocked {
+        firmwareDataRequest?.let {
+            UnderFloorHeaterResponse(
+                firmwareUpgradeState = FirmwareUpgradeState(
+                    firmwareHolder?.data?.size ?: 0,
+                    it.offset,
+                    it.timestampDelta,
+                    it.receivedAt,
+                    it.rssi
+                )
+            )
+        } ?: UnderFloorHeaterResponse(lastStatus)
+    }!!
 
     fun updateMode(newMode: UnderFloorHeaterMode): Boolean {
         setCurrentMode(newMode.mode)
@@ -183,80 +365,72 @@ class UnderFloorHeaterService(
         return true
     }
 
-    private fun accept(sensorData: UnderFloorSensorData): Boolean {
-        val previous = previousValue
-        return if (previous == null || previous.ageInSeconds() > 15 * 60) {
-            previousValue = sensorData
-            true
-        } else {
-            val delta = ((sensorData.temperature - previous.temperature).absoluteValue) / 100
-            (delta <= 5).apply {
-                if (!this) {
-                    logger.info("Ignoring abnormal values. previous=$previous")
-                }
-            }
-        }
-    }
-
-    private fun parsePacket(
-        p: RfPacket,
-        record: Boolean
+    private fun parseAndRecord(
+        packet: LoRaInboundPacketDecrypted,
+        now: Long
     ): UnderFloorSensorData {
-        val sensorData = UnderFloorSensorData.fromRfPacket(p)
+        val sensorData = UnderFloorSensorData.fromRfPacket(packet, now)
 
         logger.info { "Received sensorData=$sensorData" }
 
-        if (record) {
-            influxDBClient.recordSensorData(
-                "sensor",
-                listOf(
-                    "temperature" to sensorData.toTemperature(),
-                    "humidity" to sensorData.toHumidity(),
-                    "heater_status" to (if (sensorData.heaterIsOn) 1 else 0).toString(),
-                ),
-                "room" to "heating_controller"
-            )
-        }
+        influxDBClient.recordSensorData(
+            "sensor",
+            listOf(
+                "temperature" to sensorData.toTemperature(),
+                "heater_status" to (if (sensorData.heaterIsOn) 1 else 0).toString(),
+            ),
+            "room" to "heating_controller"
+        )
 
         return sensorData
     }
 
     private fun recordLocalValues(
-        currentMode: Mode,
-        failedAttempts: Int
+        currentMode: Mode
     ) {
         influxDBClient.recordSensorData(
             "sensor",
             listOf(
                 "manual_mode" to (if (currentMode == Mode.MANUAL) 1 else 0).toString(),
                 "target_temperature" to getTargetTemperature().toString(),
-                "configured_heater_target" to (if (getConfiguredHeaterTarget() == "on") 1 else 0).toString(),
-                "failed_attempts" to failedAttempts.toString()
+                "configured_heater_target" to (if (getConfiguredHeaterTarget() == "on") 1 else 0).toString()
             ),
             "room" to "heating_controller"
         )
     }
 
-    private fun executeCommand(command: Int): RfPacket? {
-        val finalCommand = if (failedAttempts.get() > 10) {
-            logger.warn("Overriding command $command with OFF because of too many failed attempts ${failedAttempts.get()}")
-            commandSwitchOffHeater
-        } else command
-        val inMsg = LinkedBlockingQueue<RfPacket>()
-        msgListener = { rfPacket -> inMsg.offer(rfPacket) }
-        try {
-            repeat(5) {
-                rf433Client.send(RfPacket(rfAddr, intArrayOf(finalCommand)))
-                val response = inMsg.poll(500, TimeUnit.MILLISECONDS)
-                if (response != null) {
-                    return response
-                }
-                Thread.sleep(1000)
-            }
-        } finally {
-            msgListener = null
+    private fun sendOnCommand(): Boolean {
+        var sent = false
+        receiveQueue.clear()
+        val ct = CountDownLatch(1)
+        loRaConnection.send(
+            keyId,
+            loRaAddr,
+            LoRaPacketType.HEATER_ON_REQUEST,
+            byteArrayOf()
+        ) {
+            sent = it
+            ct.countDown()
         }
-        return null
+
+        return sent && receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.HEATER_RESPONSE
+    }
+
+    private fun sendOffCommand(): Boolean {
+        var sent = false
+        receiveQueue.clear()
+        val ct = CountDownLatch(1)
+        loRaConnection.send(
+            keyId,
+            loRaAddr,
+            LoRaPacketType.HEATER_OFF_REQUEST,
+            byteArrayOf()
+        ) {
+            sent = it
+            ct.countDown()
+        }
+
+        return sent && receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.HEATER_RESPONSE
     }
 
     private fun getCurrentMode() = Mode.valueOf(
@@ -292,31 +466,35 @@ data class TemperatureAndHeaterStatus(
 
 data class UnderFloorSensorData(
     val temperature: Int,
-    val humidity: Int,
     val heaterIsOn: Boolean,
-    val receivedAt: Instant = Instant.now()
+    val timestampDelta: Long,
+    val receivedAt: Long
 ) {
     companion object {
-        fun fromRfPacket(p: RfPacket): UnderFloorSensorData {
-            val temperature = Sht15Calculator.calculateTermperature(p)
-            val humidity = calculateRelativeHumidity(p, temperature)
-            val heaterStatus = p.message[4] == 1
+        fun fromRfPacket(loRaInboundPacketDecrypted: LoRaInboundPacketDecrypted, now: Long): UnderFloorSensorData {
+            val allocate = ByteBuffer.allocate(4)
+            allocate.put(loRaInboundPacketDecrypted.payload[0])
+            allocate.put(loRaInboundPacketDecrypted.payload[1])
+            allocate.put(loRaInboundPacketDecrypted.payload[2])
+            allocate.put(loRaInboundPacketDecrypted.payload[3])
+            allocate.flip()
+            val temperatureRaw = allocate.int
+            val temperature = temperatureRaw.toFloat() / 16F
+            val heaterStatus = loRaInboundPacketDecrypted.payload[7].toInt() > 0
 
             return UnderFloorSensorData(
-                temperature,
-                humidity,
-                heaterStatus
+                (temperature * 100).toInt(),
+                heaterStatus,
+                loRaInboundPacketDecrypted.timestampDelta,
+                now
             )
         }
     }
 
     fun toTemperature() = (temperature.toFloat() / 100).toString()
-    fun toHumidity() = (humidity.toFloat() / 100).toString()
 
     override fun toString(): String {
-        return "UnderFloorSensorData(temperature=${toTemperature()}, humidity=${toHumidity()}, heaterIsOn=$heaterIsOn, receivedAt=$receivedAt)"
+        return "UnderFloorSensorData(temperature=${toTemperature()}, heaterIsOn=$heaterIsOn, receivedAt=$receivedAt)"
     }
-
-    fun ageInSeconds() = (System.currentTimeMillis() - receivedAt.toEpochMilli()) / 1000
 
 }
