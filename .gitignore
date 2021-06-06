@@ -1,6 +1,7 @@
 .idea/
 smarthome-server.iml
 target/
+testdir/
 
 node_modules/
 logs/

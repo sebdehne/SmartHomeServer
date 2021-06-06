@@ -39,6 +39,7 @@ export const EvChargingStations = () => {
                     null,
                     null
                 ),
+                null,
                 null
             )).then(response => setStations(response.evChargingStationResponse!!.chargingStationsDataAndConfig)));
 

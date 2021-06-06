@@ -36,6 +36,7 @@ export const FirmwareUpload = ({ setSending, setCmdResult, clientId }: FirmwareU
                     null,
                     null
                 ),
+                null,
                 null
             )).then(response => {
                 setCmdResult(response.evChargingStationResponse!!.uploadFirmwareToClientResult!!);

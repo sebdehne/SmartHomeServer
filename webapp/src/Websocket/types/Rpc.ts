@@ -3,6 +3,7 @@ import {GarageRequest, GarageResponse} from "./Garage";
 import {UnderFloorHeaterRequest, UnderFloorHeaterResponse} from "./UnderFloorHeater";
 import {EvChargingStationRequest, EvChargingStationResponse} from "./EVChargingStation";
 import { EnvironmentSensorRequest, EnvironmentSensorResponse } from "./EnvironmentSensors";
+import { VideoBrowserRequest, VideoBrowserResponse } from "./Video";
 
 export enum RequestType {
     subscribe = "subscribe",
@@ -11,7 +12,8 @@ export enum RequestType {
     garageRequest = "garageRequest",
     underFloorHeaterRequest = "underFloorHeaterRequest",
     evChargingStationRequest = "evChargingStationRequest",
-    environmentSensorRequest = "environmentSensorRequest"
+    environmentSensorRequest = "environmentSensorRequest",
+    videoBrowser = "videoBrowser"
 }
 
 export class RpcRequest {
@@ -23,8 +25,9 @@ export class RpcRequest {
     public underFloorHeaterRequest: UnderFloorHeaterRequest | null;
     public evChargingStationRequest: EvChargingStationRequest | null;
     public environmentSensorRequest: EnvironmentSensorRequest | null;
+    public videoBrowserRequest: VideoBrowserRequest | null;
 
-    public constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, garageRequest: GarageRequest | null, underFloorHeaterRequest: UnderFloorHeaterRequest | null, evChargingStationRequest: EvChargingStationRequest | null, environmentSensorRequest: EnvironmentSensorRequest | null) {
+    public constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, garageRequest: GarageRequest | null, underFloorHeaterRequest: UnderFloorHeaterRequest | null, evChargingStationRequest: EvChargingStationRequest | null, environmentSensorRequest: EnvironmentSensorRequest | null, videoBrowserRequest: VideoBrowserRequest | null) {
         this.type = type;
         this.subscribe = subscribe;
         this.unsubscribe = unsubscribe;
@@ -32,6 +35,7 @@ export class RpcRequest {
         this.underFloorHeaterRequest = underFloorHeaterRequest;
         this.evChargingStationRequest = evChargingStationRequest;
         this.environmentSensorRequest = environmentSensorRequest;
+        this.videoBrowserRequest = videoBrowserRequest;
     }
 }
 
@@ -43,13 +47,15 @@ export class RpcResponse {
     public underFloorHeaterResponse: UnderFloorHeaterResponse | null;
     public evChargingStationResponse: EvChargingStationResponse | null;
     public environmentSensorResponse: EnvironmentSensorResponse | null;
+    public videoBrowserResponse: VideoBrowserResponse | null;
 
-    public constructor(subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageResponse: GarageResponse | null, underFloorHeaterResponse: UnderFloorHeaterResponse | null, evChargingStationResponse: EvChargingStationResponse | null, environmentSensorResponse: EnvironmentSensorResponse | null) {
+    public constructor(subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageResponse: GarageResponse | null, underFloorHeaterResponse: UnderFloorHeaterResponse | null, evChargingStationResponse: EvChargingStationResponse | null, environmentSensorResponse: EnvironmentSensorResponse | null, videoBrowserResponse: VideoBrowserResponse | null) {
         this.subscriptionCreated = subscriptionCreated;
         this.subscriptionRemoved = subscriptionRemoved;
         this.garageResponse = garageResponse;
         this.underFloorHeaterResponse = underFloorHeaterResponse;
         this.evChargingStationResponse = evChargingStationResponse;
         this.environmentSensorResponse = environmentSensorResponse;
+        this.videoBrowserResponse = videoBrowserResponse;
     }
 }

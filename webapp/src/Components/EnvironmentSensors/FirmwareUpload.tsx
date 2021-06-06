@@ -40,7 +40,8 @@ export const FirmwareUpload = ({ firmwareInfo, setSending, setCmdResult, setFirm
                     file.name,
                     firmwareBased64Encoded,
                     null
-                )
+                ),
+                null
             )).then(response => {
                 setCmdResult(true);
                 setFirmwareInfo(response.environmentSensorResponse!!.firmwareInfo);

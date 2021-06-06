@@ -11,6 +11,7 @@ import { EvChargingStations } from "./Components/EvChargingStations/EvChargingSt
 import Webcams from "./Components/Webcams/Webcams";
 import theme from "./theme";
 import { EnvironmentSensors } from "./Components/EnvironmentSensors/EnvironmentSensors";
+import { VideoRecordings } from "./Components/VideoRecordings/VideoRecordings";
 
 ReactDOM.render(
     <React.StrictMode>
@@ -35,6 +36,9 @@ ReactDOM.render(
                     </Route>
                     <Route path="/webcams">
                         <Webcams/>
+                    </Route>
+                    <Route path="/recordings">
+                        <VideoRecordings/>
                     </Route>
                 </Switch>
             </Router>

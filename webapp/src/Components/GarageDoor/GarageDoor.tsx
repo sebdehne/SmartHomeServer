@@ -35,6 +35,7 @@ const GarageDoor = () => {
                     ),
                     null,
                     null,
+                    null,
                     null))
                     .then(response => setGarageStatus(response.garageResponse!!));
             }
@@ -54,6 +55,7 @@ const GarageDoor = () => {
                 deltaInMinutes * 60,
                 null
             ),
+            null,
             null,
             null,
             null
@@ -79,6 +81,7 @@ const GarageDoor = () => {
             ),
             null,
             null,
+            null,
             null
         )).then((response: RpcResponse) => {
             setCmdResult(response.garageResponse!!.garageCommandAdjustTimeSuccess!!);
@@ -95,6 +98,7 @@ const GarageDoor = () => {
             null,
             null,
             new GarageRequest(cmd, null, null),
+            null,
             null,
             null,
             null

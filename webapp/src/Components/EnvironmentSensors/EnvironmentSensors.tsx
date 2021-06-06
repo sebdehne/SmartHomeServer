@@ -43,7 +43,8 @@ export const EnvironmentSensors = () => {
                     null,
                     null,
                     null
-                )
+                ),
+                null
             )).then(response => {
                 setSensors(response.environmentSensorResponse!!.sensors);
                 setFirmwareInfo(response.environmentSensorResponse!!.firmwareInfo);

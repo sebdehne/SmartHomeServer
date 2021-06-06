@@ -72,6 +72,7 @@ export const EvChargingStation = ({
             null,
             null,
             req,
+            null,
             null))
             .then(response => {
                 setCmdResult(response.evChargingStationResponse!!.configUpdated!!);

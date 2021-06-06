@@ -34,6 +34,7 @@ export const FirmwareUpload = ({ setSending, setCmdResult }: FirmwareUploadProps
                     firmwareBased64Encoded
                 ),
                 null,
+                null,
                 null
             )).then(response => {
                 setCmdResult(response.underFloorHeaterResponse!!.firmwareUploadSuccess!!);

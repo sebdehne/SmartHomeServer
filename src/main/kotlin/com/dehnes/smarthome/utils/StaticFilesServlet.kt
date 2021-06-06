@@ -28,10 +28,11 @@ class StaticFilesServlet : HttpServlet() {
 }
 
 val fileNamePattern = "^[\\w]+(\\.[\\w]+)+\$".toRegex()
-val dirNamePattern = "^[\\w]+\$".toRegex()
+val dirNamePattern = "^[\\w-]+\$".toRegex()
 val allowedDirs = listOf(
-    listOf("static", "css"),
-    listOf("static", "js")
+    "static/css".toRegex(),
+    "static/js".toRegex(),
+    "^\\d\\d\\d\\d-\\d\\d-\\d\\d".toRegex()
 )
 val defaultFile = "index.html"
 val contextPath = "smarthome"
@@ -67,7 +68,10 @@ fun pathToResource(path: String): String? {
 
     while (resultResource.size > 1) {
         val dirs = resultResource.subList(0, resultResource.size - 1)
-        if (allowedDirs.any { it == dirs }) {
+        val dirsString = dirs.joinToString(separator = "/")
+        if (allowedDirs.any {
+                it.matches(dirsString)
+        }) {
             return resultResource.joinToString("/")
         }
         resultResource = resultResource.subList(1, resultResource.size)

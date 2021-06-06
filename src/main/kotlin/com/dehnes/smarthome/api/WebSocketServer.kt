@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.api
 
+import com.dehnes.smarthome.VideoBrowser
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
@@ -33,6 +34,8 @@ class WebSocketServer {
         configuration.getBean<FirmwareUploadService>(FirmwareUploadService::class)
     private val loRaSensorBoardService =
         configuration.getBean<EnvironmentSensorService>(EnvironmentSensorService::class)
+    private val videoBrowser =
+        configuration.getBean<VideoBrowser>(VideoBrowser::class)
 
     @OnOpen
     fun onWebSocketConnect(sess: Session) {
@@ -96,6 +99,7 @@ class WebSocketServer {
             underFloorHeaterRequest -> RpcResponse(underFloorHeaterResponse = underFloorHeaterRequest(rpcRequest.underFloorHeaterRequest!!))
             evChargingStationRequest -> RpcResponse(evChargingStationResponse = evChargingStationRequest(rpcRequest.evChargingStationRequest!!))
             environmentSensorRequest -> RpcResponse(environmentSensorResponse = environmentSensorRequest(rpcRequest.environmentSensorRequest!!))
+            RequestType.videoBrowser -> RpcResponse(videoBrowserResponse = videoBrowser.rpc(rpcRequest.videoBrowserRequest!!))
         }
 
         argSession.basicRemote.sendText(

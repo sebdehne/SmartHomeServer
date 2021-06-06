@@ -10,7 +10,6 @@ import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.garage_door.GarageController
-import com.dehnes.smarthome.rf433.Rf433Client
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -36,9 +35,6 @@ class Configuration {
 
         val persistenceService = PersistenceService(objectMapper)
         val influxDBClient = InfluxDBClient(persistenceService, objectMapper, System.getProperty("DST_HOST"))
-
-        val serialConnection = Rf433Client(executorService, System.getProperty("DST_HOST"))
-        serialConnection.start()
 
         val clock = Clock.system(ZoneId.of("Europe/Oslo"))
 
@@ -100,7 +96,8 @@ class Configuration {
         )
         heaterService.start()
 
-        beans[Rf433Client::class] = serialConnection
+        val videoBrowser = VideoBrowser()
+
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageController::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
@@ -108,6 +105,7 @@ class Configuration {
         beans[FirmwareUploadService::class] = firmwareUploadService
         beans[EvChargingService::class] = evChargingService
         beans[EnvironmentSensorService::class] = loRaSensorBoardService
+        beans[VideoBrowser::class] = videoBrowser
     }
 
     fun <T> getBean(klass: KClass<*>): T {

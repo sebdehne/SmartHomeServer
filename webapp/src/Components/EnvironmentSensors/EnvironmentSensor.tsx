@@ -108,7 +108,8 @@ export const EnvironmentSensor = ({
             null,
             null,
             null,
-            req))
+            req,
+            null))
             .then(response => {
                 setCmdResult(true);
                 setSensors(response.environmentSensorResponse!!.sensors);

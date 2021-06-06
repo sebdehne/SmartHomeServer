@@ -41,6 +41,11 @@ const App = () => {
                     </Button>
                 </li>
                 <li>
+                    <Button variant="contained" color="primary" onClick={relative("/recordings")}>
+                        Video recordings
+                    </Button>
+                </li>
+                <li>
                     <Link href="https://dehnes.com/stats/d/000000007/current">
                         <Button variant="contained" color="primary">
                             Temp's and Stats
