@@ -34,8 +34,8 @@ const nowDate = () => {
 export const VideoRecordings = () => {
 
     const [sending, setSending] = useState<boolean>(false);
-    const [fileSizeRange, setFileSizeRange] = useState<number[]>([20, 1000]);
-    const [fileDateRange, setFileDateRange] = useState<number[]>([-5, 0]);
+    const [fileSizeRange, setFileSizeRange] = useState<number[]>([3, 200]);
+    const [fileDateRange, setFileDateRange] = useState<number[]>([-2, 0]);
 
     const [previousRequestSent, setPreviousRequestSent] = useState<VideoBrowserRequest | null>(null);
     const [videoResponse, setVideoResponse] = useState<VideoBrowserResponse | null>(null);
@@ -89,10 +89,13 @@ export const VideoRecordings = () => {
 
     return <Container maxWidth="lg" className="App">
         <Header
-            title={"Video recordings"}
+            title={"Video recordings (" + videoResponse?.dirs.flatMap(d => d.files).length + ")"}
             sending={sending}
         />
-        <div>
+        <div style={{
+            marginLeft: "50px",
+            marginRight: "50px",
+        }}>
             <Typography id="non-linear-slider" gutterBottom>
                 File size filter: {fileSizeRange[0]} - {fileSizeRange[1]} MB
             </Typography>
@@ -100,7 +103,7 @@ export const VideoRecordings = () => {
                 value={fileSizeRange}
                 min={0}
                 step={1}
-                max={1000}
+                max={200}
                 onChange={(e, value) => {
                     setFileSizeRange(value as number[]);
                 }}
@@ -138,7 +141,7 @@ export const VideoRecordings = () => {
                 </TableHead>
                 <TableBody>
                     {videoResponse?.dirs.flatMap(d => d.files.map(f => ({ dirname: d.dirname, file: f })))
-                        .sort((a, b) => a.file.timestampMillis - b.file.timestampMillis)
+                        .sort((a, b) => b.file.timestampMillis - a.file.timestampMillis)
                         .map((file) => (
                             <Row key={file.file.timestampMillis} file={file.file} dirname={file.dirname}/>
                         ))}
@@ -162,7 +165,7 @@ const Row = ({ file, dirname }: RowProps) => {
                 </IconButton>
             </TableCell>
             <TableCell component="th" scope="row">
-                {new Date(file.timestampMillis).toISOString()}
+                {formatDate(new Date(file.timestampMillis))}
             </TableCell>
             <TableCell component="th" scope="row">            {humanFileSize(file.size)}        </TableCell>
         </TableRow>
@@ -179,6 +182,15 @@ const Row = ({ file, dirname }: RowProps) => {
         </TableRow>
     </>;
 };
+
+const formatDate = (date: Date) =>
+    date.getFullYear()
+    + "-" + (date.getMonth() + 1).toString().padStart(2, '0')
+    + "-" + date.getDate().toString().padStart(2, '0')
+    + " " + date.getHours().toString().padStart(2, '0')
+    + ":" + date.getMinutes().toString().padStart(2, '0')
+    + ":" + date.getSeconds().toString().padStart(2, '0');
+
 
 
 function humanFileSize(bytes: number, si = false, dp = 1) {

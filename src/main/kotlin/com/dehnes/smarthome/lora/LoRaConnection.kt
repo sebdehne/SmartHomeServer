@@ -14,8 +14,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
-import javax.annotation.PostConstruct
-import javax.annotation.PreDestroy
 
 class LoRaConnection(
     private val persistenceService: PersistenceService,
@@ -170,7 +168,7 @@ class LoRaConnection(
                             logger.info { "Ignoring packet not for me. $inboundPacket" }
                         } else if (inboundPacket.type == LoRaPacketType.SETUP_REQUEST) {
                             onSetupRequest(inboundPacket)
-                        } else if (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30) {
+                        } else if (validateTimestamp() && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
                             logger.warn { "Ignoring received packet because of invalid timestampDelta. $inboundPacket" }
                         } else {
 
@@ -333,6 +331,8 @@ class LoRaConnection(
 
     private fun getLoRaAddr(serialId: String) =
         persistenceService["EnvironmentSensor.loraAddr.$serialId", null]?.toInt()
+
+    private fun validateTimestamp() = persistenceService["EnvironmentSensor.validateTimestamp", "true"].toBoolean()
 
 }
 

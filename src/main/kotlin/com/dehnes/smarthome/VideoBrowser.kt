@@ -17,7 +17,7 @@ class VideoBrowser {
 
     fun rpc(request: VideoBrowserRequest): VideoBrowserResponse {
         val minFileSize = request.minFileSize ?: 0
-        val maxFileSize = request.maxFileSize ?: Long.MAX_VALUE
+        val maxFileSize = request.maxFileSize?.let { if (it >= 200000000) Long.MAX_VALUE else it } ?: Long.MAX_VALUE
         val fromDate = request.fromDate?.let { Instant.ofEpochMilli(it) } ?: Instant.MIN
         val toDate = request.toDate?.let { Instant.ofEpochMilli(it) } ?: Instant.MAX
 
