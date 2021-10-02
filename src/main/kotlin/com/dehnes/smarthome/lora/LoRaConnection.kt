@@ -62,13 +62,21 @@ class LoRaConnection(
         isStarted = false
     }
 
-    fun send(keyId: Int, toAddr: Int, type: LoRaPacketType, payload: ByteArray, onResult: (Boolean) -> Unit) {
+    fun send(
+        keyId: Int,
+        toAddr: Int,
+        type: LoRaPacketType,
+        payload: ByteArray,
+        timestamp: Long?,
+        onResult: (Boolean) -> Unit
+    ) {
         outQueue.add(
             LoRaOutboundPacketRequest(
                 keyId,
                 toAddr,
                 type,
                 payload,
+                timestamp,
                 onResult
             )
         )
@@ -168,7 +176,7 @@ class LoRaConnection(
                             logger.info { "Ignoring packet not for me. $inboundPacket" }
                         } else if (inboundPacket.type == LoRaPacketType.SETUP_REQUEST) {
                             onSetupRequest(inboundPacket)
-                        } else if (validateTimestamp() && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
+                        } else if (persistenceService.validateTimestamp() && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
                             logger.warn { "Ignoring received packet because of invalid timestampDelta. $inboundPacket" }
                         } else {
 
@@ -319,7 +327,7 @@ class LoRaConnection(
 
         val loraAddr = getLoRaAddr(setupRequest.serialIdHex)
         if (loraAddr != null) {
-            send(packet.keyId, loraAddr, LoRaPacketType.SETUP_RESPONSE, packet.payload) {
+            send(packet.keyId, loraAddr, LoRaPacketType.SETUP_RESPONSE, packet.payload, null) {
                 if (!it) {
                     logger.info { "Could not send pong response" }
                 }
@@ -332,9 +340,9 @@ class LoRaConnection(
     private fun getLoRaAddr(serialId: String) =
         persistenceService["EnvironmentSensor.loraAddr.$serialId", null]?.toInt()
 
-    private fun validateTimestamp() = persistenceService["EnvironmentSensor.validateTimestamp", "true"].toBoolean()
-
 }
+
+fun PersistenceService.validateTimestamp() = this["EnvironmentSensor.validateTimestamp", "true"].toBoolean()
 
 val headerLength = 11
 val maxPayload = 255 - headerLength - AES265GCM.overhead()
@@ -345,6 +353,7 @@ data class LoRaOutboundPacketRequest(
     val toAddr: Int,
     val type: LoRaPacketType,
     val payload: ByteArray,
+    val timestamp: Long?,
     val onResult: (Boolean) -> Unit
 ) {
     fun toByteArray(timestamp: Long): ByteArray {
@@ -354,7 +363,7 @@ data class LoRaOutboundPacketRequest(
         data[2] = type.value.toByte()
 
         System.arraycopy(
-            timestamp.to32Bit(),
+            (this.timestamp ?: timestamp).to32Bit(),
             0,
             data,
             3,
@@ -475,6 +484,9 @@ enum class LoRaPacketType(
 
     GARAGE_HEATER_DATA_REQUEST(16),
     GARAGE_HEATER_DATA_RESPONSE(17),
+
+    SENSOR_DATA_REQUEST_V2(18),
+    SENSOR_DATA_RESPONSE_V2(19),
 
     ;
 

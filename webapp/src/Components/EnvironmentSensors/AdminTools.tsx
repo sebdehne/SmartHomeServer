@@ -9,14 +9,15 @@ import {
 } from "../../Websocket/types/EnvironmentSensors";
 import { arrayBufferToBase64 } from "../Utils/utils";
 
-type FirmwareUploadProps = {
+type AdminToolsProps = {
     firmwareInfo: FirmwareInfo | null;
     setSending: (sending: boolean) => void;
     setCmdResult: (sending: boolean | null) => void;
     setFirmwareInfo: (firmwareInfo: FirmwareInfo | null) => void;
+    sendUpdate: (req: EnvironmentSensorRequest) => void;
 }
 
-export const FirmwareUpload = ({ firmwareInfo, setSending, setCmdResult, setFirmwareInfo }: FirmwareUploadProps) => {
+export const AdminTools = ({ firmwareInfo, setSending, setCmdResult, setFirmwareInfo, sendUpdate }: AdminToolsProps) => {
 
     const uploadFirmware = (file: File) => {
         setSending(true);
@@ -58,6 +59,21 @@ export const FirmwareUpload = ({ firmwareInfo, setSending, setCmdResult, setFirm
         reader.readAsArrayBuffer(file);
     };
 
+    const scheduleTimeAdjustment = () => sendUpdate(new EnvironmentSensorRequest(
+        EnvironmentSensorRequestType.scheduleTimeAdjustment,
+        null,
+        null,
+        null,
+        null
+    ));
+    const scheduleReset = () => sendUpdate(new EnvironmentSensorRequest(
+        EnvironmentSensorRequestType.scheduleReset,
+        null,
+        null,
+        null,
+        null
+    ));
+
     return (
         <Grid item xs={12}>
             <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
@@ -95,6 +111,22 @@ export const FirmwareUpload = ({ firmwareInfo, setSending, setCmdResult, setFirm
                                             Upload firmware
                                         </Button>
                                     </label>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell component="th" scope="row"/>
+                                <TableCell align="right">
+                                    <Button variant="contained" component="span" onClick={scheduleTimeAdjustment}>
+                                        Adjust time for all
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell component="th" scope="row"/>
+                                <TableCell align="right">
+                                    <Button variant="contained" component="span" onClick={scheduleReset}>
+                                        Reset all
+                                    </Button>
                                 </TableCell>
                             </TableRow>
                         </TableBody>

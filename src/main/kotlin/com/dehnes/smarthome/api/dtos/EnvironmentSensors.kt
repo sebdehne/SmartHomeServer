@@ -8,7 +8,9 @@ enum class EnvironmentSensorRequestType {
     cancelTimeAdjustment,
     scheduleFirmwareUpgrade,
     cancelFirmwareUpgrade,
-    adjustSleepTimeInSeconds
+    adjustSleepTimeInSeconds,
+    scheduleReset,
+    cancelReset
 }
 
 data class EnvironmentSensorRequest(
@@ -37,6 +39,7 @@ data class EnvironmentSensorState(
     val firmwareUpgradeState: FirmwareUpgradeState?,
     val firmwareVersion: Int,
     val firmwareUpgradeScheduled: Boolean,
+    val resetScheduled: Boolean,
     val timeAdjustmentSchedule: Boolean
 )
 

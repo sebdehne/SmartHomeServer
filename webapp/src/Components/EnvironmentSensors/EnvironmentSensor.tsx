@@ -20,8 +20,6 @@ import {
     TableRow
 } from "@material-ui/core";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
-import WebsocketService from "../../Websocket/websocketClient";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 
 const stateToText = (currentMilliSeconds: number, sensor: EnvironmentSensorState) => {
@@ -82,43 +80,19 @@ const firmwareUpgradeProgress = (sensor: EnvironmentSensorState) => {
 }
 
 type EnvironmentSensorProps = {
-    setSending: (sending: boolean) => void;
-    setCmdResult: (sending: boolean | null) => void;
     sensor: EnvironmentSensorState;
-    setSensors: (sensors: EnvironmentSensorState[]) => void;
     currentMilliSeconds: number;
     firmwareInfo: FirmwareInfo | null;
+    sendUpdate: (req: EnvironmentSensorRequest) => void;
 };
 
 export const EnvironmentSensor = ({
-                                      setSending,
-                                      setCmdResult,
                                       sensor,
-                                      setSensors,
                                       currentMilliSeconds,
-                                      firmwareInfo
+                                      firmwareInfo,
+                                      sendUpdate
                                   }: EnvironmentSensorProps) => {
 
-    const sendUpdate = (req: EnvironmentSensorRequest) => {
-        setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.environmentSensorRequest,
-            null,
-            null,
-            null,
-            null,
-            null,
-            req,
-            null))
-            .then(response => {
-                setCmdResult(true);
-                setSensors(response.environmentSensorResponse!!.sensors);
-                setTimeout(() => {
-                    setCmdResult(null);
-                }, 2000);
-            })
-            .finally(() => setSending(false));
-    };
     const sendCommand = (cmd: EnvironmentSensorRequestType) => sendUpdate(new EnvironmentSensorRequest(
         cmd,
         sensor.sensorId,
@@ -182,6 +156,14 @@ export const EnvironmentSensor = ({
                                         : sendCommand(EnvironmentSensorRequestType.scheduleFirmwareUpgrade)
                                 }
                             >Upgrade firmware</Button>
+                            <Button
+                                color={sensor.resetScheduled ? 'secondary' : 'primary'}
+                                onClick={() =>
+                                    sensor.resetScheduled
+                                        ? sendCommand(EnvironmentSensorRequestType.cancelReset)
+                                        : sendCommand(EnvironmentSensorRequestType.scheduleReset)
+                                }
+                            >Reset</Button>
                         </ButtonGroup>
                     </Grid>
                 </Grid>

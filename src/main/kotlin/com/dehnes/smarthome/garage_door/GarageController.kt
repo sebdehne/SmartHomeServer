@@ -101,6 +101,7 @@ class GarageController(
             loRaAddr,
             LoRaPacketType.FIRMWARE_INFO_RESPONSE,
             byteArray,
+            null
         ) {
             ct.countDown()
             sent = it
@@ -129,6 +130,7 @@ class GarageController(
             loRaAddr,
             LoRaPacketType.ADJUST_TIME_REQUEST,
             byteArrayOf(),
+            null
         ) {
             ct.countDown()
         }
@@ -226,7 +228,7 @@ class GarageController(
                 )
 
                 // send chunk
-                loRaConnection.send(packet.keyId, packet.from, LoRaPacketType.FIRMWARE_DATA_RESPONSE, data) { }
+                loRaConnection.send(packet.keyId, packet.from, LoRaPacketType.FIRMWARE_DATA_RESPONSE, data, null) { }
 
                 bytesSent += nextChunkSize
                 sequentNumber++
@@ -270,7 +272,7 @@ class GarageController(
                 var sent = false
                 val ct = CountDownLatch(1)
                 receiveQueue.clear()
-                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUEST, byteArrayOf()) {
+                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUEST, byteArrayOf(), null) {
                     ct.countDown()
                     sent = it
                 }
@@ -375,6 +377,7 @@ class GarageController(
             loRaAddr,
             if (openCommand) LoRaPacketType.GARAGE_DOOR_OPEN_REQUEST else LoRaPacketType.GARAGE_DOOR_CLOSE_REQUEST,
             byteArrayOf(),
+            null
         ) {
             ct.countDown()
         }

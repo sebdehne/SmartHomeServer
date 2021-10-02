@@ -11,7 +11,7 @@ import {
     FirmwareInfo
 } from "../../Websocket/types/EnvironmentSensors";
 import { EnvironmentSensor, getSensorStatus, SensorStatus } from "./EnvironmentSensor";
-import { FirmwareUpload } from "./FirmwareUpload";
+import { AdminTools } from "./AdminTools";
 
 export const EnvironmentSensors = () => {
 
@@ -58,6 +58,27 @@ export const EnvironmentSensors = () => {
         byFirmwareVersions[s.firmwareVersion] = (byFirmwareVersions[s.firmwareVersion] || 0) + 1;
     });
 
+    const sendUpdate = (req: EnvironmentSensorRequest) => {
+        setSending(true);
+        WebsocketService.rpc(new RpcRequest(
+            RequestType.environmentSensorRequest,
+            null,
+            null,
+            null,
+            null,
+            null,
+            req,
+            null))
+            .then(response => {
+                setCmdResult(true);
+                setSensors(response.environmentSensorResponse!!.sensors);
+                setTimeout(() => {
+                    setCmdResult(null);
+                }, 2000);
+            })
+            .finally(() => setSending(false));
+    };
+
     return <Container maxWidth="sm" className="App">
         <Header
             title={"Environment Sensors (" + sensors.filter(s => getSensorStatus(s, currentSeconds) === SensorStatus.green).length + "/" + sensors.length + ")"}
@@ -79,11 +100,9 @@ export const EnvironmentSensors = () => {
                             <EnvironmentSensor
                                 key={sensor.sensorId}
                                 sensor={sensor}
-                                setCmdResult={setCmdResult}
-                                setSending={setSending}
-                                setSensors={setSensors}
                                 currentMilliSeconds={currentSeconds}
                                 firmwareInfo={firmwareInfo}
+                                sendUpdate={sendUpdate}
                             />
                         ))}
                 </div>
@@ -94,11 +113,12 @@ export const EnvironmentSensors = () => {
         <h4>Currently no Environment Sensor online</h4>
         }
 
-        <FirmwareUpload
+        <AdminTools
             setSending={setSending}
             setCmdResult={setCmdResult}
             setFirmwareInfo={setFirmwareInfo}
             firmwareInfo={firmwareInfo}
+            sendUpdate={sendUpdate}
         />
 
         {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}

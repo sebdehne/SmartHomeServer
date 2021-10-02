@@ -2,11 +2,8 @@ package com.dehnes.smarthome.environment_sensors
 
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
-import com.dehnes.smarthome.lora.LoRaConnection
-import com.dehnes.smarthome.lora.LoRaInboundPacketDecrypted
+import com.dehnes.smarthome.lora.*
 import com.dehnes.smarthome.lora.LoRaPacketType.*
-import com.dehnes.smarthome.lora.ReceivedMessage
-import com.dehnes.smarthome.lora.maxPayload
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.time.Clock
@@ -41,6 +38,7 @@ class EnvironmentSensorService(
 
                 val updatedState = when (packet.type) {
                     SENSOR_DATA_REQUEST -> onSensorData(currentState, packet)
+                    SENSOR_DATA_REQUEST_V2 -> onSensorDataV2(currentState, packet)
                     FIRMWARE_INFO_REQUEST -> if (currentState == null) null else onFirmwareInfoRequest(currentState, packet)
                     FIRMWARE_DATA_REQUEST -> if (currentState == null) null else onFirmwareDataRequest(currentState, packet)
                     else -> null
@@ -121,6 +119,7 @@ class EnvironmentSensorService(
             firmwareUpgradeState,
             sensorState.firmwareVersion,
             sensorState.triggerFirmwareUpdate,
+            sensorState.triggerReset,
             sensorState.triggerTimeAdjustment
         )
     }
@@ -166,16 +165,32 @@ class EnvironmentSensorService(
         }
     }
 
-    fun timeAdjustment(sensorId: Int, scheduled: Boolean) = synchronized(this) {
-        val sensorState = sensors[sensorId]
-        if (sensorState == null) {
-            false
-        } else {
-            sensors[sensorId] = sensorState.copy(
+    fun timeAdjustment(sensorId: Int?, scheduled: Boolean) = synchronized(this) {
+        val selectedSensors = sensorId?.let { listOfNotNull(sensors[it]) } ?: sensors.values
+
+        var adjustedSome = false
+        selectedSensors.forEach {
+            sensors[it.id] = it.copy(
                 triggerTimeAdjustment = scheduled
             )
-            true
+            adjustedSome = true
         }
+
+        adjustedSome
+    }
+
+    fun configureReset(sensorId: Int?, scheduled: Boolean) = synchronized(this) {
+        val selectedSensors = sensorId?.let { listOfNotNull(sensors[it]) } ?: sensors.values
+
+        var adjustedSome = false
+        selectedSensors.forEach {
+            sensors[it.id] = it.copy(
+                triggerReset = scheduled
+            )
+            adjustedSome = true
+        }
+
+        adjustedSome
     }
 
     fun setFirmware(filename: String, firmwareBased64Encoded: String) {
@@ -232,7 +247,13 @@ class EnvironmentSensorService(
                 )
 
                 // send chunk
-                loRaConnection.send(packet.keyId, packet.from, FIRMWARE_DATA_RESPONSE, data) { }
+                loRaConnection.send(
+                    packet.keyId,
+                    packet.from,
+                    FIRMWARE_DATA_RESPONSE,
+                    data,
+                    if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+                ) { }
 
                 bytesSent += nextChunkSize
                 sequentNumber++
@@ -271,7 +292,13 @@ class EnvironmentSensorService(
             )
         }
 
-        loRaConnection.send(packet.keyId, packet.from, FIRMWARE_INFO_RESPONSE, byteArray) {
+        loRaConnection.send(
+            packet.keyId,
+            packet.from,
+            FIRMWARE_INFO_RESPONSE,
+            byteArray,
+            if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+        ) {
             if (!it) {
                 logger.info { "Could not send firmware-info-response" }
             }
@@ -329,7 +356,13 @@ class EnvironmentSensorService(
             sensorData
         }
 
-        loRaConnection.send(packet.keyId, packet.from, SENSOR_DATA_RESPONSE, responsePayload) {
+        loRaConnection.send(
+            packet.keyId,
+            packet.from,
+            SENSOR_DATA_RESPONSE,
+            responsePayload,
+            if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+        ) {
             if (!it) {
                 logger.info { "Could not send sensor-data response" }
             }
@@ -370,6 +403,102 @@ class EnvironmentSensorService(
             firmwareVersion = sensorData.firmwareVersion,
             triggerTimeAdjustment = false,
             triggerFirmwareUpdate = false,
+            triggerReset = false,
+            lastReceivedMessage = updatedSensorData
+        )
+    }
+
+    private fun onSensorDataV2(existingState: SensorState?, packet: LoRaInboundPacketDecrypted): SensorState? {
+        if (packet.payload.size != 21) {
+            logger.warn { "Forced to ignore packet with invalid payloadSize=${packet.payload.size} != 21" }
+            return existingState
+        }
+        if (isIgnored(packet.from)) {
+            logger.warn { "Ignoring $packet" }
+            return existingState
+        }
+        val sensorData = SensorData(
+            readLong32Bits(packet.payload, 0),
+            readLong32Bits(packet.payload, 4),
+            readLong32Bits(packet.payload, 8),
+            readLong32Bits(packet.payload, 12),
+            readLong32Bits(packet.payload, 16),
+            packet.payload[20].toInt(),
+            clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
+            clock.millis(),
+            packet.rssi
+        )
+        logger.info { "Handling sensorData from ${packet.from}: $sensorData" }
+
+        val responsePayload = ByteArray(7) { 0 }
+        responsePayload[0] = (existingState?.triggerFirmwareUpdate ?: false).toInt().toByte()
+        responsePayload[1] = (existingState?.triggerTimeAdjustment ?: false).toInt().toByte()
+        responsePayload[2] = (existingState?.triggerReset ?: false).toInt().toByte()
+        val sleepTimeInSeconds = getSleepTimeInSeconds(packet.from)
+        val updatedSensorData = if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
+            logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> $sleepTimeInSeconds" }
+            System.arraycopy(
+                sleepTimeInSeconds.to32Bit(),
+                0,
+                responsePayload,
+                3,
+                4
+            )
+            sensorData.copy(
+                sleepTimeInSeconds = sleepTimeInSeconds
+            )
+        } else {
+            sensorData
+        }
+
+        loRaConnection.send(
+            packet.keyId,
+            packet.from,
+            SENSOR_DATA_RESPONSE_V2,
+            responsePayload,
+            if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+        ) {
+            if (!it) {
+                logger.info { "Could not send sensor-data response" }
+            }
+        }
+
+        influxDBClient.recordSensorData(
+            "sensor",
+            updatedSensorData.toInfluxDbFields(
+                batteryAdcToMv(
+                    packet.from,
+                    updatedSensorData.adcBattery
+                ),
+                packet.from == 10 // no light sensor for #10 - "bak knevegg"
+            ),
+            "room" to getName(packet.from)
+        )
+
+        if (packet.from in outsideSensorIds) {
+            // update combined as well
+            val outsideData = sensors
+                .filter { it.key in outsideSensorIds }
+                .filterNot { it.key == packet.from }
+                .filter { it.value.lastReceivedMessage is SensorData }
+                .map { it.value.lastReceivedMessage as SensorData } + updatedSensorData
+
+            influxDBClient.recordSensorData(
+                "sensor",
+                listOf(
+                    "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
+                    "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
+                ),
+                "room" to "outside_combined"
+            )
+        }
+
+        return SensorState(
+            id = packet.from,
+            firmwareVersion = sensorData.firmwareVersion,
+            triggerTimeAdjustment = false,
+            triggerFirmwareUpdate = false,
+            triggerReset = false,
             lastReceivedMessage = updatedSensorData
         )
     }
@@ -390,6 +519,7 @@ data class SensorState(
     val firmwareVersion: Int,
     val triggerFirmwareUpdate: Boolean,
     val triggerTimeAdjustment: Boolean,
+    val triggerReset: Boolean,
     val lastReceivedMessage: ReceivedMessage? = null
 )
 

@@ -6,7 +6,9 @@ export enum EnvironmentSensorRequestType {
     cancelTimeAdjustment = "cancelTimeAdjustment",
     scheduleFirmwareUpgrade = "scheduleFirmwareUpgrade",
     cancelFirmwareUpgrade = "cancelFirmwareUpgrade",
-    adjustSleepTimeInSeconds = "adjustSleepTimeInSeconds"
+    adjustSleepTimeInSeconds = "adjustSleepTimeInSeconds",
+    scheduleReset = "scheduleReset",
+    cancelReset = "cancelReset"
 }
 
 export class EnvironmentSensorRequest {
@@ -71,9 +73,11 @@ export class EnvironmentSensorState {
     public firmwareUpgradeState: FirmwareUpgradeState | null;
     public firmwareVersion: number;
     public firmwareUpgradeScheduled: boolean;
+    public resetScheduled: boolean;
     public timeAdjustmentSchedule: boolean;
 
-    public constructor(sensorId: number, displayName: string, sleepTimeInSeconds: number, sensorData: EnvironmentSensorData | null, firmwareUpgradeState: FirmwareUpgradeState | null, firmwareVersion: number, firmwareUpgradeScheduled: boolean, timeAdjustmentSchedule: boolean) {
+
+   public constructor(sensorId: number, displayName: string, sleepTimeInSeconds: number, sensorData: EnvironmentSensorData | null, firmwareUpgradeState: FirmwareUpgradeState | null, firmwareVersion: number, firmwareUpgradeScheduled: boolean, resetScheduled: boolean, timeAdjustmentSchedule: boolean) {
         this.sensorId = sensorId;
         this.displayName = displayName;
         this.sleepTimeInSeconds = sleepTimeInSeconds;
@@ -81,6 +85,7 @@ export class EnvironmentSensorState {
         this.firmwareUpgradeState = firmwareUpgradeState;
         this.firmwareVersion = firmwareVersion;
         this.firmwareUpgradeScheduled = firmwareUpgradeScheduled;
+        this.resetScheduled = resetScheduled;
         this.timeAdjustmentSchedule = timeAdjustmentSchedule;
     }
 }

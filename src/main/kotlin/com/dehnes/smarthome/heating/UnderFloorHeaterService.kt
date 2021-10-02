@@ -97,7 +97,7 @@ class UnderFloorHeaterService(
                 var sent = false
                 val ct = CountDownLatch(1)
                 receiveQueue.clear()
-                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUEST, byteArrayOf()) {
+                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUEST, byteArrayOf(), null) {
                     sent = it
                     ct.countDown()
                 }
@@ -161,6 +161,7 @@ class UnderFloorHeaterService(
             loRaAddr,
             LoRaPacketType.FIRMWARE_INFO_RESPONSE,
             byteArray,
+            null
         ) {
             ct.countDown()
             sent = it
@@ -178,6 +179,7 @@ class UnderFloorHeaterService(
             loRaAddr,
             LoRaPacketType.ADJUST_TIME_REQUEST,
             byteArrayOf(),
+            null
         ) {
             ct.countDown()
         }
@@ -230,7 +232,7 @@ class UnderFloorHeaterService(
                 )
 
                 // send chunk
-                loRaConnection.send(packet.keyId, packet.from, LoRaPacketType.FIRMWARE_DATA_RESPONSE, data) { }
+                loRaConnection.send(packet.keyId, packet.from, LoRaPacketType.FIRMWARE_DATA_RESPONSE, data, null) { }
 
                 bytesSent += nextChunkSize
                 sequentNumber++
@@ -407,7 +409,8 @@ class UnderFloorHeaterService(
             keyId,
             loRaAddr,
             LoRaPacketType.HEATER_ON_REQUEST,
-            byteArrayOf()
+            byteArrayOf(),
+            null
         ) {
             sent = it
             ct.countDown()
@@ -424,7 +427,8 @@ class UnderFloorHeaterService(
             keyId,
             loRaAddr,
             LoRaPacketType.HEATER_OFF_REQUEST,
-            byteArrayOf()
+            byteArrayOf(),
+            null
         ) {
             sent = it
             ct.countDown()

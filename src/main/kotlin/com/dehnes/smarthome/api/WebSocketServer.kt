@@ -126,11 +126,19 @@ class WebSocketServer {
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
         EnvironmentSensorRequestType.scheduleTimeAdjustment -> {
-            loRaSensorBoardService.timeAdjustment(request.sensorId!!, true)
+            loRaSensorBoardService.timeAdjustment(request.sensorId, true)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
         EnvironmentSensorRequestType.cancelTimeAdjustment -> {
-            loRaSensorBoardService.timeAdjustment(request.sensorId!!, false)
+            loRaSensorBoardService.timeAdjustment(request.sensorId, false)
+            loRaSensorBoardService.getEnvironmentSensorResponse()
+        }
+        EnvironmentSensorRequestType.scheduleReset -> {
+            loRaSensorBoardService.configureReset(request.sensorId, true)
+            loRaSensorBoardService.getEnvironmentSensorResponse()
+        }
+        EnvironmentSensorRequestType.cancelReset -> {
+            loRaSensorBoardService.configureReset(request.sensorId, false)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
         EnvironmentSensorRequestType.adjustSleepTimeInSeconds -> {
