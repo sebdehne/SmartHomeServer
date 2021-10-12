@@ -14,17 +14,7 @@ enum class DoorStatus(
 ) {
     doorClosed(0),
     doorOpen(1),
-    doorClosing(2),
-    doorOpening(3),
-    doorMiddle(4);
-
-    companion object {
-        fun parse(ch1: Boolean, ch2: Boolean) = when {
-            !ch1 -> doorOpen
-            !ch2 -> doorClosed
-            else -> doorMiddle
-        }
-    }
+    doorClosing(2)
 }
 
 data class GarageRequest(

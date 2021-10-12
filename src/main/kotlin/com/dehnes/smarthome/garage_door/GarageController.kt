@@ -166,7 +166,7 @@ class GarageController(
         val newStatus = if (doorCommandOpen) {
             sent = sendCommandInternal(true)
             autoCloseAfter = System.currentTimeMillis() + (defaultAutoCloseInSeconds * 1000)
-            DoorStatus.doorOpening
+            DoorStatus.doorOpen
         } else {
             sent = sendCommandInternal(false)
             autoCloseAfter = null
@@ -299,14 +299,14 @@ class GarageController(
     private fun handleNewData(dataResponse: LoRaInboundPacketDecrypted) {
         logger.info { "Received: $dataResponse" }
         val receivedDoorStatus =
-            DoorStatus.parse(dataResponse.payload[4].toInt() > 0, dataResponse.payload[5].toInt() > 0)
+            RecevivedDoorStatus.parse(dataResponse.payload[4].toInt() > 0, dataResponse.payload[5].toInt() > 0)
         val receivedLightIsOn = dataResponse.payload[6].toInt() == 0
 
         val currentStatus = lastStatus
         if (currentStatus == null) {
             lastStatus = GarageStatus(
                 receivedLightIsOn,
-                receivedDoorStatus,
+                DoorStatus.doorClosed,
                 null,
                 dataResponse.timestampDelta,
                 dataResponse.payload[8].toInt(),
@@ -314,46 +314,41 @@ class GarageController(
             )
         } else {
             var autoCloseAfter = currentStatus.autoCloseAfter
-            var newStatus = if (receivedDoorStatus == DoorStatus.doorClosed)
-                DoorStatus.doorClosed
-            else
-                DoorStatus.doorOpen
 
-            when {
-                currentStatus.doorStatus == DoorStatus.doorClosed && receivedDoorStatus == DoorStatus.doorClosed -> {
+            val newStatus = when (currentStatus.doorStatus) {
+                DoorStatus.doorClosed -> when (receivedDoorStatus) {
+                    RecevivedDoorStatus.middle, RecevivedDoorStatus.open -> {
+                        // open with another remote? accept
+                        if (autoCloseAfter == null) {
+                            autoCloseAfter = clock.millis() + (defaultAutoCloseInSeconds * 1000)
+                        }
+                        DoorStatus.doorOpen
+                    }
+                    RecevivedDoorStatus.closed -> DoorStatus.doorClosed
                 }
-                currentStatus.doorStatus == DoorStatus.doorClosed && receivedDoorStatus == DoorStatus.doorOpen -> {
-                    // open with another remote? accept
-                    autoCloseAfter = clock.millis() + (defaultAutoCloseInSeconds * 1000)
-                }
-                currentStatus.doorStatus == DoorStatus.doorOpen && receivedDoorStatus == DoorStatus.doorClosed -> {
-                    // closed with another remote? accept
-                    autoCloseAfter = null
-                }
-                currentStatus.doorStatus == DoorStatus.doorOpen && receivedDoorStatus == DoorStatus.doorOpen -> {
-                    if (autoCloseAfter != null && clock.millis() > autoCloseAfter) {
-                        // close now
-                        sendCommandInternal(false)
-                        newStatus = DoorStatus.doorClosing
+                DoorStatus.doorOpen -> when (receivedDoorStatus) {
+                    RecevivedDoorStatus.open, RecevivedDoorStatus.middle -> {
+                        if (autoCloseAfter != null && clock.millis() > autoCloseAfter) {
+                            autoCloseAfter = null
+                            sendCommandInternal(false)
+                            DoorStatus.doorClosing
+                        } else {
+                            DoorStatus.doorOpen
+                        }
+                    }
+                    RecevivedDoorStatus.closed -> {
                         autoCloseAfter = null
-                    } else if (autoCloseAfter == null) {
-                        autoCloseAfter = clock.millis() + (defaultAutoCloseInSeconds * 1000)
+                        DoorStatus.doorClosed
                     }
                 }
-                currentStatus.doorStatus == DoorStatus.doorOpening && receivedDoorStatus == DoorStatus.doorClosed -> {
-                    // OK - do not implement auto-retry for open - giveup
-                    autoCloseAfter = null
-                }
-                currentStatus.doorStatus == DoorStatus.doorOpening && receivedDoorStatus == DoorStatus.doorOpen -> {
-                    // OK - reach desired state
-                }
-                currentStatus.doorStatus == DoorStatus.doorClosing && receivedDoorStatus == DoorStatus.doorClosed -> {
-                    // OK - reach desired state
-                }
-                currentStatus.doorStatus == DoorStatus.doorClosing && receivedDoorStatus == DoorStatus.doorOpen -> {
-                    // OK - retry
-                    sendCommandInternal(false)
-                    newStatus = DoorStatus.doorClosing
+                DoorStatus.doorClosing -> when (receivedDoorStatus) {
+                    RecevivedDoorStatus.middle, RecevivedDoorStatus.open -> {
+                        // retry
+                        sendCommandInternal(false)
+                        autoCloseAfter = null
+                        DoorStatus.doorClosing
+                    }
+                    RecevivedDoorStatus.closed -> DoorStatus.doorClosed
                 }
             }
 
@@ -389,3 +384,17 @@ class GarageController(
     override fun logger() = logger
 }
 
+
+enum class RecevivedDoorStatus {
+    open,
+    closed,
+    middle;
+
+    companion object {
+        fun parse(ch1: Boolean, ch2: Boolean) = when {
+            !ch1 -> open
+            !ch2 -> closed
+            else -> middle
+        }
+    }
+}

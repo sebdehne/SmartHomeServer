@@ -21,9 +21,7 @@ export class GarageStatus {
 export enum DoorStatus {
     doorClosed = "doorClosed",
     doorOpen = "doorOpen",
-    doorClosing = "doorClosing",
-    doorOpening = "doorOpening",
-    doorMiddle = "doorMiddle"
+    doorClosing = "doorClosing"
 }
 
 export class GarageRequest {

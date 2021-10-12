@@ -261,18 +261,10 @@ const DoorStatusComponent = ({ doorStatus }: DoorStatusComponentProps) => {
             color: "#00ff07",
             fontWeight: "bold"
         }}>Closed</span>}
-        {doorStatus === DoorStatus.doorOpening && <span style={{
-            color: "#ff0000",
-            fontWeight: "bold"
-        }}>Opening &#11016;</span>}
         {doorStatus === DoorStatus.doorClosing && <span style={{
             color: "#00ff07",
             fontWeight: "bold"
         }}>Closing &#11018;</span>}
-        {doorStatus === DoorStatus.doorMiddle && <span style={{
-            color: "#ff0000",
-            fontWeight: "bold"
-        }}>Middle &#11016;</span>}
     </>
 };
 

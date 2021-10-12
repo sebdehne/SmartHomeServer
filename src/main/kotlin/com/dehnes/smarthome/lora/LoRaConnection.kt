@@ -488,6 +488,7 @@ enum class LoRaPacketType(
     SENSOR_DATA_REQUEST_V2(18),
     SENSOR_DATA_RESPONSE_V2(19),
 
+    GARAGE_HEATER_DATA_RESPONSEV2(20)
     ;
 
     companion object {

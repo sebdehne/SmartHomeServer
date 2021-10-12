@@ -258,17 +258,22 @@ class UnderFloorHeaterService(
             Mode.OFF -> persistenceService[HEATER_STATUS_KEY] = "off"
             Mode.ON -> persistenceService[HEATER_STATUS_KEY] = "on"
             Mode.MANUAL -> {
-                val targetTemperature = getTargetTemperature()
-                logger.info("Evaluating target temperature now: $targetTemperature")
-                waitUntilCheapHour = tibberService.mustWaitUntil(24 - getMostExpensiveHoursToSkip())
-                if (waitUntilCheapHour == null && sensorData.temperature < targetTemperature * 100) {
-                    logger.info("Setting heater to on")
-                    persistenceService[HEATER_STATUS_KEY] = "on"
-                } else {
-                    logger.info {
-                        "Setting heater to off. waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
-                    }
+                if (sensorData.temperatureError) {
+                    logger.info("Forcing heater off due to temperature error")
                     persistenceService[HEATER_STATUS_KEY] = "off"
+                } else {
+                    val targetTemperature = getTargetTemperature()
+                    logger.info("Evaluating target temperature now: $targetTemperature")
+                    waitUntilCheapHour = tibberService.mustWaitUntil(24 - getMostExpensiveHoursToSkip())
+                    if (waitUntilCheapHour == null && sensorData.temperature < targetTemperature * 100) {
+                        logger.info("Setting heater to on")
+                        persistenceService[HEATER_STATUS_KEY] = "on"
+                    } else {
+                        logger.info {
+                            "Setting heater to off. waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
+                        }
+                        persistenceService[HEATER_STATUS_KEY] = "off"
+                    }
                 }
             }
         }
@@ -303,7 +308,8 @@ class UnderFloorHeaterService(
             sensorData.timestampDelta,
             UnderFloorHeaterStatusFromController(
                 clock.millis(),
-                sensorData.temperature
+                sensorData.temperature,
+                sensorData.temperatureError
             )
         )
 
@@ -379,6 +385,7 @@ class UnderFloorHeaterService(
             "sensor",
             listOf(
                 "temperature" to sensorData.toTemperature(),
+                "temperatureError" to (if (sensorData.temperatureError) 1 else 0).toString(),
                 "heater_status" to (if (sensorData.heaterIsOn) 1 else 0).toString(),
             ),
             "room" to "heating_controller"
@@ -470,6 +477,7 @@ data class TemperatureAndHeaterStatus(
 
 data class UnderFloorSensorData(
     val temperature: Int,
+    val temperatureError: Boolean,
     val heaterIsOn: Boolean,
     val timestampDelta: Long,
     val receivedAt: Long
@@ -485,9 +493,17 @@ data class UnderFloorSensorData(
             val temperatureRaw = allocate.int
             val temperature = temperatureRaw.toFloat() / 16F
             val heaterStatus = loRaInboundPacketDecrypted.payload[7].toInt() > 0
+            val temperatureError =
+                if (loRaInboundPacketDecrypted.type == LoRaPacketType.GARAGE_HEATER_DATA_RESPONSEV2) {
+                    loRaInboundPacketDecrypted.payload[9].toInt() > 0
+                } else {
+                    false
+                }
+
 
             return UnderFloorSensorData(
                 (temperature * 100).toInt(),
+                temperatureError,
                 heaterStatus,
                 loRaInboundPacketDecrypted.timestampDelta,
                 now
@@ -495,10 +511,10 @@ data class UnderFloorSensorData(
         }
     }
 
-    fun toTemperature() = (temperature.toFloat() / 100).toString()
+    fun toTemperature() = if (temperatureError) "0" else (temperature.toFloat() / 100).toString()
 
     override fun toString(): String {
-        return "UnderFloorSensorData(temperature=${toTemperature()}, heaterIsOn=$heaterIsOn, receivedAt=$receivedAt)"
+        return "UnderFloorSensorData(temperature=${toTemperature()}, heaterIsOn=$heaterIsOn, receivedAt=$receivedAt, temperatureError=$temperatureError)"
     }
 
 }

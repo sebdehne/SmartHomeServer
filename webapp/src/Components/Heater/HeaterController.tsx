@@ -223,11 +223,18 @@ const HeaterController = () => {
                                 </TableCell>
                             </TableRow>
                             {underFloorHeaterStatus.underFloorHeaterStatus.fromController &&
-                            <TableRow>
-                                <TableCell component="th" scope="row">Current temperature:</TableCell>
-                                <TableCell
-                                    align="right">{underFloorHeaterStatus.underFloorHeaterStatus.fromController.currentTemperature / 100} &deg;C</TableCell>
-                            </TableRow>
+                            <>
+                                <TableRow>
+                                    <TableCell component="th" scope="row">Current temperature:</TableCell>
+                                    <TableCell
+                                        align="right">{underFloorHeaterStatus.underFloorHeaterStatus.fromController.currentTemperature / 100} &deg;C</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell component="th" scope="row">Current temperatureError:</TableCell>
+                                    <TableCell
+                                        align="right">{underFloorHeaterStatus.underFloorHeaterStatus.fromController.temperatureError ? 'true' : 'false'}</TableCell>
+                                </TableRow>
+                            </>
                             }
 
                             <TableRow>

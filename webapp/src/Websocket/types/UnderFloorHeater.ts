@@ -70,11 +70,13 @@ export class UnderFloorHeaterStatus {
 export class UnderFloorHeaterStatusFromController {
     public receivedAt: number;
     public currentTemperature: number;
+    public temperatureError: boolean;
 
 
-    public constructor(receivedAt: number, currentTemperature: number) {
+    public constructor(receivedAt: number, currentTemperature: number, temperatureError: boolean) {
         this.receivedAt = receivedAt;
         this.currentTemperature = currentTemperature;
+        this.temperatureError = temperatureError;
     }
 }
 
