@@ -35,10 +35,9 @@ fun readInt32Bits(buf: ByteArray, offset: Int): Int {
 
 fun readLong32Bits(buf: ByteArray, offset: Int): Long {
     val byteBuffer = ByteBuffer.allocate(8)
-    byteBuffer.put(byteArrayOf(0, 0, 0, 0), 0, 4)
     byteBuffer.put(buf, offset, 4)
     byteBuffer.flip()
-    return byteBuffer.getLong(0)
+    return byteBuffer.getInt(0).toLong()
 }
 
 fun Boolean.toInt() = if (this) 1 else 0
