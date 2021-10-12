@@ -39,6 +39,7 @@ class EnvironmentSensorService(
                 val updatedState = when (packet.type) {
                     SENSOR_DATA_REQUEST -> onSensorData(currentState, packet)
                     SENSOR_DATA_REQUEST_V2 -> onSensorDataV2(currentState, packet)
+                    SENSOR_DATA_REQUEST_V3 -> onSensorDataV3(currentState, packet)
                     FIRMWARE_INFO_REQUEST -> if (currentState == null) null else onFirmwareInfoRequest(currentState, packet)
                     FIRMWARE_DATA_REQUEST -> if (currentState == null) null else onFirmwareDataRequest(currentState, packet)
                     else -> null
@@ -108,6 +109,7 @@ class EnvironmentSensorService(
             getSleepTimeInSeconds(sensorId),
             if (lastReceivedMessage is SensorData) EnvironmentSensorData(
                 lastReceivedMessage.temperature,
+                lastReceivedMessage.temperatureError,
                 lastReceivedMessage.humidity,
                 batteryAdcToMv(sensorId, lastReceivedMessage.adcBattery),
                 lastReceivedMessage.adcLight,
@@ -325,6 +327,7 @@ class EnvironmentSensorService(
         }
         val sensorData = SensorData(
             readLong32Bits(packet.payload, 0),
+            false,
             readLong32Bits(packet.payload, 4),
             readLong32Bits(packet.payload, 8),
             readLong32Bits(packet.payload, 12),
@@ -419,6 +422,103 @@ class EnvironmentSensorService(
         }
         val sensorData = SensorData(
             readLong32Bits(packet.payload, 0),
+            false,
+            readLong32Bits(packet.payload, 4),
+            readLong32Bits(packet.payload, 8),
+            readLong32Bits(packet.payload, 12),
+            readLong32Bits(packet.payload, 16),
+            packet.payload[20].toInt(),
+            clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
+            clock.millis(),
+            packet.rssi
+        )
+        logger.info { "Handling sensorData from ${packet.from}: $sensorData" }
+
+        val responsePayload = ByteArray(7) { 0 }
+        responsePayload[0] = (existingState?.triggerFirmwareUpdate ?: false).toInt().toByte()
+        responsePayload[1] = (existingState?.triggerTimeAdjustment ?: false).toInt().toByte()
+        responsePayload[2] = (existingState?.triggerReset ?: false).toInt().toByte()
+        val sleepTimeInSeconds = getSleepTimeInSeconds(packet.from)
+        val updatedSensorData = if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
+            logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> $sleepTimeInSeconds" }
+            System.arraycopy(
+                sleepTimeInSeconds.to32Bit(),
+                0,
+                responsePayload,
+                3,
+                4
+            )
+            sensorData.copy(
+                sleepTimeInSeconds = sleepTimeInSeconds
+            )
+        } else {
+            sensorData
+        }
+
+        loRaConnection.send(
+            packet.keyId,
+            packet.from,
+            SENSOR_DATA_RESPONSE_V2,
+            responsePayload,
+            if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+        ) {
+            if (!it) {
+                logger.info { "Could not send sensor-data response" }
+            }
+        }
+
+        influxDBClient.recordSensorData(
+            "sensor",
+            updatedSensorData.toInfluxDbFields(
+                batteryAdcToMv(
+                    packet.from,
+                    updatedSensorData.adcBattery
+                ),
+                packet.from == 10 // no light sensor for #10 - "bak knevegg"
+            ),
+            "room" to getName(packet.from)
+        )
+
+        if (packet.from in outsideSensorIds) {
+            // update combined as well
+            val outsideData = sensors
+                .filter { it.key in outsideSensorIds }
+                .filterNot { it.key == packet.from }
+                .filter { it.value.lastReceivedMessage is SensorData }
+                .map { it.value.lastReceivedMessage as SensorData } + updatedSensorData
+
+            influxDBClient.recordSensorData(
+                "sensor",
+                listOf(
+                    "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
+                    "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
+                ),
+                "room" to "outside_combined"
+            )
+        }
+
+        return SensorState(
+            id = packet.from,
+            firmwareVersion = sensorData.firmwareVersion,
+            triggerTimeAdjustment = false,
+            triggerFirmwareUpdate = false,
+            triggerReset = false,
+            lastReceivedMessage = updatedSensorData
+        )
+    }
+
+    private fun onSensorDataV3(existingState: SensorState?, packet: LoRaInboundPacketDecrypted): SensorState? {
+        if (packet.payload.size != 22) {
+            logger.warn { "Forced to ignore packet with invalid payloadSize=${packet.payload.size} != 22" }
+            return existingState
+        }
+        if (isIgnored(packet.from)) {
+            logger.warn { "Ignoring $packet" }
+            return existingState
+        }
+        val sensorData = SensorData(
+            readLong32Bits(packet.payload, 0),
+            packet.payload[21].toInt() > 0,
             readLong32Bits(packet.payload, 4),
             readLong32Bits(packet.payload, 8),
             readLong32Bits(packet.payload, 12),
@@ -526,6 +626,7 @@ data class SensorState(
 
 data class SensorData(
     val temperature: Long,
+    val temperatureError: Boolean,
     val humidity: Long,
     val adcBattery: Long,
     val adcLight: Long,
@@ -537,6 +638,7 @@ data class SensorData(
 ) : ReceivedMessage() {
     fun toInfluxDbFields(batteryAdcToMv: Long, skipLight: Boolean) = listOf(
         "temperature" to (temperature.toFloat() / 100).toString(),
+        "temperatureError" to (if (temperatureError) 1 else 0).toString(),
         "humidity" to (humidity.toFloat() / 100).toString(),
         "light" to if (skipLight) 0 else adcLight,
         "battery_volt" to (batteryAdcToMv.toFloat() / 1000).toString(),

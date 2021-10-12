@@ -53,6 +53,7 @@ data class FirmwareUpgradeState(
 
 data class EnvironmentSensorData(
     val temperature: Long,
+    val temperatureError: Boolean,
     val humidity: Long,
     val batteryMilliVolts: Long,
     val adcLight: Long,

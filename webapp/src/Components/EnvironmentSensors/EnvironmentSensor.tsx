@@ -62,6 +62,9 @@ export const getSensorStatus = (sensor: EnvironmentSensorState, currentMilliSeco
         if (sensor.sensorData!!.batteryMilliVolts < 3400) {
             status = SensorStatus.yellow;
         }
+        if (sensor.sensorData!!.temperatureError) {
+            status = SensorStatus.yellow;
+        }
     }
 
     if (deltaSeconds > sensor.sleepTimeInSeconds) {
@@ -202,6 +205,11 @@ export const EnvironmentSensor = ({
                                             <TableCell component="th" scope="row">Temperature</TableCell>
                                             <TableCell
                                                 align="right">{(sensor.sensorData!!.temperature / 100).toFixed(2)} &deg;C</TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell component="th" scope="row">Temperature Error</TableCell>
+                                            <TableCell
+                                                align="right">{sensor.sensorData.temperatureError ? 'true' : 'false'}</TableCell>
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Humidity</TableCell>

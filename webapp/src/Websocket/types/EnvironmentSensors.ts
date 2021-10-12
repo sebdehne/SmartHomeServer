@@ -45,6 +45,7 @@ export class FirmwareUpgradeState {
 
 export class EnvironmentSensorData {
     public temperature: number;
+    public temperatureError: boolean;
     public humidity: number;
     public batteryMilliVolts: number;
     public adcLight: number;
@@ -53,8 +54,9 @@ export class EnvironmentSensorData {
     public receivedAt: number;
     public rssi: number;
 
-    public constructor(temperature: number, humidity: number, batteryMilliVolts: number, adcLight: number, sleepTimeInSeconds: number, timestampDelta: number, receivedAt: number, rssi: number) {
+    public constructor(temperature: number, temperatureError: boolean, humidity: number, batteryMilliVolts: number, adcLight: number, sleepTimeInSeconds: number, timestampDelta: number, receivedAt: number, rssi: number) {
         this.temperature = temperature;
+        this.temperatureError = temperatureError;
         this.humidity = humidity;
         this.batteryMilliVolts = batteryMilliVolts;
         this.adcLight = adcLight;
