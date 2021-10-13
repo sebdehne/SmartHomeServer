@@ -232,7 +232,7 @@ const HeaterController = () => {
                                 <TableRow>
                                     <TableCell component="th" scope="row">Current temperatureError:</TableCell>
                                     <TableCell
-                                        align="right">{underFloorHeaterStatus.underFloorHeaterStatus.fromController.temperatureError ? 'true' : 'false'}</TableCell>
+                                        align="right">{underFloorHeaterStatus.underFloorHeaterStatus.fromController.temperatureError}</TableCell>
                                 </TableRow>
                             </>
                             }

@@ -97,7 +97,7 @@ class UnderFloorHeaterService(
                 var sent = false
                 val ct = CountDownLatch(1)
                 receiveQueue.clear()
-                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUEST, byteArrayOf(), null) {
+                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUESTV2, byteArrayOf(1), null) {
                     sent = it
                     ct.countDown()
                 }
@@ -258,8 +258,8 @@ class UnderFloorHeaterService(
             Mode.OFF -> persistenceService[HEATER_STATUS_KEY] = "off"
             Mode.ON -> persistenceService[HEATER_STATUS_KEY] = "on"
             Mode.MANUAL -> {
-                if (sensorData.temperatureError) {
-                    logger.info("Forcing heater off due to temperature error")
+                if (sensorData.temperatureError > 0) {
+                    logger.info("Forcing heater off due to temperature error=${sensorData.temperatureError}")
                     persistenceService[HEATER_STATUS_KEY] = "off"
                 } else {
                     val targetTemperature = getTargetTemperature()
@@ -385,7 +385,7 @@ class UnderFloorHeaterService(
             "sensor",
             listOf(
                 "temperature" to sensorData.toTemperature(),
-                "temperatureError" to (if (sensorData.temperatureError) 1 else 0).toString(),
+                "temperatureError" to sensorData.temperatureError.toString(),
                 "heater_status" to (if (sensorData.heaterIsOn) 1 else 0).toString(),
             ),
             "room" to "heating_controller"
@@ -477,7 +477,7 @@ data class TemperatureAndHeaterStatus(
 
 data class UnderFloorSensorData(
     val temperature: Int,
-    val temperatureError: Boolean,
+    val temperatureError: Int,
     val heaterIsOn: Boolean,
     val timestampDelta: Long,
     val receivedAt: Long
@@ -495,9 +495,9 @@ data class UnderFloorSensorData(
             val heaterStatus = loRaInboundPacketDecrypted.payload[7].toInt() > 0
             val temperatureError =
                 if (loRaInboundPacketDecrypted.type == LoRaPacketType.GARAGE_HEATER_DATA_RESPONSEV2) {
-                    loRaInboundPacketDecrypted.payload[9].toInt() > 0
+                    loRaInboundPacketDecrypted.payload[9].toInt()
                 } else {
-                    false
+                    0
                 }
 
 
@@ -511,7 +511,7 @@ data class UnderFloorSensorData(
         }
     }
 
-    fun toTemperature() = if (temperatureError) "0" else (temperature.toFloat() / 100).toString()
+    fun toTemperature() = if (temperatureError > 0) "0" else (temperature.toFloat() / 100).toString()
 
     override fun toString(): String {
         return "UnderFloorSensorData(temperature=${toTemperature()}, heaterIsOn=$heaterIsOn, receivedAt=$receivedAt, temperatureError=$temperatureError)"

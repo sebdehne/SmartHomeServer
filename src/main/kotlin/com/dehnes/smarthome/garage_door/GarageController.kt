@@ -272,7 +272,7 @@ class GarageController(
                 var sent = false
                 val ct = CountDownLatch(1)
                 receiveQueue.clear()
-                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUEST, byteArrayOf(), null) {
+                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUESTV2, byteArrayOf(0), null) {
                     ct.countDown()
                     sent = it
                 }

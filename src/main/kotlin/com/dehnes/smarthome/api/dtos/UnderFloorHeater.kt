@@ -42,7 +42,7 @@ data class UnderFloorHeaterStatus(
 data class UnderFloorHeaterStatusFromController(
     val receivedAt: Long,
     val currentTemperature: Int,
-    val temperatureError: Boolean
+    val temperatureError: Int
 )
 
 enum class UnderFloorHeaterMode(val mode: Mode) {
