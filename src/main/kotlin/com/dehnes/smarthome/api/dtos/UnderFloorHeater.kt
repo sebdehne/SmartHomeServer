@@ -8,7 +8,7 @@ data class UnderFloorHeaterRequest(
     val type: UnderFloorHeaterRequestType,
     val newMode: UnderFloorHeaterMode?,
     val newTargetTemperature: Int?,
-    val newMostExpensiveHoursToSkip: Int?,
+    val skipPercentExpensiveHours: Int?,
     val firmwareBased64Encoded: String?,
 )
 
@@ -24,7 +24,7 @@ enum class UnderFloorHeaterRequestType {
     getStatus,
     updateMode,
     updateTargetTemperature,
-    updateMostExpensiveHoursToSkip,
+    setSkipPercentExpensiveHours,
     adjustTime,
     firmwareUpgrade
 }
@@ -33,7 +33,7 @@ data class UnderFloorHeaterStatus(
     val mode: UnderFloorHeaterMode,
     val status: OnOff,
     val targetTemperature: Int,
-    val mostExpensiveHoursToSkip: Int,
+    val skipPercentExpensiveHours: Int,
     val waitUntilCheapHour: Long?,
     val timestampDelta: Long,
     val fromController: UnderFloorHeaterStatusFromController?

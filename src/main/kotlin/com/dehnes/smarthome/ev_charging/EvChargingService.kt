@@ -119,14 +119,14 @@ class EvChargingService(
         persistenceService["EvChargingService.client.mode.$clientId", EvChargingMode.ChargeDuringCheapHours.name]!!
             .let { EvChargingMode.valueOf(it) }
 
-    fun getNumberOfHoursRequiredFor(clientId: String) = persistenceService.get(
-        "EvChargingService.client.numberOfHoursRequired.$clientId",
-        "4"
+    fun getSkipPercentExpensiveHours(clientId: String) = persistenceService.get(
+        "EvChargingService.client.skipPercentExpensiveHours.$clientId",
+        "40"
     )!!.toInt()
 
-    fun setNumberOfHoursRequiredFor(clientId: String, numberOfHoursRequiredFor: Int): Boolean {
-        persistenceService["EvChargingService.client.numberOfHoursRequired.$clientId"] =
-            numberOfHoursRequiredFor.toString()
+    fun setSkipPercentExpensiveHours(clientId: String, skipPercentExpensiveHours: Int): Boolean {
+        persistenceService["EvChargingService.client.skipPercentExpensiveHours.$clientId"] =
+            skipPercentExpensiveHours.toString()
         return true
     }
 
@@ -180,7 +180,7 @@ class EvChargingService(
          * B) Figure out if the charging stations is allowed to charge at this point in time
          */
         val mode = getMode(clientId)
-        val nextCheapHour = tibberService.mustWaitUntil(getNumberOfHoursRequiredFor(clientId))
+        val nextCheapHour = tibberService.mustWaitUntilV2(getSkipPercentExpensiveHours(clientId))
         var reasonCannotCharge: String? = null
         val canCharge = when {
             mode == EvChargingMode.ON -> true
@@ -448,7 +448,7 @@ class EvChargingService(
         EVChargingStationConfig(
             getMode(internalState.clientId),
             internalState.loadSharingPriority,
-            getNumberOfHoursRequiredFor(internalState.clientId)
+            getSkipPercentExpensiveHours(internalState.clientId)
         ),
         internalState.evChargingStationClient
     )

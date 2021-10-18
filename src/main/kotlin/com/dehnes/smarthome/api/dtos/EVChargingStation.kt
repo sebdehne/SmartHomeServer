@@ -19,7 +19,7 @@ enum class EvChargingStationRequestType {
 
     setMode,
     setLoadSharingPriority,
-    setNumberOfHoursRequiredFor
+    setSkipPercentExpensiveHours
 }
 
 data class EvChargingStationRequest(
@@ -29,7 +29,7 @@ data class EvChargingStationRequest(
 
     val newMode: EvChargingMode?,
     val newLoadSharingPriority: LoadSharingPriority?,
-    val newNumberOfHoursRequiredFor: Int?
+    val skipPercentExpensiveHours: Int?
 )
 
 data class EvChargingStationResponse(
@@ -74,7 +74,7 @@ data class EvChargingStationData(
 data class EVChargingStationConfig(
     val mode: EvChargingMode,
     val loadSharingPriority: LoadSharingPriority,
-    val numberOfHoursRequiredFor: Int
+    val skipPercentExpensiveHours: Int
 )
 
 enum class EvChargingMode {

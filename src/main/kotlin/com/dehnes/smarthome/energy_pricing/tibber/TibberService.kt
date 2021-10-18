@@ -79,6 +79,43 @@ class TibberService(
 
     }
 
+    @Synchronized
+    fun mustWaitUntilV2(skipPercentExpensiveHours: Int): Instant? {
+        check(skipPercentExpensiveHours in 0..100)
+        ensureCacheLoaded()
+        val now = Instant.now(clock)
+
+        val futurePrices = priceCache
+            .sortedBy { it.from }
+            .filter { it.to.isAfter(now) }
+
+        val allowedHours = futurePrices
+            .sortedBy { it.price }
+            .let { sortedHours ->
+                val keep = (100 - skipPercentExpensiveHours) * sortedHours.size / 100
+                if (keep < sortedHours.size) {
+                    sortedHours.subList(0, keep)
+                } else {
+                    sortedHours
+                }
+            }
+            .sortedBy { it.from }
+
+        val nextCheapHour = allowedHours.firstOrNull()
+        return when {
+            nextCheapHour == null -> {
+                val endOfKnownPrices = priceCache.maxByOrNull { it.from }?.to
+                logger.info { "No cheap enough hour available. Using endOfKnownPrices=$endOfKnownPrices" }
+                endOfKnownPrices
+            }
+            nextCheapHour.isValidFor(now) -> {
+                null
+            }
+            else -> nextCheapHour.from
+        }
+
+    }
+
     private fun getCurrentPrice(): Double? {
         ensureCacheLoaded()
 

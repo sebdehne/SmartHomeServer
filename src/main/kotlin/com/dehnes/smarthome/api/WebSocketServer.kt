@@ -170,10 +170,10 @@ class WebSocketServer {
             configUpdated = evChargingService.updateMode(request.clientId!!, request.newMode!!),
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
-        EvChargingStationRequestType.setNumberOfHoursRequiredFor -> EvChargingStationResponse(
-            configUpdated = evChargingService.setNumberOfHoursRequiredFor(
+        EvChargingStationRequestType.setSkipPercentExpensiveHours -> EvChargingStationResponse(
+            configUpdated = evChargingService.setSkipPercentExpensiveHours(
                 request.clientId!!,
-                request.newNumberOfHoursRequiredFor!!
+                request.skipPercentExpensiveHours!!
             ),
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
@@ -186,8 +186,8 @@ class WebSocketServer {
                 updateUnderFloorHeaterModeSuccess = success
             )
         }
-        UnderFloorHeaterRequestType.updateMostExpensiveHoursToSkip -> {
-            val success = underFloopHeaterService.updateMostExpensiveHoursToSkip(request.newMostExpensiveHoursToSkip!!)
+        UnderFloorHeaterRequestType.setSkipPercentExpensiveHours -> {
+            val success = underFloopHeaterService.setEkipPercentExpensiveHours(request.skipPercentExpensiveHours!!)
             underFloopHeaterService.getCurrentState().copy(
                 updateUnderFloorHeaterModeSuccess = success
             )

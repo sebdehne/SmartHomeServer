@@ -100,14 +100,14 @@ export const EvChargingStation = ({
         priority,
         null
     ));
-    const changeNumberOfHoursRequiredFor = (delta: number) => sendUpdate(
+    const setSkipPercentExpensiveHours = (delta: number) => sendUpdate(
         new EvChargingStationRequest(
-            EvChargingStationRequestType.setNumberOfHoursRequiredFor,
+            EvChargingStationRequestType.setSkipPercentExpensiveHours,
             station.clientConnection.clientId,
             null,
             null,
             null,
-            station.config.numberOfHoursRequiredFor + delta
+            station.config.skipPercentExpensiveHours + delta
         )
     );
 
@@ -179,19 +179,19 @@ export const EvChargingStation = ({
                     <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
 
                         <Grid item xs={4}>
-                            <span>Minimum hours/ day: </span>
-                            <span>{station.config.numberOfHoursRequiredFor}</span>
+                            <span>Skip most expensive hours %/day: </span>
+                            <span>{station.config.skipPercentExpensiveHours}</span>
                         </Grid>
                         <Grid item xs={8}>
                             <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
                                 margin: "10px"
                             }}>
                                 <Button
-                                    disabled={station.config.numberOfHoursRequiredFor <= 1}
-                                    onClick={() => changeNumberOfHoursRequiredFor(-1)}>-</Button>
+                                    disabled={station.config.skipPercentExpensiveHours <= 0}
+                                    onClick={() => setSkipPercentExpensiveHours(-1)}>-</Button>
                                 <Button
-                                    disabled={station.config.numberOfHoursRequiredFor >= 24}
-                                    onClick={() => changeNumberOfHoursRequiredFor(1)}>+</Button>
+                                    disabled={station.config.skipPercentExpensiveHours >= 100}
+                                    onClick={() => setSkipPercentExpensiveHours(1)}>+</Button>
                             </ButtonGroup>
                         </Grid>
                     </Grid>

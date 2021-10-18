@@ -19,7 +19,7 @@ export enum EvChargingStationRequestType {
 
     setMode = "setMode",
     setLoadSharingPriority = "setLoadSharingPriority",
-    setNumberOfHoursRequiredFor = "setNumberOfHoursRequiredFor"
+    setSkipPercentExpensiveHours = "setSkipPercentExpensiveHours"
 }
 
 export class EvChargingStationRequest {
@@ -28,16 +28,16 @@ export class EvChargingStationRequest {
     public firmwareBased64Encoded: string | null;
     public newMode: EvChargingMode | null;
     public newLoadSharingPriority: LoadSharingPriority | null;
-    public newNumberOfHoursRequiredFor: number | null;
+    public skipPercentExpensiveHours: number | null;
 
 
-    public constructor(type: EvChargingStationRequestType, clientId: string | null, firmwareBased64Encoded: string | null, newMode: EvChargingMode | null, newLoadSharingPriority: LoadSharingPriority | null, newNumberOfHoursRequiredFor: number | null) {
+    public constructor(type: EvChargingStationRequestType, clientId: string | null, firmwareBased64Encoded: string | null, newMode: EvChargingMode | null, newLoadSharingPriority: LoadSharingPriority | null, skipPercentExpensiveHours: number | null) {
         this.type = type;
         this.clientId = clientId;
         this.firmwareBased64Encoded = firmwareBased64Encoded;
         this.newMode = newMode;
         this.newLoadSharingPriority = newLoadSharingPriority;
-        this.newNumberOfHoursRequiredFor = newNumberOfHoursRequiredFor;
+        this.skipPercentExpensiveHours = skipPercentExpensiveHours;
     }
 }
 
@@ -126,13 +126,13 @@ export class EvChargingStationData {
 export class EVChargingStationConfig {
     public mode: EvChargingMode;
     public loadSharingPriority: LoadSharingPriority;
-    public numberOfHoursRequiredFor: number;
+    public skipPercentExpensiveHours: number;
 
 
-    public constructor(mode: EvChargingMode, loadSharingPriority: LoadSharingPriority, numberOfHoursRequiredFor: number) {
+    public constructor(mode: EvChargingMode, loadSharingPriority: LoadSharingPriority, skipPercentExpensiveHours: number) {
         this.mode = mode;
         this.loadSharingPriority = loadSharingPriority;
-        this.numberOfHoursRequiredFor = numberOfHoursRequiredFor;
+        this.skipPercentExpensiveHours = skipPercentExpensiveHours;
     }
 }
 

@@ -10,14 +10,14 @@ export class UnderFloorHeaterRequest {
     public type: UnderFloorHeaterRequestType;
     public newMode: UnderFloorHeaterMode | null;
     public newTargetTemperature: number | null;
-    public newMostExpensiveHoursToSkip: number | null;
+    public skipPercentExpensiveHours: number | null;
     public firmwareBased64Encoded: string | null;
 
-    public constructor(type: UnderFloorHeaterRequestType, newMode: UnderFloorHeaterMode | null, newTargetTemperature: number | null, newMostExpensiveHoursToSkip: number | null, firmwareBased64Encoded: string | null) {
+    public constructor(type: UnderFloorHeaterRequestType, newMode: UnderFloorHeaterMode | null, newTargetTemperature: number | null, skipPercentExpensiveHours: number | null, firmwareBased64Encoded: string | null) {
         this.type = type;
         this.newMode = newMode;
         this.newTargetTemperature = newTargetTemperature;
-        this.newMostExpensiveHoursToSkip = newMostExpensiveHoursToSkip;
+        this.skipPercentExpensiveHours = skipPercentExpensiveHours;
         this.firmwareBased64Encoded = firmwareBased64Encoded;
     }
 }
@@ -42,7 +42,7 @@ export enum UnderFloorHeaterRequestType {
     getStatus = "getStatus",
     updateMode = "updateMode",
     updateTargetTemperature = "updateTargetTemperature",
-    updateMostExpensiveHoursToSkip = "updateMostExpensiveHoursToSkip",
+    setSkipPercentExpensiveHours = "setSkipPercentExpensiveHours",
     adjustTime = "adjustTime",
     firmwareUpgrade = "firmwareUpgrade"
 }
@@ -51,16 +51,16 @@ export class UnderFloorHeaterStatus {
     public mode: UnderFloorHeaterMode;
     public status: OnOff;
     public targetTemperature: number;
-    public mostExpensiveHoursToSkip: number;
+    public skipPercentExpensiveHours: number;
     public waitUntilCheapHour: number | null;
     public timestampDelta: number;
     public fromController: UnderFloorHeaterStatusFromController | null;
 
-    public constructor(mode: UnderFloorHeaterMode, status: OnOff, targetTemperature: number, mostExpensiveHoursToSkip: number, waitUntilCheapHour: number | null, timestampDelta: number, fromController: UnderFloorHeaterStatusFromController | null) {
+    public constructor(mode: UnderFloorHeaterMode, status: OnOff, targetTemperature: number, skipPercentExpensiveHours: number, waitUntilCheapHour: number | null, timestampDelta: number, fromController: UnderFloorHeaterStatusFromController | null) {
         this.mode = mode;
         this.status = status;
         this.targetTemperature = targetTemperature;
-        this.mostExpensiveHoursToSkip = mostExpensiveHoursToSkip;
+        this.skipPercentExpensiveHours = skipPercentExpensiveHours;
         this.waitUntilCheapHour = waitUntilCheapHour;
         this.timestampDelta = timestampDelta;
         this.fromController = fromController;

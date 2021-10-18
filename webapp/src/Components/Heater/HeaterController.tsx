@@ -238,30 +238,30 @@ const HeaterController = () => {
                             }
 
                             <TableRow>
-                                <TableCell component="th" scope="row">Expensive hours to skip:</TableCell>
+                                <TableCell component="th" scope="row">Skip most expensive hours %/day:</TableCell>
                                 <TableCell align="right">
-                                    {underFloorHeaterStatus.underFloorHeaterStatus.mostExpensiveHoursToSkip}
+                                    {underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours}
                                     <ButtonGroup variant="contained"
                                                  aria-label="contained primary button group"
                                                  style={{
                                                      margin: "10px"
                                                  }}>
                                         <Button
-                                            disabled={underFloorHeaterStatus.underFloorHeaterStatus.mostExpensiveHoursToSkip <= 1}
+                                            disabled={underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours <= 0}
                                             onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                                UnderFloorHeaterRequestType.updateMostExpensiveHoursToSkip,
+                                                UnderFloorHeaterRequestType.setSkipPercentExpensiveHours,
                                                 null,
                                                 null,
-                                                underFloorHeaterStatus.underFloorHeaterStatus.mostExpensiveHoursToSkip - 1,
+                                                underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours - 1,
                                                 null
                                             ))}>-</Button>
                                         <Button
-                                            disabled={underFloorHeaterStatus.underFloorHeaterStatus.mostExpensiveHoursToSkip >= 24}
+                                            disabled={underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours >= 100}
                                             onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                                UnderFloorHeaterRequestType.updateMostExpensiveHoursToSkip,
+                                                UnderFloorHeaterRequestType.setSkipPercentExpensiveHours,
                                                 null,
                                                 null,
-                                                underFloorHeaterStatus.underFloorHeaterStatus.mostExpensiveHoursToSkip + 1,
+                                                underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours + 1,
                                                 null
                                             ))}>+</Button>
                                     </ButtonGroup>

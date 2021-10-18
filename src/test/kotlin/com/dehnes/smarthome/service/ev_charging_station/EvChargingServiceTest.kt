@@ -34,7 +34,7 @@ internal class EvChargingServiceTest {
 
     init {
         every {
-            tibberService.mustWaitUntil(any())
+            tibberService.mustWaitUntilV2(any())
         } answers {
             mustWaitUntil
         }

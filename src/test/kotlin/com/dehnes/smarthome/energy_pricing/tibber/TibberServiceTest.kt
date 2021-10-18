@@ -20,7 +20,7 @@ internal class TibberServiceTest {
             persistenceService.get("tibberAuthBearer", any())
         } returns "<insert-token>"
 
-        var time = Instant.parse("2021-04-01T22:34:00.000Z")
+        var time = Instant.parse("2021-10-18T06:34:00.000Z")
         val clock = mockk<Clock>()
         every {
             clock.instant()
@@ -36,7 +36,8 @@ internal class TibberServiceTest {
             Executors.newSingleThreadExecutor()
         )
 
-        val mustWaitUntil = tibberService.mustWaitUntil(2)
-        println(mustWaitUntil)
+        (0..10).map { it * 10 }.forEach { p ->
+            println("p=$p" + tibberService.mustWaitUntilV2(p))
+        }
     }
 }
