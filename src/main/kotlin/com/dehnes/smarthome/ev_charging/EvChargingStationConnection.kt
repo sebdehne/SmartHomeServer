@@ -3,6 +3,7 @@ package com.dehnes.smarthome.ev_charging
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.utils.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -12,6 +13,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.time.Clock
+import java.time.Instant
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
@@ -307,28 +309,33 @@ class EvChargingStationConnection(
 
     private fun recordData(dataResponse: DataResponse, evChargingStationClient: EvChargingStationClient) {
         influxDBClient.recordSensorData(
-            "evChargingDataV2",
-            listOf(
-                "conactorOn" to dataResponse.conactorOn.toInt(),
-                "pwmPercent" to dataResponse.pwmPercent,
-                "pilotVoltage" to dataResponse.pilotVoltage.voltValue,
-                "proximityPilotAmps" to dataResponse.proximityPilotAmps.ampValue,
-                "phase1Millivolts" to dataResponse.phase1Millivolts,
-                "phase2Millivolts" to dataResponse.phase2Millivolts,
-                "phase3Millivolts" to dataResponse.phase3Millivolts,
-                "phase1Milliamps" to dataResponse.phase1Milliamps,
-                "phase2Milliamps" to dataResponse.phase2Milliamps,
-                "phase3Milliamps" to dataResponse.phase3Milliamps,
-                "phase1VoltsAdc" to dataResponse.phase1VoltsAdc,
-                "phase2VoltsAdc" to dataResponse.phase2VoltsAdc,
-                "phase3VoltsAdc" to dataResponse.phase3VoltsAdc,
-                "phase1AmpsAdc" to dataResponse.phase1AmpsAdc,
-                "phase2AmpsAdc" to dataResponse.phase2AmpsAdc,
-                "phase3AmpsAdc" to dataResponse.phase3AmpsAdc,
-                "wifiRSSI" to dataResponse.wifiRSSI,
-                "systemUptime" to dataResponse.systemUptime
-            ),
-            "clientId" to evChargingStationClient.clientId
+            InfluxDBRecord(
+                Instant.ofEpochMilli(dataResponse.utcTimestampInMs),
+                "evChargingDataV2",
+                mapOf(
+                    "conactorOn" to dataResponse.conactorOn.toInt(),
+                    "pwmPercent" to dataResponse.pwmPercent,
+                    "pilotVoltage" to dataResponse.pilotVoltage.voltValue,
+                    "proximityPilotAmps" to dataResponse.proximityPilotAmps.ampValue,
+                    "phase1Millivolts" to dataResponse.phase1Millivolts,
+                    "phase2Millivolts" to dataResponse.phase2Millivolts,
+                    "phase3Millivolts" to dataResponse.phase3Millivolts,
+                    "phase1Milliamps" to dataResponse.phase1Milliamps,
+                    "phase2Milliamps" to dataResponse.phase2Milliamps,
+                    "phase3Milliamps" to dataResponse.phase3Milliamps,
+                    "phase1VoltsAdc" to dataResponse.phase1VoltsAdc,
+                    "phase2VoltsAdc" to dataResponse.phase2VoltsAdc,
+                    "phase3VoltsAdc" to dataResponse.phase3VoltsAdc,
+                    "phase1AmpsAdc" to dataResponse.phase1AmpsAdc,
+                    "phase2AmpsAdc" to dataResponse.phase2AmpsAdc,
+                    "phase3AmpsAdc" to dataResponse.phase3AmpsAdc,
+                    "wifiRSSI" to dataResponse.wifiRSSI,
+                    "systemUptime" to dataResponse.systemUptime
+                ),
+                mapOf(
+                    "clientId" to evChargingStationClient.clientId
+                )
+            )
         )
     }
 

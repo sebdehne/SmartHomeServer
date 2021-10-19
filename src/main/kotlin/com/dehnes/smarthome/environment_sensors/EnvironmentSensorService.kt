@@ -2,11 +2,13 @@ package com.dehnes.smarthome.environment_sensors
 
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.lora.*
 import com.dehnes.smarthome.lora.LoRaPacketType.*
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.time.Clock
+import java.time.Instant
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -40,8 +42,14 @@ class EnvironmentSensorService(
                     SENSOR_DATA_REQUEST -> onSensorData(currentState, packet)
                     SENSOR_DATA_REQUEST_V2 -> onSensorDataV2(currentState, packet)
                     SENSOR_DATA_REQUEST_V3 -> onSensorDataV3(currentState, packet)
-                    FIRMWARE_INFO_REQUEST -> if (currentState == null) null else onFirmwareInfoRequest(currentState, packet)
-                    FIRMWARE_DATA_REQUEST -> if (currentState == null) null else onFirmwareDataRequest(currentState, packet)
+                    FIRMWARE_INFO_REQUEST -> if (currentState == null) null else onFirmwareInfoRequest(
+                        currentState,
+                        packet
+                    )
+                    FIRMWARE_DATA_REQUEST -> if (currentState == null) null else onFirmwareDataRequest(
+                        currentState,
+                        packet
+                    )
                     else -> null
                 }
 
@@ -372,15 +380,14 @@ class EnvironmentSensorService(
         }
 
         influxDBClient.recordSensorData(
-            "sensor",
-            updatedSensorData.toInfluxDbFields(
+            updatedSensorData.toInfluxDbRecord(
+                getName(packet.from),
                 batteryAdcToMv(
                     packet.from,
                     updatedSensorData.adcBattery
                 ),
                 packet.from == 10 // no light sensor for #10 - "bak knevegg"
-            ),
-            "room" to getName(packet.from)
+            )
         )
 
         if (packet.from in outsideSensorIds) {
@@ -392,12 +399,17 @@ class EnvironmentSensorService(
                 .map { it.value.lastReceivedMessage as SensorData } + updatedSensorData
 
             influxDBClient.recordSensorData(
-                "sensor",
-                listOf(
-                    "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
-                    "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
-                ),
-                "room" to "outside_combined"
+                InfluxDBRecord(
+                    Instant.ofEpochMilli(updatedSensorData.receivedAt),
+                    "sensor",
+                    mapOf(
+                        "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
+                        "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
+                    ),
+                    mapOf(
+                        "room" to "outside_combined"
+                    )
+                )
             )
         }
 
@@ -468,15 +480,14 @@ class EnvironmentSensorService(
         }
 
         influxDBClient.recordSensorData(
-            "sensor",
-            updatedSensorData.toInfluxDbFields(
+            updatedSensorData.toInfluxDbRecord(
+                getName(packet.from),
                 batteryAdcToMv(
                     packet.from,
                     updatedSensorData.adcBattery
                 ),
                 packet.from == 10 // no light sensor for #10 - "bak knevegg"
-            ),
-            "room" to getName(packet.from)
+            )
         )
 
         if (packet.from in outsideSensorIds) {
@@ -488,12 +499,17 @@ class EnvironmentSensorService(
                 .map { it.value.lastReceivedMessage as SensorData } + updatedSensorData
 
             influxDBClient.recordSensorData(
-                "sensor",
-                listOf(
-                    "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
-                    "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
-                ),
-                "room" to "outside_combined"
+                InfluxDBRecord(
+                    Instant.ofEpochMilli(updatedSensorData.receivedAt),
+                    "sensor",
+                    mapOf(
+                        "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
+                        "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
+                    ),
+                    mapOf(
+                        "room" to "outside_combined"
+                    )
+                )
             )
         }
 
@@ -564,15 +580,14 @@ class EnvironmentSensorService(
         }
 
         influxDBClient.recordSensorData(
-            "sensor",
-            updatedSensorData.toInfluxDbFields(
+            updatedSensorData.toInfluxDbRecord(
+                getName(packet.from),
                 batteryAdcToMv(
                     packet.from,
                     updatedSensorData.adcBattery
                 ),
                 packet.from == 10 // no light sensor for #10 - "bak knevegg"
-            ),
-            "room" to getName(packet.from)
+            )
         )
 
         if (packet.from in outsideSensorIds) {
@@ -584,12 +599,17 @@ class EnvironmentSensorService(
                 .map { it.value.lastReceivedMessage as SensorData } + updatedSensorData
 
             influxDBClient.recordSensorData(
-                "sensor",
-                listOf(
-                    "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
-                    "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
-                ),
-                "room" to "outside_combined"
+                InfluxDBRecord(
+                    Instant.ofEpochMilli(updatedSensorData.receivedAt),
+                    "sensor",
+                    mapOf(
+                        "temperature" to ((outsideData.minOf { it.temperature }).toFloat() / 100).toString(),
+                        "humidity" to ((outsideData.maxOf { it.humidity }).toFloat() / 100).toString()
+                    ),
+                    mapOf(
+                        "room" to "outside_combined"
+                    )
+                )
             )
         }
 
@@ -636,11 +656,21 @@ data class SensorData(
     override val receivedAt: Long,
     override val rssi: Int
 ) : ReceivedMessage() {
-    fun toInfluxDbFields(batteryAdcToMv: Long, skipLight: Boolean) = listOf(
+
+    fun toInfluxDbRecord(roomName: String, batteryAdcToMv: Long, skipLight: Boolean) = InfluxDBRecord(
+        Instant.ofEpochMilli(receivedAt),
+        "sensor",
+        toInfluxDbFields(batteryAdcToMv, skipLight),
+        mapOf(
+            "room" to roomName
+        )
+    )
+
+    fun toInfluxDbFields(batteryAdcToMv: Long, skipLight: Boolean) = mapOf(
         "temperature" to (temperature.toFloat() / 100).toString(),
         "temperatureError" to (if (temperatureError) 1 else 0).toString(),
         "humidity" to (humidity.toFloat() / 100).toString(),
-        "light" to if (skipLight) 0 else adcLight,
+        "light" to if (skipLight) "0" else adcLight.toString(),
         "battery_volt" to (batteryAdcToMv.toFloat() / 1000).toString(),
         "sleeptime_seconds" to sleepTimeInSeconds.toString(),
         "firmware_version" to firmwareVersion.toString(),

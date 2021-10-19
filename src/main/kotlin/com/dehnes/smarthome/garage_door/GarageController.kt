@@ -5,6 +5,7 @@ import com.dehnes.smarthome.api.dtos.FirmwareUpgradeState
 import com.dehnes.smarthome.api.dtos.GarageResponse
 import com.dehnes.smarthome.api.dtos.GarageStatus
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.environment_sensors.FirmwareDataRequest
 import com.dehnes.smarthome.environment_sensors.FirmwareHolder
 import com.dehnes.smarthome.lora.LoRaConnection
@@ -14,6 +15,7 @@ import com.dehnes.smarthome.lora.maxPayload
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.time.Clock
+import java.time.Instant
 import java.util.*
 import java.util.concurrent.*
 import java.util.zip.CRC32
@@ -244,10 +246,14 @@ class GarageController(
         logger.info { "New status=$lastStatus firmwareUpgrade=$firmwareDataRequest" }
 
         influxDBClient.recordSensorData(
-            "garageStatus",
-            listOf(
-                "light" to lastStatus!!.lightIsOn.toInt().toString(),
-                "door" to lastStatus!!.doorStatus.influxDbValue.toString()
+            InfluxDBRecord(
+                Instant.ofEpochMilli(lastStatus!!.utcTimestampInMs),
+                "garageStatus",
+                mapOf(
+                    "light" to lastStatus!!.lightIsOn.toInt().toString(),
+                    "door" to lastStatus!!.doorStatus.influxDbValue.toString()
+                ),
+                emptyMap()
             )
         )
 

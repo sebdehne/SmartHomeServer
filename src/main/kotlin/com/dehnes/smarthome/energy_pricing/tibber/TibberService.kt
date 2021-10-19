@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import java.time.Clock
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.concurrent.ExecutorService
 
 class TibberService(
@@ -28,56 +27,18 @@ class TibberService(
     override fun tickLocked(): Boolean {
         ensureCacheLoaded()
 
-        return getCurrentPrice()?.let { price ->
-            influxDBClient.recordSensorData(
-                "energyPrice",
-                listOf(
-                    "price" to price.toString()
-                ),
-                "service" to "Tibber"
-            )
-            logger.info { "Recorded price=$price to influxDB" }
-            true
-        } ?: false
+        influxDBClient.recordSensorData(
+            priceCache
+                .sortedBy { it.from }
+                .flatMap { p ->
+                    p.toInfluxDbRecords()
+                }
+        )
+
+        return true
     }
 
     override fun logger() = logger
-
-    @Synchronized
-    fun mustWaitUntil(numberOfHoursRequired: Int): Instant? {
-        ensureCacheLoaded()
-
-        val now = Instant.now(clock)
-        val nowPlus24Hours = now.plus(24, ChronoUnit.HOURS)
-
-        val next24Hours = priceCache
-            .sortedBy { it.from }
-            .filter { it.to.isAfter(now) }
-            .filter { it.from.isBefore(nowPlus24Hours) }
-
-        val cheapEnoughHours = next24Hours
-            .sortedBy { it.price }
-            .let {
-                if (it.size >= numberOfHoursRequired) {
-                    it.subList(0, numberOfHoursRequired)
-                } else
-                    it
-            }
-            .sortedBy { it.from }
-
-        val nextCheapHour = cheapEnoughHours.firstOrNull()
-        return when {
-            nextCheapHour == null -> {
-                logger.info { "No cheap enough hour available" }
-                null
-            }
-            nextCheapHour.isValidFor(now) -> {
-                null
-            }
-            else -> nextCheapHour.from
-        }
-
-    }
 
     @Synchronized
     fun mustWaitUntilV2(skipPercentExpensiveHours: Int): Instant? {
@@ -114,14 +75,6 @@ class TibberService(
             else -> nextCheapHour.from
         }
 
-    }
-
-    private fun getCurrentPrice(): Double? {
-        ensureCacheLoaded()
-
-        val now = Instant.now(clock)
-
-        return priceCache.firstOrNull { price: Price -> price.isValidFor(now) }?.price
     }
 
     private fun ensureCacheLoaded() {

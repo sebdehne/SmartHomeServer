@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.energy_pricing.tibber
 
+import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -52,7 +53,7 @@ class TibberPriceClient(
 
         prices.forEachIndexed { i, current ->
             val startAt = Instant.parse(current["startsAt"] as CharSequence)
-            var endsAt = startAt.plus(30, ChronoUnit.DAYS)
+            var endsAt = startAt.plus(1, ChronoUnit.HOURS)
             if (i + 1 < prices.size) {
                 endsAt = Instant.parse(prices[i + 1]["startsAt"] as CharSequence?)
             }
@@ -78,4 +79,26 @@ data class Price(
     var price: Double
 ) {
     fun isValidFor(input: Instant) = (input.isAfter(from) || input == from) && input.isBefore(to)
+
+    fun toInfluxDbRecords(): List<InfluxDBRecord> {
+        var current = from
+        val result = mutableListOf<InfluxDBRecord>()
+        while (current.isBefore(to)) {
+            result.add(
+                InfluxDBRecord(
+                    current,
+                    "energyPrice",
+                    mapOf(
+                        "price" to price.toString()
+                    ),
+                    mapOf(
+                        "service" to "Tibber"
+                    )
+                )
+            )
+
+            current = current.plusSeconds(60)
+        }
+        return result
+    }
 }

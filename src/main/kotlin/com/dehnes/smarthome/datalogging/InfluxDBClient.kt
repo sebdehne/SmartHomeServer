@@ -11,7 +11,23 @@ import org.apache.http.client.utils.URIBuilder
 import org.apache.http.entity.ContentType
 import java.io.IOException
 import java.nio.charset.Charset
+import java.time.Duration
+import java.time.Instant
 import java.util.*
+import java.util.concurrent.TimeUnit
+
+data class InfluxDBRecord(
+    val timestamp: Instant,
+    val type: String,
+    val fields: Map<String, Any>,
+    val tags: Map<String, String>
+) {
+    fun toLine(): String {
+        val tags = this.tags.entries.joinToString(separator = ",", prefix = ",") { "${it.key}=${it.value}" }
+        val fields = this.fields.entries.joinToString(separator = ",") { "${it.key}=${it.value}" }
+        return "$type$tags $fields ${TimeUnit.NANOSECONDS.convert(Duration.ofMillis(timestamp.toEpochMilli()))}"
+    }
+}
 
 class InfluxDBClient(
     private val persistenceService: PersistenceService,
@@ -24,24 +40,29 @@ class InfluxDBClient(
     private val bucketName = "sensor_data"
     private val baseUrl = "http://$host:$port"
 
-    fun recordSensorData(type: String, fields: List<Pair<String, Any>>, vararg tags: Pair<String, String>) {
+    fun recordSensorData(vararg record: InfluxDBRecord) {
+        recordSensorData(record.toList())
+    }
+
+    fun recordSensorData(records: List<InfluxDBRecord>) {
         try {
-            val sb = StringBuilder()
-            sb.append(type)
-            tags.toList().forEach { tag ->
-                sb.append(",").append(tag.first).append("=").append(tag.second)
-            }
-            sb.append(" ").append(fields.joinToString(",") { v -> v.first + "=" + v.second })
-            logger.debug("About to send {}", sb)
+            val body = records.joinToString(separator = "\n") { it.toLine() }
+            logger.debug("About to send {}", body)
             val result: Response = Request.Post("$baseUrl/api/v2/write?bucket=$bucketName&org=dehnes.com")
                 .addHeader("Authorization", "Token " + persistenceService["influxDbAuthToken", null]!!)
-                .bodyString(sb.toString(), ContentType.TEXT_PLAIN)
+                .bodyString(body, ContentType.TEXT_PLAIN)
                 .execute()
             val httpResponse: HttpResponse? = result.returnResponse()
             if (httpResponse?.statusLine != null && httpResponse.statusLine.statusCode > 299) {
-                throw RuntimeException("Could not write to InFluxDb $httpResponse ${httpResponse.entity.content.readAllBytes().toString(
-                    Charset.defaultCharset())}")
+                throw RuntimeException(
+                    "Could not write to InFluxDb $httpResponse ${
+                        httpResponse.entity.content.readAllBytes().toString(
+                            Charset.defaultCharset()
+                        )
+                    }"
+                )
             }
+
         } catch (e: IOException) {
             throw RuntimeException(e)
         }

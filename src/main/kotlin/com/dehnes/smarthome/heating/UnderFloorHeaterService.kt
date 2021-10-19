@@ -2,6 +2,7 @@ package com.dehnes.smarthome.heating
 
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
 import com.dehnes.smarthome.environment_sensors.FirmwareDataRequest
 import com.dehnes.smarthome.environment_sensors.FirmwareHolder
@@ -97,7 +98,13 @@ class UnderFloorHeaterService(
                 var sent = false
                 val ct = CountDownLatch(1)
                 receiveQueue.clear()
-                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUESTV2, byteArrayOf(1), null) {
+                loRaConnection.send(
+                    keyId,
+                    loRaAddr,
+                    LoRaPacketType.GARAGE_HEATER_DATA_REQUESTV2,
+                    byteArrayOf(1),
+                    null
+                ) {
                     sent = it
                     ct.countDown()
                 }
@@ -382,13 +389,18 @@ class UnderFloorHeaterService(
         logger.info { "Received sensorData=$sensorData" }
 
         influxDBClient.recordSensorData(
-            "sensor",
-            listOf(
-                "temperature" to sensorData.toTemperature(),
-                "temperatureError" to sensorData.temperatureError.toString(),
-                "heater_status" to (if (sensorData.heaterIsOn) 1 else 0).toString(),
-            ),
-            "room" to "heating_controller"
+            InfluxDBRecord(
+                Instant.ofEpochMilli(sensorData.receivedAt),
+                "sensor",
+                mapOf(
+                    "temperature" to sensorData.toTemperature(),
+                    "temperatureError" to sensorData.temperatureError.toString(),
+                    "heater_status" to (if (sensorData.heaterIsOn) 1 else 0).toString(),
+                ),
+                mapOf(
+                    "room" to "heating_controller"
+                )
+            )
         )
 
         return sensorData
@@ -398,13 +410,18 @@ class UnderFloorHeaterService(
         currentMode: Mode
     ) {
         influxDBClient.recordSensorData(
-            "sensor",
-            listOf(
-                "manual_mode" to (if (currentMode == Mode.MANUAL) 1 else 0).toString(),
-                "target_temperature" to getTargetTemperature().toString(),
-                "configured_heater_target" to (if (getConfiguredHeaterTarget() == "on") 1 else 0).toString()
-            ),
-            "room" to "heating_controller"
+            InfluxDBRecord(
+                clock.instant(),
+                "sensor",
+                mapOf(
+                    "manual_mode" to (if (currentMode == Mode.MANUAL) 1 else 0).toString(),
+                    "target_temperature" to getTargetTemperature().toString(),
+                    "configured_heater_target" to (if (getConfiguredHeaterTarget() == "on") 1 else 0).toString()
+                ),
+                mapOf(
+                    "room" to "heating_controller"
+                )
+            )
         )
     }
 
