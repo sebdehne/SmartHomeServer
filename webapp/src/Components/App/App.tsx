@@ -55,7 +55,7 @@ const App = () => {
                 <li>
                     <Link href="https://dehnes.com/stats/d/sDbG2Td7k/enegery-prices">
                         <Button variant="contained" color="primary">
-                            Enery prices
+                            Energy prices
                         </Button>
                     </Link>
                 </li>
