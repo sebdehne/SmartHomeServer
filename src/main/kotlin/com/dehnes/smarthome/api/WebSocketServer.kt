@@ -11,15 +11,16 @@ import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import jakarta.websocket.CloseReason
+import jakarta.websocket.Endpoint
+import jakarta.websocket.EndpointConfig
+import jakarta.websocket.Session
 import mu.KotlinLogging
 import java.io.Closeable
 import java.util.*
-import javax.websocket.*
-import javax.websocket.server.ServerEndpoint
 
 // one instance per sessions
-@ServerEndpoint(value = "/api")
-class WebSocketServer {
+class WebSocketServer : Endpoint() {
 
     private val instanceId = UUID.randomUUID().toString()
 
@@ -37,12 +38,20 @@ class WebSocketServer {
     private val videoBrowser =
         configuration.getBean<VideoBrowser>(VideoBrowser::class)
 
-    @OnOpen
-    fun onWebSocketConnect(sess: Session) {
+    override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info("$instanceId Socket connected: $sess")
+        sess.addMessageHandler(String::class.java) { msg -> onWebSocketText(sess, msg) }
     }
 
-    @OnMessage
+    override fun onClose(session: Session, closeReason: CloseReason) {
+        subscriptions.values.toList().forEach { it.close() }
+        logger.info("$instanceId Socket Closed: $closeReason")
+    }
+
+    override fun onError(session: Session?, cause: Throwable?) {
+        logger.warn("$instanceId ", cause)
+    }
+
     fun onWebSocketText(argSession: Session, argMessage: String) {
         val websocketMessage: WebsocketMessage = objectMapper.readValue(argMessage)
 
@@ -241,17 +250,6 @@ class WebSocketServer {
                 firmwareUploadSuccess = garageDoorService.startFirmwareUpgrade(request.firmwareBased64Encoded!!),
             )
         }
-    }
-
-    @OnClose
-    fun onWebSocketClose(reason: CloseReason) {
-        subscriptions.values.toList().forEach { it.close() }
-        logger.info("$instanceId Socket Closed: $reason")
-    }
-
-    @OnError
-    fun onWebSocketError(cause: Throwable) {
-        logger.warn("$instanceId ", cause)
     }
 
     inner class GarageStatusSubscription(

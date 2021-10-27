@@ -1,12 +1,12 @@
 package com.dehnes.smarthome.utils
 
 import com.dehnes.smarthome.videoRootDir
+import jakarta.servlet.http.HttpServlet
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
 import mu.KotlinLogging
 import java.io.File
 import java.io.RandomAccessFile
-import javax.servlet.http.HttpServlet
-import javax.servlet.http.HttpServletRequest
-import javax.servlet.http.HttpServletResponse
 
 class VideoDownloader : HttpServlet() {
 

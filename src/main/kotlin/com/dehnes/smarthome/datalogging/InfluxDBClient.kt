@@ -23,7 +23,13 @@ data class InfluxDBRecord(
     val tags: Map<String, String>
 ) {
     fun toLine(): String {
-        val tags = this.tags.entries.joinToString(separator = ",", prefix = ",") { "${it.key}=${it.value}" }
+        val tags = this.tags.entries.joinToString(separator = ",") { "${it.key}=${it.value}" }.let {
+            if (it.isNotBlank()) {
+                ",$it"
+            } else {
+                it
+            }
+        }
         val fields = this.fields.entries.joinToString(separator = ",") { "${it.key}=${it.value}" }
         return "$type$tags $fields ${TimeUnit.NANOSECONDS.convert(Duration.ofMillis(timestamp.toEpochMilli()))}"
     }

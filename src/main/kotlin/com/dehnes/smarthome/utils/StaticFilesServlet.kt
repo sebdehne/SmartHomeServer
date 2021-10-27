@@ -1,9 +1,9 @@
 package com.dehnes.smarthome.utils
 
+import jakarta.servlet.http.HttpServlet
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
 import mu.KotlinLogging
-import javax.servlet.http.HttpServlet
-import javax.servlet.http.HttpServletRequest
-import javax.servlet.http.HttpServletResponse
 
 class StaticFilesServlet : HttpServlet() {
     val logger = KotlinLogging.logger { }
@@ -71,7 +71,7 @@ fun pathToResource(path: String): String? {
         val dirsString = dirs.joinToString(separator = "/")
         if (allowedDirs.any {
                 it.matches(dirsString)
-        }) {
+            }) {
             return resultResource.joinToString("/")
         }
         resultResource = resultResource.subList(1, resultResource.size)

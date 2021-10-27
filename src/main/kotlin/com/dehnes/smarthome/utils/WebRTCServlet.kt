@@ -1,10 +1,10 @@
 package com.dehnes.smarthome.utils
 
+import jakarta.servlet.http.HttpServlet
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
 import mu.KotlinLogging
 import org.apache.http.client.fluent.Request
-import javax.servlet.http.HttpServlet
-import javax.servlet.http.HttpServletRequest
-import javax.servlet.http.HttpServletResponse
 
 class WebRTCServlet : HttpServlet() {
     val webrtcServer = "http://192.168.1.1:8083"

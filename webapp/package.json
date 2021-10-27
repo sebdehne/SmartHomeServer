@@ -7,10 +7,10 @@
     "@material-ui/core": "^4.11.3",
     "@material-ui/icons": "^4.11.2",
     "@testing-library/jest-dom": "^5.11.10",
-    "@testing-library/react": "^11.2.6",
+    "@testing-library/react": "^12.1.2",
     "@testing-library/user-event": "^13.1.1",
-    "@types/jest": "^26.0.22",
-    "@types/node": "^14.14.37",
+    "@types/jest": "^27.0.2",
+    "@types/node": "^16.11.6",
     "@types/react": "^17.0.3",
     "@types/react-dom": "^17.0.3",
     "@types/react-router-dom": "^5.1.7",
@@ -23,7 +23,7 @@
     "reflect-metadata": "^0.1.13",
     "typescript": "^4.2.3",
     "uuid": "^8.3.2",
-    "web-vitals": "^1.1.1"
+    "web-vitals": "^2.1.2"
   },
   "scripts": {
     "start": "react-scripts start",

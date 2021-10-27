@@ -34,7 +34,7 @@ class Configuration {
         val objectMapper = objectMapper()
 
         val persistenceService = PersistenceService(objectMapper)
-        val influxDBClient = InfluxDBClient(persistenceService, objectMapper, System.getProperty("DST_HOST"))
+        val influxDBClient = InfluxDBClient(persistenceService, objectMapper)
 
         val clock = Clock.system(ZoneId.of("Europe/Oslo"))
 
