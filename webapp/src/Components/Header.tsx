@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import WebsocketService, { ConnectionStatus } from "../Websocket/websocketClient";
 import { Button, CircularProgress } from "@material-ui/core";
-import { useHistory } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 
 type HeaderProps = {
@@ -11,7 +11,7 @@ type HeaderProps = {
 
 const Header = ({ title, sending }: HeaderProps) => {
     const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.connecting);
-    let history = useHistory();
+    const navigate = useNavigate();
 
     useEffect(() =>
         WebsocketService.monitorConnectionStatus((status: ConnectionStatus) => {
@@ -25,7 +25,7 @@ const Header = ({ title, sending }: HeaderProps) => {
             justifyContent: "space-between"
         }
         }>
-            <Button color="primary"variant="contained" onClick={() => history.push("/")}><ArrowBackIcon/>Home</Button>
+            <Button color="primary"variant="contained" onClick={() => navigate("/")}><ArrowBackIcon/>Home</Button>
             {sending &&
             <CircularProgress color="primary"/>
             }

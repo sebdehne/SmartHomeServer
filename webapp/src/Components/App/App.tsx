@@ -1,14 +1,14 @@
 import React from 'react';
 import { Button, Container, Link} from "@material-ui/core";
-import { useHistory } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import './App.css';
 
 const App = () => {
 
-    let history = useHistory();
+    let navigate = useNavigate();
 
     const relative = (path: string) => () => {
-        history.push(path);
+        navigate(path);
     };
 
     return (

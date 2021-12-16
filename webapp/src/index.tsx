@@ -4,7 +4,7 @@ import './index.css';
 import App from './Components/App/App';
 import reportWebVitals from './reportWebVitals';
 import { CssBaseline, MuiThemeProvider } from "@material-ui/core";
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
 import { EvChargingStations } from "./Components/EvChargingStations/EvChargingStations";
@@ -18,8 +18,8 @@ ReactDOM.render(
         <MuiThemeProvider theme={theme}>
             <CssBaseline/>
             <Router basename={process.env.REACT_APP_BASENAME}>
-                <Switch>
-                    <Route exact path="/">
+                <Routes>
+                    <Route path="/">
                         <App/>
                     </Route>
                     <Route path="/garage">
@@ -40,7 +40,7 @@ ReactDOM.render(
                     <Route path="/recordings">
                         <VideoRecordings/>
                     </Route>
-                </Switch>
+                </Routes>
             </Router>
         </MuiThemeProvider>
     </React.StrictMode>,
