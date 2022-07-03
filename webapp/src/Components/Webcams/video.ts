@@ -1,9 +1,11 @@
-const start = (streamId: string, onStream: (stream: MediaStream) => void): (() => void) => {
+const start = (streamId: string, onStream: (stream: MediaStream) => void, addLog: (log: string) => void): (() => void) => {
+    addLog('init');
     let stream = new MediaStream();
     let config = {
         iceServers: [{
             urls: ["stun:stun.l.google.com:19302"]
-        }]
+        }],
+        sdpSemantics: 'unified-plan'
     };
     const pc = new RTCPeerConnection(config);
 
@@ -13,23 +15,26 @@ const start = (streamId: string, onStream: (stream: MediaStream) => void): (() =
 
     //send ping becouse PION not handle RTCSessionDescription.close()
     let sendChannel = pc.createDataChannel('foo');
-    sendChannel.onclose = () => console.log('sendChannel has closed');
+    sendChannel.onclose = () => addLog("sendChannel has closed");
     sendChannel.onopen = () => {
-        console.log('sendChannel has opened');
+        addLog('sendChannel has opened');
         sendChannel.send('ping');
         setInterval(() => {
             sendChannel.send('ping');
         }, 1000)
     }
-    sendChannel.onmessage = e => console.log(`Message from DataChannel '${sendChannel.label}' payload '${e.data}'`);
+    sendChannel.onmessage = e => addLog(`Message from DataChannel '${sendChannel.label}' payload '${e.data}'`);
 
     pc.onnegotiationneeded = () => {
         pc.createOffer()
-            .then(offer => pc.setLocalDescription(offer))
+            .then(offer => {
+                return pc.setLocalDescription(offer);
+            })
             .then(() => {
+                const localSdpOffer = pc.localDescription!!.sdp;
+                addLog('Sending offer: ' + localSdpOffer);
                 const data = new URLSearchParams();
-                data.append("suuid", streamId);
-                data.append("data", btoa(pc.localDescription!!.sdp));
+                data.append("data", btoa(localSdpOffer));
                 return fetch('webrtc/receiver/' + streamId, {
                     method: "POST",
                     body: data
@@ -37,15 +42,23 @@ const start = (streamId: string, onStream: (stream: MediaStream) => void): (() =
             })
             .then(response => response.text())
             .then(text => {
+                addLog('Raw remote answer: ' + text);
+                const sdp = atob(text);
+                addLog('Remote SDP: ' + sdp);
                 pc.setRemoteDescription(new RTCSessionDescription({
                     type: 'answer',
-                    sdp: atob(text)
-                }))
+                    sdp: sdp
+                }));
+                addLog('Done setting sdp');
             })
-            .catch(e => console.log(e))
+            .catch(e => {
+                addLog(e.toString())
+                console.log(e);
+            })
     };
     let track: MediaStreamTrack;
     pc.ontrack = ev => {
+        addLog('ontrack');
         track = ev.track;
         stream.addTrack(ev.track);
         onStream(stream);

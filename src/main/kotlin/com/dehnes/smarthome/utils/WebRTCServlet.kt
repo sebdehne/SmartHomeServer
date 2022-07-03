@@ -18,10 +18,11 @@ class WebRTCServlet : HttpServlet() {
         val pathParts = req.pathInfo.split("/")
         val readAllBytes = req.inputStream.readAllBytes()
 
-        Request.Post("$webrtcServer/stream/receiver/${pathParts.last()}")
+        Request.Post("$webrtcServer/stream/${pathParts.last()}/channel/0/webrtc")
             .addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
             .bodyByteArray(readAllBytes).execute()
             .handleResponse { clientResponse ->
+                logger.info { "POST pathInfo=${req.pathInfo} proxy-response-status=${clientResponse.statusLine.statusCode}" }
                 resp.status = clientResponse.statusLine.statusCode
                 clientResponse.entity.writeTo(resp.outputStream)
                 resp.outputStream.flush()

@@ -4,7 +4,7 @@ import './index.css';
 import App from './Components/App/App';
 import reportWebVitals from './reportWebVitals';
 import { CssBaseline, MuiThemeProvider } from "@material-ui/core";
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
 import { EvChargingStations } from "./Components/EvChargingStations/EvChargingStations";
@@ -17,31 +17,17 @@ ReactDOM.render(
     <React.StrictMode>
         <MuiThemeProvider theme={theme}>
             <CssBaseline/>
-            <Router basename={process.env.REACT_APP_BASENAME}>
+            <BrowserRouter basename={process.env.REACT_APP_BASENAME}>
                 <Routes>
-                    <Route path="/">
-                        <App/>
-                    </Route>
-                    <Route path="/garage">
-                        <GarageDoor/>
-                    </Route>
-                    <Route path="/heater">
-                        <HeaterController/>
-                    </Route>
-                    <Route path="/evChargingStations">
-                        <EvChargingStations/>
-                    </Route>
-                    <Route path="/environmentSensors">
-                        <EnvironmentSensors/>
-                    </Route>
-                    <Route path="/webcams">
-                        <Webcams/>
-                    </Route>
-                    <Route path="/recordings">
-                        <VideoRecordings/>
-                    </Route>
+                    <Route path="/" element={<App/>}/>
+                    <Route path="/garage" element={<GarageDoor/>}/>
+                    <Route path="/heater" element={<HeaterController/>}/>
+                    <Route path="/evChargingStations" element={<EvChargingStations/>}/>
+                    <Route path="/environmentSensors" element={<EnvironmentSensors/>}/>
+                    <Route path="/webcams" element={<Webcams/>}/>
+                    <Route path="/recordings" element={<VideoRecordings/>}/>
                 </Routes>
-            </Router>
+            </BrowserRouter>
         </MuiThemeProvider>
     </React.StrictMode>,
     document.getElementById('root')

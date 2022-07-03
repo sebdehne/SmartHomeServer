@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Container } from "@material-ui/core";
+import { Button, Checkbox, Container } from "@material-ui/core";
 import './Webcams.css';
 import VideoService from "./video";
 import Header from "../Header";
@@ -12,11 +12,19 @@ const streams = [
 const Webcams = () => {
     const refContainer = useRef<HTMLVideoElement>(null);
     const [selectedStream, setSelectedStream] = useState<string>(streams[0]);
+    const [debug, setDebug] = useState(false);
+    const [logs, setLogs] = useState<string[]>([]);
 
     useEffect(() =>
         VideoService.start(selectedStream, stream => {
-            refContainer.current!!.srcObject = stream;
-        }), [selectedStream]);
+                refContainer.current!!.srcObject = stream;
+            },
+            log =>
+                setLogs(prevState => ([
+                    ...prevState,
+                    log
+                ]))
+        ), [selectedStream]);
 
     return (
         <Container maxWidth="lg" className="App">
@@ -34,6 +42,20 @@ const Webcams = () => {
                 >{s}</Button>
             ))}
             <video width="100%" autoPlay muted controls ref={refContainer}/>
+
+            <div>
+                <Checkbox
+                    checked={debug}
+                    onChange={(event, checked) => setDebug(checked)}
+                /> Debug
+            </div>
+            {debug && <div>
+                <h2>Logs:</h2>
+                <ul>
+                    {logs.map(value => (<li><pre>{value}</pre></li>))}
+                </ul>
+            </div>}
+
         </Container>
     );
 };
