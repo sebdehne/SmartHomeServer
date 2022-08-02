@@ -5,6 +5,7 @@ import com.dehnes.smarthome.energy_pricing.tibber.TibberService
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
+import java.lang.Integer.min
 import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
@@ -140,11 +141,34 @@ class EvChargingService(
         result
     }
 
-    fun getPriorityFor(clientId: String) =
+    private fun getPriorityFor(clientId: String) =
         persistenceService["EvChargingService.client.priorty.$clientId", LoadSharingPriority.NORMAL.name]!!.let {
             LoadSharingPriority.valueOf(it)
         }
 
+    fun setChargeRateLimitFor(clientId: String, chargeRateLimit: Int) = synchronized(this) {
+        check(chargeRateLimit in 6..32)
+        persistenceService["EvChargingService.client.chargeRateLimit.$clientId"] = chargeRateLimit.toString()
+        var result = false
+        currentData.computeIfPresent(clientId) { _, internalState ->
+            result = true
+            internalState.copy(chargeRateLimit = chargeRateLimit)
+        }
+        result
+    }
+
+    private fun getChargeRateLimit(clientId: String) =
+        persistenceService["EvChargingService.client.chargeRateLimit.$clientId", 32.toString()]!!.toInt()
+
+    fun getPowerConnection(powerConnectionId: String): PowerConnection = object : PowerConnection {
+        override fun availableAmpsCapacity(): Int {
+            return persistenceService["PowerConnection.availableCapacity.$powerConnectionId", "32"]!!.toInt()
+        }
+
+        override fun availablePowerCapacity(): Int {
+            return (230 * availableAmpsCapacity()) * 3 // TODO ony provide the headroom up to the configured power-target
+        }
+    }
 
     internal fun onIncomingDataUpdate(
         evChargingStationClient: EvChargingStationClient,
@@ -156,44 +180,65 @@ class EvChargingService(
         val existingState = currentData[clientId] ?: run {
             val chargingState = ChargingState.reconstruct(dataResponse)
             InternalState(
-                clientId,
-                evChargingStationClient.powerConnectionId,
-                evChargingStationClient,
-                chargingState,
-                clock.millis(),
-                getPriorityFor(clientId),
-                dataResponse,
-                dataResponse.pwmPercent,
-                null,
-                null,
-                if (chargingState == ConnectedChargingUnavailable) "Unknown" else null
+                clientId = clientId,
+                powerConnectionId = evChargingStationClient.powerConnectionId,
+                evChargingStationClient = evChargingStationClient,
+                chargingState = chargingState,
+                chargingStateChangedAt = clock.millis(),
+                loadSharingPriority = getPriorityFor(clientId),
+                chargeRateLimit = getChargeRateLimit(clientId),
+                usesThreePhase = false,
+                dataResponse = dataResponse,
+                pwmDutyCyclePercent = dataResponse.pwmPercent,
+                measuredCurrentPeakAt = null,
+                measuredCurrentInAmpsAvg = null,
+                reasonChargingUnavailable = if (chargingState == ConnectedChargingUnavailable) "Unknown" else null,
+                chargingEndingAmpDelta = chargingEndingAmpDelta
             )
         }
         val powerConnectionId = existingState.powerConnectionId
+        val loadSharingAlgorithmId =
+            persistenceService["EvChargingService.powerConnection.loadSharingAlgorithm.$powerConnectionId", PriorityLoadSharing::class.java.simpleName]!!
+        val loadSharingAlgorithm = loadSharingAlgorithms[loadSharingAlgorithmId]
+            ?: error("Could not find loadSharingAlgorithmId=$loadSharingAlgorithmId")
 
         /*
-         * A) If some received data doesnt match the required state, re-send and stop
+         * A) If some received data doesn't match the required state, re-send and stop
          */
         if (!synchronizeIfNeeded(existingState, dataResponse)) return@synchronized null
 
         /*
-         * B) Figure out if the charging stations is allowed to charge at this point in time
+         * B) Figure out if charging is allowed to charge at this point in time
          */
-        val mode = getMode(clientId)
-        val nextCheapHour = tibberService.mustWaitUntilV2(getSkipPercentExpensiveHours(clientId))
-        var reasonCannotCharge: String? = null
-        val canCharge = when {
-            mode == EvChargingMode.ON -> true
-            mode == EvChargingMode.OFF -> {
-                reasonCannotCharge = "Switched Off"
-                false
+        val getReasonCannotCharge = {
+            val mode = getMode(clientId)
+            val nextCheapHour = tibberService.mustWaitUntilV2(getSkipPercentExpensiveHours(clientId))
+            var reasonCannotCharge: String? = null
+
+            when {
+                mode == EvChargingMode.OFF -> {
+                    reasonCannotCharge = "Switched Off"
+                }
+                mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour != null -> {
+                    reasonCannotCharge = "starting @ " + nextCheapHour.atZone(clock.zone).toLocalTime()
+                }
             }
-            mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour == null -> true
-            mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour != null -> {
-                reasonCannotCharge = "starting @ " + nextCheapHour.atZone(clock.zone).toLocalTime()
-                false
+
+            // ask load sharing algorithm if there is capacity available
+            if (reasonCannotCharge == null) {
+                val changedStates = loadSharingAlgorithm.calculateLoadSharing(
+                    (currentData + (clientId to existingState.changeState(
+                        ChargingRequested,
+                        clock.millis(),
+                        fake = true
+                    ))).values.toList(),
+                    getPowerConnection(powerConnectionId),
+                    chargingEndingAmpDelta
+                ) as List<InternalState>
+                reasonCannotCharge = changedStates.first { it.clientId == clientId }.reasonChargingUnavailable
             }
-            else -> error("Impossible")
+
+            reasonCannotCharge
         }
 
         /*
@@ -204,7 +249,8 @@ class EvChargingService(
                 if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
                     existingState.changeState(Error, clock.millis())
                 } else if (dataResponse.pilotVoltage != PilotVoltage.Volt_12) {
-                    if (canCharge) {
+                    val reasonCannotCharge = getReasonCannotCharge()
+                    if (reasonCannotCharge == null) {
                         existingState.changeState(ConnectedChargingAvailable, clock.millis())
                     } else {
                         existingState.changeState(
@@ -223,7 +269,8 @@ class EvChargingService(
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
                     existingState.changeState(Error, clock.millis())
                 } else {
-                    if (canCharge) {
+                    val reasonCannotCharge = getReasonCannotCharge()
+                    if (reasonCannotCharge == null) {
                         existingState.changeState(ConnectedChargingAvailable, clock.millis())
                     } else {
                         existingState
@@ -236,7 +283,8 @@ class EvChargingService(
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
                     existingState.changeState(Error, clock.millis())
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Volt_9) {
-                    if (canCharge) {
+                    val reasonCannotCharge = getReasonCannotCharge()
+                    if (reasonCannotCharge == null) {
                         existingState
                     } else {
                         existingState.changeState(
@@ -246,7 +294,8 @@ class EvChargingService(
                         )
                     }
                 } else {
-                    if (canCharge) {
+                    val reasonCannotCharge = getReasonCannotCharge()
+                    if (reasonCannotCharge == null) {
                         existingState.changeState(ChargingRequested, clock.millis())
                     } else {
                         existingState.changeState(
@@ -270,7 +319,8 @@ class EvChargingService(
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
                     existingState.changeState(Error, clock.millis())
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Volt_9) {
-                    if (canCharge) {
+                    val reasonCannotCharge = getReasonCannotCharge()
+                    if (reasonCannotCharge == null) {
                         existingState.changeState(ConnectedChargingAvailable, clock.millis())
                     } else {
                         existingState.changeState(
@@ -283,7 +333,8 @@ class EvChargingService(
                     if (clock.millis() - existingState.chargingStateChangedAt < stayInStoppingChargingForMS) {
                         existingState
                     } else {
-                        if (canCharge) {
+                        val reasonCannotCharge = getReasonCannotCharge()
+                        if (reasonCannotCharge == null) {
                             existingState.changeState(ConnectedChargingAvailable, clock.millis())
                         } else {
                             existingState.changeState(
@@ -301,7 +352,8 @@ class EvChargingService(
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
                     existingState.changeState(Error, clock.millis())
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Volt_9) {
-                    if (canCharge) {
+                    val reasonCannotCharge = getReasonCannotCharge()
+                    if (reasonCannotCharge == null) {
                         existingState.changeState(ConnectedChargingAvailable, clock.millis())
                     } else {
                         existingState.changeState(
@@ -320,15 +372,18 @@ class EvChargingService(
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Fault) {
                     existingState.changeState(Error, clock.millis())
                 } else if (dataResponse.pilotVoltage == PilotVoltage.Volt_9) {
-                    if (canCharge) {
+                    val reasonCannotCharge = getReasonCannotCharge()
+                    if (reasonCannotCharge == null) {
                         existingState.changeState(ConnectedChargingAvailable, clock.millis())
                     } else {
                         existingState.changeState(ConnectedChargingUnavailable, clock.millis())
                             .setReasonChargingUnavailable(reasonCannotCharge)
                     }
                 } else {
-                    if (canCharge) {
-                        val existingMeasuredCurrentInAmpsAvg = existingState.measuredCurrentInAmpsAvg ?: dataResponse.currentInAmps().toDouble()
+                    val reasonCannotCharge = getReasonCannotCharge()
+                    if (reasonCannotCharge == null) {
+                        val existingMeasuredCurrentInAmpsAvg =
+                            existingState.measuredCurrentInAmpsAvg ?: dataResponse.currentInAmps().toDouble()
                         val updatedMeasuredCurrentInAmpsAvg =
                             ((existingMeasuredCurrentInAmpsAvg * rollingAverageDepth) + dataResponse.currentInAmps()) / (rollingAverageDepth + 1)
 
@@ -338,20 +393,40 @@ class EvChargingService(
                             else
                                 existingState.measuredCurrentPeakAt
 
-                        logger.info { "Lader=$clientId measuredCurrentPeakAt=${Instant.ofEpochMilli(measuredCurrentPeakAt)} measuredCurrentInAmpsAvg=$updatedMeasuredCurrentInAmpsAvg" }
+                        logger.info {
+                            "Lader=$clientId measuredCurrentPeakAt=${
+                                Instant.ofEpochMilli(
+                                    measuredCurrentPeakAt
+                                )
+                            } measuredCurrentInAmpsAvg=$updatedMeasuredCurrentInAmpsAvg"
+                        }
 
                         existingState.copy(
                             measuredCurrentInAmpsAvg = updatedMeasuredCurrentInAmpsAvg,
                             measuredCurrentPeakAt = measuredCurrentPeakAt
                         )
                     } else {
-                        existingState.changeState(StoppingCharging, clock.millis())
+                        existingState.changeState(StoppingCharging, clock.millis(), reasonCannotCharge)
                     }
                 }
             }
         }
             .updateData(evChargingStationClient, dataResponse)
-            .copy(reasonChargingUnavailable = reasonCannotCharge)
+            .let {
+                if (!it.usesThreePhase) {
+                    val p2Amps = dataResponse.phase2Milliamps / 1000
+                    val p3Amps = dataResponse.phase3Milliamps / 1000
+                    if (p2Amps > 2 || p3Amps > 2) {
+                        logger.info { "Detected three phase charging for clientId=$clientId" }
+                        // current flowing over P2 / P3 -> upgrade to three phase
+                        it.copy(usesThreePhase = true)
+                    } else {
+                        it
+                    }
+                } else {
+                    it
+                }
+            }
 
         currentData[clientId] = updatedState
 
@@ -369,15 +444,11 @@ class EvChargingService(
         }
 
         /*
-         * E) Rebalance loadsharing between active charging stations
+         * E) Re-balance loadsharing between active charging stations
          */
-        val loadSharingAlgorithmId =
-            persistenceService["EvChargingService.powerConnection.loadSharingAlgorithm.$powerConnectionId", PriorityLoadSharing::class.java.simpleName]!!
-        val loadSharingAlgorithm = loadSharingAlgorithms[loadSharingAlgorithmId]
-            ?: error("Could not find loadSharingAlgorithmId=$loadSharingAlgorithmId")
         val changedStates = loadSharingAlgorithm.calculateLoadSharing(
-            currentData,
-            powerConnectionId,
+            currentData.values.toList(),
+            getPowerConnection(powerConnectionId),
             chargingEndingAmpDelta
         ) as List<InternalState>
 
@@ -400,7 +471,7 @@ class EvChargingService(
             synchronizeIfNeeded(internalState)
         }
 
-        // only send increments of all decrements were successful
+        // only send increments if all decrements were successful
         if (decreasingSuccess) {
             increasing.forEach { internalState ->
                 synchronizeIfNeeded(internalState)
@@ -448,41 +519,60 @@ class EvChargingService(
         EVChargingStationConfig(
             getMode(internalState.clientId),
             internalState.loadSharingPriority,
-            getSkipPercentExpensiveHours(internalState.clientId)
+            getSkipPercentExpensiveHours(internalState.clientId),
+            getChargeRateLimit(internalState.clientId)
         ),
         internalState.evChargingStationClient
     )
 }
 
 data class InternalState(
-    val clientId: String,
-    override val powerConnectionId: String,
+    override val clientId: String,
+    val powerConnectionId: String,
     val evChargingStationClient: EvChargingStationClient,
-    override val chargingState: ChargingState,
+    val chargingState: ChargingState,
     val chargingStateChangedAt: Long,
-    val loadSharingPriority: LoadSharingPriority,
+    override val loadSharingPriority: LoadSharingPriority,
+    val chargeRateLimit: Int,
+    override val usesThreePhase: Boolean,
 
     val dataResponse: DataResponse,
     val pwmDutyCyclePercent: Int,
 
-    override val measuredCurrentPeakAt: Long?,
+    val measuredCurrentPeakAt: Long?,
     val measuredCurrentInAmpsAvg: Double?,
 
-    val reasonChargingUnavailable: String?
+    val reasonChargingUnavailable: String?,
+    private val chargingEndingAmpDelta: Int
 ) : LoadSharable {
 
-    override fun getMaxChargeCurrentAmps() =
+    override fun isCharging(): Boolean = chargingState == Charging
+    override fun isChargingOrChargingRequested(): Boolean = isCharging() || chargingState == ChargingRequested
+
+    override fun getConfiguredRateAmps() =
         if (chargingState == ChargingRequested || chargingState == Charging) {
             pwmPercentToChargingRate(pwmDutyCyclePercent)
         } else
             error("Not in a state which allows current to flow. state=$chargingState")
 
-    override val measuredCurrentInAmps: Int?
-        get() = measuredCurrentInAmpsAvg?.roundToInt()
-    override val proximityPilotAmps: Int
-        get() = dataResponse.proximityPilotAmps.toAmps()
-    override val loadSharingPriorityValue: Int
-        get() = loadSharingPriority.value
+    private fun getPossibleRateAmps(): Int = min(dataResponse.proximityPilotAmps.ampValue, chargeRateLimit)
+
+    override fun wantsMore(timestamp: Long): Boolean {
+        if (chargingState !in listOf(Charging, ChargingRequested)) {
+            return false
+        }
+
+        if (getPossibleRateAmps() <= getConfiguredRateAmps()) {
+            return false
+        }
+
+        if (isCharging() && measuredCurrentInAmpsAvg != null && measuredCurrentPeakAt != null && timestamp - measuredCurrentPeakAt > 60 * 1000) {
+            // already reached peak power draw
+            return getConfiguredRateAmps() < (measuredCurrentInAmpsAvg.roundToInt() + chargingEndingAmpDelta)
+        }
+
+        return true
+    }
 
     override fun setNoCapacityAvailable(timestamp: Long) = if (chargingState != ConnectedChargingUnavailable)
         changeState(ConnectedChargingUnavailable, timestamp, "No capacity available")
@@ -490,16 +580,19 @@ data class InternalState(
         this
 
     override fun adjustMaxChargeCurrent(amps: Int, timestamp: Long) =
-        if (this.chargingState == ChargingRequested) copy(
-            chargingState = Charging,
-            chargingStateChangedAt = timestamp,
-            pwmDutyCyclePercent = chargeRateToPwmPercent(amps),
-            measuredCurrentInAmpsAvg = null,
-            measuredCurrentPeakAt = null
-        )
-        else copy(
-            pwmDutyCyclePercent = chargeRateToPwmPercent(amps)
-        )
+        when {
+            amps < 1 && chargingState == ChargingRequested -> this
+            amps < 1 -> copy(pwmDutyCyclePercent = PWM_OFF)
+            amps >= LOWEST_CHARGE_RATE && chargingState == ChargingRequested -> copy(
+                chargingState = Charging,
+                chargingStateChangedAt = timestamp,
+                pwmDutyCyclePercent = chargeRateToPwmPercent(amps),
+                measuredCurrentInAmpsAvg = null,
+                measuredCurrentPeakAt = null
+            )
+            amps >= LOWEST_CHARGE_RATE -> copy(pwmDutyCyclePercent = chargeRateToPwmPercent(amps))
+            else -> error("Impossible this=$this amps=$amps")
+        }
 
     fun updateData(evChargingStationClient: EvChargingStationClient, dataResponse: DataResponse) =
         if (dataResponse.pwmPercent > this.dataResponse.pwmPercent) copy(
@@ -519,7 +612,8 @@ data class InternalState(
     fun changeState(
         chargingState: ChargingState,
         timestamp: Long,
-        reasonChargingUnavailable: String? = null
+        reasonChargingUnavailable: String? = null,
+        fake: Boolean = false
     ): InternalState {
         if (chargingState == ConnectedChargingUnavailable) {
             check(reasonChargingUnavailable != null)
@@ -528,15 +622,21 @@ data class InternalState(
         return if (this.chargingState == chargingState) {
             this
         } else {
-            EvChargingService.logger.info { "StateChange for ${this.clientId}:  ${this.chargingState} -> $chargingState" }
+            if (!fake) {
+                EvChargingService.logger.info { "StateChange for ${this.clientId}:  ${this.chargingState} -> $chargingState" }
+            }
             this.copy(
                 pwmDutyCyclePercent = PWM_OFF, // will re-adjust by LoadSharing
                 chargingState = chargingState,
                 chargingStateChangedAt = timestamp,
-                reasonChargingUnavailable = if (chargingState == ConnectedChargingUnavailable) reasonChargingUnavailable else null,
+                reasonChargingUnavailable = if (chargingState == ConnectedChargingUnavailable || chargingState == StoppingCharging) reasonChargingUnavailable else null,
                 measuredCurrentInAmpsAvg = null,
                 measuredCurrentPeakAt = null
-            )
+            ).let {
+                if (chargingState == Unconnected) {
+                    it.copy(usesThreePhase = false)
+                } else it
+            }
         }
     }
 
@@ -575,7 +675,7 @@ fun pwmPercentToChargingRate(pwmPercent: Int) = when (pwmPercent) {
  *
  * https://www.ti.com/lit/ug/tidub87/tidub87.pdf
  */
-fun chargeRateToPwmPercent(amps: Int) = ceil(((amps * 10).toDouble() / 6)).roundToInt()
+fun chargeRateToPwmPercent(amps: Int) = if (amps == 0) PWM_OFF else ceil(((amps * 10).toDouble() / 6)).roundToInt()
 
 fun desiredPwmPercent(chargingState: ChargingState, pwmDutyCyclePercent: Int) = when (chargingState) {
     Charging -> pwmDutyCyclePercent

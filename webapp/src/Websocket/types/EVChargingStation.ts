@@ -19,7 +19,8 @@ export enum EvChargingStationRequestType {
 
     setMode = "setMode",
     setLoadSharingPriority = "setLoadSharingPriority",
-    setSkipPercentExpensiveHours = "setSkipPercentExpensiveHours"
+    setSkipPercentExpensiveHours = "setSkipPercentExpensiveHours",
+    setChargeRateLimit = "setChargeRateLimit"
 }
 
 export class EvChargingStationRequest {
@@ -29,15 +30,16 @@ export class EvChargingStationRequest {
     public newMode: EvChargingMode | null;
     public newLoadSharingPriority: LoadSharingPriority | null;
     public skipPercentExpensiveHours: number | null;
+    public chargeRateLimit: number | null;
 
-
-    public constructor(type: EvChargingStationRequestType, clientId: string | null, firmwareBased64Encoded: string | null, newMode: EvChargingMode | null, newLoadSharingPriority: LoadSharingPriority | null, skipPercentExpensiveHours: number | null) {
+    public constructor(type: EvChargingStationRequestType, clientId: string | null, firmwareBased64Encoded: string | null, newMode: EvChargingMode | null, newLoadSharingPriority: LoadSharingPriority | null, skipPercentExpensiveHours: number | null, chargeRateLimit: number | null) {
         this.type = type;
         this.clientId = clientId;
         this.firmwareBased64Encoded = firmwareBased64Encoded;
         this.newMode = newMode;
         this.newLoadSharingPriority = newLoadSharingPriority;
         this.skipPercentExpensiveHours = skipPercentExpensiveHours;
+        this.chargeRateLimit = chargeRateLimit;
     }
 }
 
@@ -127,12 +129,13 @@ export class EVChargingStationConfig {
     public mode: EvChargingMode;
     public loadSharingPriority: LoadSharingPriority;
     public skipPercentExpensiveHours: number;
+    public chargeRateLimit: number;
 
-
-    public constructor(mode: EvChargingMode, loadSharingPriority: LoadSharingPriority, skipPercentExpensiveHours: number) {
+    public constructor(mode: EvChargingMode, loadSharingPriority: LoadSharingPriority, skipPercentExpensiveHours: number, chargeRateLimit: number) {
         this.mode = mode;
         this.loadSharingPriority = loadSharingPriority;
         this.skipPercentExpensiveHours = skipPercentExpensiveHours;
+        this.chargeRateLimit = chargeRateLimit;
     }
 }
 

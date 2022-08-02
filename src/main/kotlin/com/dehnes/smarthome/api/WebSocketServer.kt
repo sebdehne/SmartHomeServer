@@ -186,6 +186,13 @@ class WebSocketServer : Endpoint() {
             ),
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
+        EvChargingStationRequestType.setChargeRateLimit -> EvChargingStationResponse(
+            configUpdated = evChargingService.setChargeRateLimitFor(
+                request.clientId!!,
+                request.chargeRateLimit!!
+            ),
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+        )
     }
 
     private fun underFloorHeaterRequest(request: UnderFloorHeaterRequest) = when (request.type) {

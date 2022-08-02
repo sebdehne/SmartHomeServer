@@ -31,6 +31,7 @@ internal class EvChargingServiceTest {
 
     val allChargingsStations = mutableMapOf<String, TestChargingStation>()
     val onlineChargingStations = mutableSetOf<String>()
+    var currentPowerConnectionCapacity = 32
 
     init {
         every {
@@ -63,6 +64,9 @@ internal class EvChargingServiceTest {
                 } else {
                     defaultSlot.captured
                 }
+            }
+            else if (key.startsWith("PowerConnection.availableCapacity.")) {
+                currentPowerConnectionCapacity.toString()
             } else {
                 defaultSlot.captured
             }
@@ -113,7 +117,7 @@ internal class EvChargingServiceTest {
         persistenceService,
         clockMock,
         mapOf(
-            PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(persistenceService, clockMock)
+            PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clockMock)
         )
     )
 
@@ -194,9 +198,9 @@ internal class EvChargingServiceTest {
         collectDataCycle(secondsToAdd = 10)
 
         assertFalse(s1.contactorOn)
-        assertEquals(chargeRateToPwmPercent(LOWEST_MAX_CHARGE_RATE), s1.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(LOWEST_CHARGE_RATE), s1.pwmPercent)
         assertFalse(s2.contactorOn)
-        assertEquals(100, s2.pwmPercent)
+        assertEquals(PWM_OFF, s2.pwmPercent)
 
         // Car ready to charge
         s1.pilotVoltage = PilotVoltage.Volt_6
@@ -217,7 +221,7 @@ internal class EvChargingServiceTest {
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(32), s1.pwmPercent)
         assertFalse(s2.contactorOn)
-        assertEquals(chargeRateToPwmPercent(LOWEST_MAX_CHARGE_RATE), s2.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(LOWEST_CHARGE_RATE), s2.pwmPercent)
 
         // Second car starts charging
         s2.pilotVoltage = PilotVoltage.Volt_6
@@ -239,6 +243,38 @@ internal class EvChargingServiceTest {
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
 
+        // Test power connection capacity drops
+        currentPowerConnectionCapacity = 16
+        collectDataCycle(secondsToAdd = 10)
+        assertTrue(s1.contactorOn)
+        assertEquals(chargeRateToPwmPercent(8), s1.pwmPercent)
+        assertTrue(s2.contactorOn)
+        assertEquals(chargeRateToPwmPercent(8), s2.pwmPercent)
+
+        // Test power connection capacity drops to minimum
+        currentPowerConnectionCapacity = 6
+        collectDataCycle(10, secondsToAdd = 10)
+        assertTrue(s1.contactorOn)
+        assertEquals(chargeRateToPwmPercent(6), s1.pwmPercent)
+        assertFalse(s2.contactorOn)
+        assertEquals(chargeRateToPwmPercent(0), s2.pwmPercent)
+
+        // Test power connection capacity drops below minimum
+        currentPowerConnectionCapacity = 2
+        collectDataCycle(10, secondsToAdd = 10)
+        assertFalse(s1.contactorOn)
+        assertEquals(chargeRateToPwmPercent(0), s1.pwmPercent)
+        assertFalse(s2.contactorOn)
+        assertEquals(chargeRateToPwmPercent(0), s2.pwmPercent)
+
+        // Test power connection capacity back to normal
+        currentPowerConnectionCapacity = 32
+        collectDataCycle(10, secondsToAdd = 10)
+        assertTrue(s1.contactorOn)
+        assertEquals(chargeRateToPwmPercent(16), s1.pwmPercent)
+        assertTrue(s2.contactorOn)
+        assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
+
         // Car 1 rate declining
         s1.setMeasuredCurrent(15)
         s2.setMeasuredCurrent(16)
@@ -251,7 +287,7 @@ internal class EvChargingServiceTest {
         // Car 1 rate declining below threshold
         s1.setMeasuredCurrent(13)
         s2.setMeasuredCurrent(16)
-        collectDataCycle(20, secondsToAdd = 2)
+        collectDataCycle(60, secondsToAdd = 2)
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(15), s1.pwmPercent)
         assertTrue(s2.contactorOn)
@@ -262,16 +298,16 @@ internal class EvChargingServiceTest {
         s2.setMeasuredCurrent(16)
         collectDataCycle(10, secondsToAdd = 10)
         assertTrue(s1.contactorOn)
-        assertEquals(chargeRateToPwmPercent(13), s1.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(12), s1.pwmPercent)
         assertTrue(s2.contactorOn)
-        assertEquals(chargeRateToPwmPercent(19), s2.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(20), s2.pwmPercent)
 
         // Car 1 rate declining below threshold even more
         s1.setMeasuredCurrent(1)
         s2.setMeasuredCurrent(16)
         collectDataCycle(10, secondsToAdd = 10)
         assertTrue(s1.contactorOn)
-        assertEquals(chargeRateToPwmPercent(LOWEST_MAX_CHARGE_RATE), s1.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(LOWEST_CHARGE_RATE), s1.pwmPercent)
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(26), s2.pwmPercent)
 
@@ -280,7 +316,7 @@ internal class EvChargingServiceTest {
         s2.setMeasuredCurrent(16)
         collectDataCycle()
         assertTrue(s1.contactorOn)
-        assertEquals(chargeRateToPwmPercent(LOWEST_MAX_CHARGE_RATE), s1.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(LOWEST_CHARGE_RATE), s1.pwmPercent)
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(26), s2.pwmPercent)
 
@@ -288,7 +324,7 @@ internal class EvChargingServiceTest {
         s1.pilotVoltage = PilotVoltage.Volt_9
         collectDataCycle()
         assertFalse(s1.contactorOn)
-        assertEquals(chargeRateToPwmPercent(LOWEST_MAX_CHARGE_RATE), s1.pwmPercent)
+        assertEquals(chargeRateToPwmPercent(LOWEST_CHARGE_RATE), s1.pwmPercent)
         assertTrue(s2.contactorOn)
         assertEquals(chargeRateToPwmPercent(32), s2.pwmPercent)
 

@@ -65,7 +65,7 @@ class Configuration {
             persistenceService,
             clock,
             mapOf(
-                PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(persistenceService, clock)
+                PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clock)
             )
         )
         evChargingService.start()

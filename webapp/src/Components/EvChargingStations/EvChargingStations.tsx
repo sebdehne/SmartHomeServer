@@ -37,6 +37,7 @@ export const EvChargingStations = () => {
                     null,
                     null,
                     null,
+                    null,
                     null
                 ),
                 null,

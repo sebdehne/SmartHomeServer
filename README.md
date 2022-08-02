@@ -5,6 +5,7 @@ Smarthome backend and frontend
 - Management of my DehneEVSE Charging stations (See [hardware](https://github.com/sebdehne/DehneEVSE-Hardware) and [firmware](https://github.com/sebdehne/DehneEVSE-Firmware)) 
   - Charge only when energy prices are low (overrideable)
   - Intelligent load sharing between multiple stations
+  - Dynamically adjust the charging rate to stay below house power-budget (I get billed by power consumption)
   - Logging of all parameters, incl. power consumption to InfluxDB
 - Heating control
   - Heat only when energy prices are low

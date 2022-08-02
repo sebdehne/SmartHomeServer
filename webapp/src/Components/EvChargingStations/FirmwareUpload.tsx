@@ -34,6 +34,7 @@ export const FirmwareUpload = ({ setSending, setCmdResult, clientId }: FirmwareU
                     firmwareBased64Encoded,
                     null,
                     null,
+                    null,
                     null
                 ),
                 null,

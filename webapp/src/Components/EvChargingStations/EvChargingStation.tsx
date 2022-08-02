@@ -90,6 +90,7 @@ export const EvChargingStation = ({
         null,
         mode,
         null,
+        null,
         null
     ));
     const updatePriorityTo = (priority: LoadSharingPriority) => sendUpdate(new EvChargingStationRequest(
@@ -98,6 +99,7 @@ export const EvChargingStation = ({
         null,
         null,
         priority,
+        null,
         null
     ));
     const setSkipPercentExpensiveHours = (delta: number) => sendUpdate(
@@ -107,7 +109,19 @@ export const EvChargingStation = ({
             null,
             null,
             null,
-            station.config.skipPercentExpensiveHours + delta
+            station.config.skipPercentExpensiveHours + delta,
+            null
+        )
+    );
+    const setChargeRateLimit = (delta: number) => sendUpdate(
+        new EvChargingStationRequest(
+            EvChargingStationRequestType.setChargeRateLimit,
+            station.clientConnection.clientId,
+            null,
+            null,
+            null,
+            null,
+            station.config.chargeRateLimit + delta
         )
     );
 
@@ -198,6 +212,28 @@ export const EvChargingStation = ({
                 </Grid>
 
                 }
+
+                <Grid item xs={12}>
+                    <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
+
+                        <Grid item xs={4}>
+                            <span>Charge limit in Amps: </span>
+                            <span>{station.config.chargeRateLimit}</span>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
+                                margin: "10px"
+                            }}>
+                                <Button
+                                    disabled={station.config.chargeRateLimit <= 6}
+                                    onClick={() => setChargeRateLimit(-1)}>-</Button>
+                                <Button
+                                    disabled={station.config.chargeRateLimit >= 32}
+                                    onClick={() => setChargeRateLimit(1)}>+</Button>
+                            </ButtonGroup>
+                        </Grid>
+                    </Grid>
+                </Grid>
 
                 <Grid item xs={12}>
                     <Grid container justify="flex-start" spacing={2} alignItems={"center"}>

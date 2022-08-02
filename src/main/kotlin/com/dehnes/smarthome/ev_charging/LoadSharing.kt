@@ -1,40 +1,42 @@
 package com.dehnes.smarthome.ev_charging
 
-import com.dehnes.smarthome.ev_charging.ChargingState.*
-import com.dehnes.smarthome.utils.PersistenceService
-import java.lang.Integer.max
 import java.time.Clock
 
-const val LOWEST_MAX_CHARGE_RATE = 6
+const val LOWEST_CHARGE_RATE = 6
 
 interface LoadSharing {
     fun calculateLoadSharing(
-        currentData: Map<String, LoadSharable>,
-        powerConnectionId: String,
+        currentData: List<LoadSharable>,
+        powerConnection: PowerConnection,
         chargingEndingAmpDelta: Int
     ): List<LoadSharable>
 }
 
 interface LoadSharable {
-    val powerConnectionId: String
-    val chargingState: ChargingState
-    val proximityPilotAmps: Int
-    val loadSharingPriorityValue: Int
+    val clientId: String
+    val loadSharingPriority: LoadSharingPriority
+    val usesThreePhase: Boolean
 
-    val measuredCurrentInAmps: Int?
-    val measuredCurrentPeakAt: Long?
+    fun isCharging(): Boolean
+    fun isChargingOrChargingRequested(): Boolean
 
-    fun getMaxChargeCurrentAmps(): Int
+    fun getConfiguredRateAmps(): Int
+
+    fun wantsMore(timestamp: Long): Boolean
+
     fun setNoCapacityAvailable(timestamp: Long): LoadSharable
     fun adjustMaxChargeCurrent(amps: Int, timestamp: Long): LoadSharable
 }
 
-enum class LoadSharingPriority(
-    val value: Int
-) {
-    HIGH(1),
-    NORMAL(2),
-    LOW(3)
+interface PowerConnection {
+    fun availableAmpsCapacity(): Int
+    fun availablePowerCapacity(): Int
+}
+
+enum class LoadSharingPriority {
+    HIGH,
+    NORMAL,
+    LOW
 }
 
 /*
@@ -42,124 +44,90 @@ enum class LoadSharingPriority(
  * more capacity is available
  */
 class PriorityLoadSharing(
-    private val persistenceService: PersistenceService,
     private val clock: Clock
 ) : LoadSharing {
 
     override fun calculateLoadSharing(
-        currentData: Map<String, LoadSharable>,
-        powerConnectionId: String,
+        currentData: List<LoadSharable>,
+        powerConnection: PowerConnection,
         chargingEndingAmpDelta: Int
     ): List<LoadSharable> {
 
         /*
          * Setup
          */
-        val loadSharableById =
-            currentData.filter { it.value.powerConnectionId == powerConnectionId }.toMap().toMutableMap()
-        var availableCapacity =
-            persistenceService["PowerConnection.availableCapacity.$powerConnectionId", "32"]!!.toInt()
-        check(availableCapacity in 1..1000) { "AvailableCapacity outside of reasonable range? $availableCapacity" }
+        val loadSharableById = currentData.map { it.clientId to it }.toMap().toMutableMap()
+        var availableAmpsCapacity = powerConnection.availableAmpsCapacity()
+        check(availableAmpsCapacity in 0..1000) { "AvailableCapacity outside of reasonable range? $availableAmpsCapacity" }
+        var availablePowerCapacity = powerConnection.availablePowerCapacity()
 
-        val requestCapability = { request: Int ->
-            request.coerceAtMost(availableCapacity).apply {
-                availableCapacity -= this
+        val takeCapacity = { requestedAmps: Int, threePhase: Boolean ->
+
+            val phases = if (threePhase) 3 else 1
+            val requestedPower = (requestedAmps * 230) * phases
+
+            val hasEnoughAmps = requestedAmps <= availableAmpsCapacity
+            val hasEnoughPower = requestedPower <= availablePowerCapacity
+
+            if (hasEnoughAmps && hasEnoughPower) {
+                availableAmpsCapacity -= requestedAmps
+                availablePowerCapacity -= requestedPower
+                requestedAmps
+            } else {
+                0
             }
         }
 
-        val spreadAvailableCapacity = { isInitial: Boolean, byPriority: Map<Int, Map<String, LoadSharable>> ->
-            if (byPriority.isNotEmpty()) {
-                byPriority.keys.sorted().forEach { priority ->
-                    val stations = byPriority[priority]!!
+        // Initially - all zero
+        loadSharableById.values
+            .filter { it.isChargingOrChargingRequested() }
+            .forEach { ls ->
+                loadSharableById[ls.clientId] = ls.adjustMaxChargeCurrent(0, clock.millis())
+            }
 
-                    val capacityPerStation = availableCapacity / stations.count()
+        // Spread the capacity
+        LoadSharingPriority.values().forEach { loadSharingPriority ->
 
-                    stations.forEach { (clientId, internalState) ->
-                        if (isInitial) {
-                            val possibleChargeRate = capacityPerStation.coerceAtMost(internalState.proximityPilotAmps)
-                            val amps = requestCapability(possibleChargeRate.coerceAtLeast(LOWEST_MAX_CHARGE_RATE))
-                            if (amps > 0) {
-                                loadSharableById[clientId] = internalState.adjustMaxChargeCurrent(amps, clock.millis())
-                            } else {
-                                loadSharableById[clientId] = internalState.setNoCapacityAvailable(clock.millis())
-                            }
+            var somethingChanged: Boolean
+            while (true) {
+                somethingChanged = false
+                loadSharableById.values
+                    .filter { it.loadSharingPriority == loadSharingPriority }
+                    .filter { it.isChargingOrChargingRequested() }
+                    .sortedBy { it.clientId }
+                    .filter { it.wantsMore(clock.millis()) }
+                    .forEach { sh ->
+                        val toBeAdded = if (sh.getConfiguredRateAmps() == 0) {
+                            LOWEST_CHARGE_RATE
                         } else {
-                            val headRoom = internalState.proximityPilotAmps - internalState.getMaxChargeCurrentAmps()
-                            val ampsToAdd = requestCapability(capacityPerStation.coerceAtMost(headRoom))
-                            loadSharableById[clientId] =
-                                internalState.adjustMaxChargeCurrent(
-                                    internalState.getMaxChargeCurrentAmps() + ampsToAdd,
-                                    clock.millis()
-                                )
+                            1
+                        }
+                        val addedAmps = takeCapacity(toBeAdded, sh.usesThreePhase)
+                        if (addedAmps > 0) {
+                            loadSharableById[sh.clientId] = sh.adjustMaxChargeCurrent(
+                                sh.getConfiguredRateAmps() + addedAmps,
+                                clock.millis()
+                            )
+                            somethingChanged = true
                         }
                     }
+
+                if (!somethingChanged) {
+                    break
                 }
             }
         }
 
-        /*
-         * States in which capacity is needed: ChargingRequested, Charging
-         */
-
-        // initially: for each priority-level, spread the capacity evenly
-        spreadAvailableCapacity(true, sortByPriority(
-            loadSharableById.filter {
-                it.value.chargingState in listOf(Charging, ChargingRequested)
-            }
-        ))
-
-        // Then reclaim capacity from unused capacity
-        val stationsNotUsingTheirCapacity = mutableSetOf<String>()
-        loadSharableById
-            .filter { it.value.chargingState == Charging }
-            .filter { it.value.measuredCurrentInAmps != null && it.value.measuredCurrentPeakAt != null }
-            .filter { clock.millis() - it.value.measuredCurrentPeakAt!! > 60 * 1000 }
-            .forEach { (clientId, internalState) ->
-
-                if (internalState.getMaxChargeCurrentAmps() > LOWEST_MAX_CHARGE_RATE) {
-                    val breakpoint = internalState.getMaxChargeCurrentAmps() - chargingEndingAmpDelta
-                    val capacityNotUsing = breakpoint - internalState.measuredCurrentInAmps!!
-                    if (capacityNotUsing > 0) {
-
-                        val newRate = max(LOWEST_MAX_CHARGE_RATE, internalState.getMaxChargeCurrentAmps() - capacityNotUsing)
-                        val madeAvailable = internalState.getMaxChargeCurrentAmps() - newRate
-
-                        if (madeAvailable > 0) {
-                            availableCapacity += madeAvailable
-                            stationsNotUsingTheirCapacity.add(clientId)
-                            loadSharableById[clientId] =
-                                internalState.adjustMaxChargeCurrent(
-                                    internalState.getMaxChargeCurrentAmps() - madeAvailable,
-                                    clock.millis()
-                                )
-                        }
-                    }
+        // those which remain at zero -> update state
+        loadSharableById.values
+            .filter { it.isChargingOrChargingRequested() }
+            .forEach { ls ->
+                if (ls.getConfiguredRateAmps() < LOWEST_CHARGE_RATE) {
+                    loadSharableById[ls.clientId] = ls.setNoCapacityAvailable(clock.millis())
                 }
             }
-
-        // At last: give reclaimed capacity to those which are capable of getting more
-        while (true) {
-            val stationsWhichWantMore = loadSharableById.filter {
-                it.value.chargingState in listOf(Charging, ChargingRequested)
-                        && it.value.proximityPilotAmps > it.value.getMaxChargeCurrentAmps()
-                        && it.key !in stationsNotUsingTheirCapacity
-            }
-
-            if (stationsWhichWantMore.isEmpty() || availableCapacity == 0) {
-                break
-            }
-
-            spreadAvailableCapacity(false, sortByPriority(stationsWhichWantMore))
-        }
 
         return loadSharableById.values.toList()
-
     }
-
-    private fun sortByPriority(input: Map<String, LoadSharable>) = input.toList()
-        .groupBy { it.second.loadSharingPriorityValue }
-        .mapValues { entry ->
-            entry.value.toMap()
-        }
 
 }
