@@ -59,7 +59,7 @@ export const getSensorStatus = (sensor: EnvironmentSensorState, currentMilliSeco
         if (sensor.sensorData!!.timestampDelta > 10 || sensor.sensorData!!.timestampDelta < -10) {
             status = SensorStatus.yellow;
         }
-        if (sensor.sensorData!!.batteryMilliVolts < 3400) {
+        if (sensor.sensorData!!.batteryMilliVolts < 3100) {
             status = SensorStatus.yellow;
         }
         if (sensor.sensorData!!.temperatureError) {

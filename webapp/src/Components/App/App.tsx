@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Container, Link} from "@material-ui/core";
+import { Button, Container, Link } from "@material-ui/core";
 import { useNavigate } from "react-router-dom";
 import './App.css';
 
@@ -13,7 +13,7 @@ const App = () => {
 
     return (
         <Container maxWidth="sm" className="App">
-            <h2 style={{textAlign: "center"}}>Smart home controller</h2>
+            <h2 style={{ textAlign: "center" }}>Smart home controller</h2>
             <ul className="Menu">
                 <li>
                     <Button variant="contained" color="primary" onClick={relative("/garage")}>
@@ -60,6 +60,20 @@ const App = () => {
                     </Link>
                 </li>
             </ul>
+
+            <iframe src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&theme=dark&panelId=2&refresh=5s&from=now-6h&to=now"
+                    style={{
+                        border: "none",
+                        width: "100%"
+                    }}></iframe>
+
+
+            <iframe
+                src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&refresh=5s&theme=dark&panelId=6&refresh=5s&from=now-48h&to=now"
+                style={{
+                    border: "none",
+                    width: "100%"
+                }}></iframe>
         </Container>
     );
 };
