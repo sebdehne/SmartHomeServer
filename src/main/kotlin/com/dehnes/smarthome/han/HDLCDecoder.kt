@@ -3,8 +3,7 @@ package com.dehnes.smarthome.han
 import com.dehnes.smarthome.utils.merge
 import com.dehnes.smarthome.utils.toUnsignedInt
 import mu.KotlinLogging
-import java.net.InetSocketAddress
-import java.net.Socket
+import java.util.*
 
 
 val headerLength = 0 +
@@ -14,18 +13,34 @@ val headerLength = 0 +
         1 + // control
         2   // HCS
 
-data class DlmsMessageHeader(
+data class HDLCFrameHeader(
     val payloadLength: Int,
     val segmentation: Int,
     val dstAddr: Int,
     val srcAddr: Int,
-    val controll: Int,
+    val control: Int,
+    val frameType: HDLCFrameType,
     val hcs: Int,
     val rawHeader: ByteArray,
 )
 
-data class DlmsMessage(
-    val header: DlmsMessageHeader,
+enum class HDLCFrameType {
+    information,
+    supervisory,
+    unnumbered;
+
+    companion object {
+        fun fromControl(control: Int) = when {
+            control and 0b11 == 0b00 -> information
+            control and 0b11 == 0b10 -> supervisory
+            control and 0b11 == 0b11 -> unnumbered
+            else -> error("Unknown frame type. control=$control")
+        }
+    }
+}
+
+data class HDLCFrame(
+    val header: HDLCFrameHeader,
     val payload: ByteArray,
     val fcs: Int,
 )
@@ -54,16 +69,17 @@ enum class HanDecoderState {
 
 class HanDecoder {
 
+    private val random = Random()
     private val logger = KotlinLogging.logger { }
     private var state: HanDecoderState = HanDecoderState.detectingStart
-    private var currentHeader: DlmsMessageHeader? = null
+    private var currentHeader: HDLCFrameHeader? = null
 
-    fun decode(buffer: ByteArray, length: Int, onMessage: (message: DlmsMessage) -> Unit): Int {
+    fun decode(buffer: ByteArray, length: Int, onMessage: (message: HDLCFrame) -> Unit): Int {
 
         when (state) {
             HanDecoderState.detectingStart -> {
                 var startPos: Int = -1
-                for(pos in 0 until length) {
+                for (pos in 0 until length) {
                     if (buffer[pos].toUnsignedInt() == 0x7e) {
                         startPos = pos
                         break
@@ -97,18 +113,21 @@ class HanDecoder {
                         0,
                         headerLength
                     )
-                    currentHeader = DlmsMessageHeader(
+                    currentHeader = HDLCFrameHeader(
                         payloadLength = frameLength - headerLength - 2,
                         segmentation = segmentation,
                         dstAddr = dstAddr,
                         srcAddr = srcAddr,
-                        controll = control,
+                        control = control,
+                        frameType = HDLCFrameType.fromControl(control),
                         hcs = hcs,
                         rawHeader = rawHeader
                     )
                     startPos + 1 + headerLength
                 } else {
-                    length
+                    val skip = random.nextInt(length)
+                    logger.warn { "Invalida data received, skipping $skip" }
+                    skip
                 }
             }
 
@@ -148,7 +167,7 @@ class HanDecoder {
 
                     return if (calculatedFcs == fcs && endFlag == 0x7e) {
                         onMessage(
-                            DlmsMessage(
+                            HDLCFrame(
                                 header,
                                 payload,
                                 fcs
@@ -171,45 +190,5 @@ class HanDecoder {
         }
     }
 
-    fun readFromTcp(port: Int, host: String) {
-        val s = Socket()
-        s.connect(InetSocketAddress(host, port), 10000)
-        s.soTimeout = (1000 * 60)
-        s.getInputStream().use { inputStream ->
 
-            logger.info { "Connected" }
-
-            val buffer = ByteArray(1024 * 10)
-            var writePos = 0
-
-            while (true) {
-                if (writePos + 1 >= buffer.size) error("Buffer full")
-                val read = inputStream.read(buffer, writePos, buffer.size - writePos)
-                if (read > -1) {
-                    writePos += read
-
-                    val consumed = decode(buffer, writePos) {
-                        logger.info { "Got new msg=${it}" }
-                    }
-
-                    if (consumed > 0) {
-                        // wrap the buffer
-                        System.arraycopy(
-                            buffer,
-                            consumed,
-                            buffer,
-                            0,
-                            writePos - consumed
-                        )
-                        writePos -= consumed
-                    }
-                }
-            }
-        }
-    }
-
-}
-
-fun main() {
-    HanDecoder().readFromTcp(23000, "192.168.1.1")
 }

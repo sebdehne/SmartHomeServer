@@ -2,20 +2,23 @@ package com.dehnes.smarthome
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
+import com.dehnes.smarthome.garage_door.GarageController
+import com.dehnes.smarthome.han.HanDataService
+import com.dehnes.smarthome.han.HanPortListeningService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
-import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
-import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import mu.KotlinLogging
 import java.time.Clock
 import java.time.ZoneId
 import java.util.concurrent.Executors
@@ -47,6 +50,15 @@ class Configuration {
         )
         tibberService.start()
 
+        val hanDataService = HanDataService(influxDBClient)
+
+        val hanPortListeningService = HanPortListeningService("192.168.1.1", 23000, executorService)
+        hanPortListeningService.listeners.add { hanData ->
+            KotlinLogging.logger("Han-Logger").info { "hanData=$hanData" }
+        }
+        hanPortListeningService.listeners.add(hanDataService::onNewData)
+
+        hanPortListeningService.start()
 
         val evChargingStationConnection = EvChargingStationConnection(
             9091,
