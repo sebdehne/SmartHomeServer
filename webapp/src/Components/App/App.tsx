@@ -64,15 +64,25 @@ const App = () => {
             <iframe src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&theme=dark&panelId=2&refresh=5s&from=now-6h&to=now"
                     style={{
                         border: "none",
-                        width: "100%"
+                        width: "50%"
                     }}></iframe>
-
+            <iframe src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&theme=dark&panelId=10&refresh=60s&from=now-24h&to=now"
+                    style={{
+                        border: "none",
+                        width: "50%"
+                    }}></iframe>
 
             <iframe
                 src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&refresh=5s&theme=dark&panelId=6&refresh=5s&from=now-48h&to=now"
                 style={{
                     border: "none",
-                    width: "100%"
+                    width: "50%"
+                }}></iframe>
+            <iframe
+                src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&refresh=5s&theme=dark&panelId=8&refresh=60s&from=now-24h&to=now"
+                style={{
+                    border: "none",
+                    width: "50%"
                 }}></iframe>
         </Container>
     );
