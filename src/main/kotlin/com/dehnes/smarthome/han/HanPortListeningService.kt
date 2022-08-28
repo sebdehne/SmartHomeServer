@@ -21,7 +21,7 @@ data class HanData(
     val totalReactiveEnergyImport: Long?,
     val totalReactiveEnergyExport: Long?,
 
-    val createdAt: Instant =  Instant.now()
+    val createdAt: Instant = Instant.now()
 )
 
 class HanPortListeningService(
@@ -35,6 +35,7 @@ class HanPortListeningService(
 
     @Volatile
     private var isStarted = false
+
     @Volatile
     private var hanPortConnection: HanPortConnection? = null
 
@@ -81,34 +82,33 @@ class HanPortListeningService(
             if (hanPortConnection != null) {
                 if (writePos + 1 >= buffer.size) error("Buffer full")
                 val read = hanPortConnection!!.read(buffer, writePos, buffer.size - writePos)
-                if (read > -1) {
-                    writePos += read
+                check(read > -1) { "EOF while reading from HAN-port" }
+                writePos += read
 
-                    val consumed = hanDecoder.decode(buffer, writePos) { hdlcFrame ->
-                        val dlmsMessage = DLMSDecoder.decode(hdlcFrame)
-                        logger.info { "Got new msg=${hdlcFrame}" }
-                        executorService.submit {
-                            listeners.forEach { l ->
-                                try {
-                                    l(mapToHanData(dlmsMessage))
-                                } catch (e: Exception) {
-                                    logger.error(e) { "Error from hanListener" }
-                                }
+                val consumed = hanDecoder.decode(buffer, writePos) { hdlcFrame ->
+                    val dlmsMessage = DLMSDecoder.decode(hdlcFrame)
+                    logger.info { "Got new msg=${hdlcFrame}" }
+                    executorService.submit {
+                        listeners.forEach { l ->
+                            try {
+                                l(mapToHanData(dlmsMessage))
+                            } catch (e: Exception) {
+                                logger.error(e) { "Error from hanListener" }
                             }
                         }
                     }
+                }
 
-                    if (consumed > 0) {
-                        // wrap the buffer
-                        System.arraycopy(
-                            buffer,
-                            consumed,
-                            buffer,
-                            0,
-                            writePos - consumed
-                        )
-                        writePos -= consumed
-                    }
+                if (consumed > 0) {
+                    // wrap the buffer
+                    System.arraycopy(
+                        buffer,
+                        consumed,
+                        buffer,
+                        0,
+                        writePos - consumed
+                    )
+                    writePos -= consumed
                 }
             }
         }
