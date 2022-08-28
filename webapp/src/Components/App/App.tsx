@@ -53,7 +53,7 @@ const App = () => {
                     </Link>
                 </li>
                 <li>
-                    <Link href="https://dehnes.com/stats/d/sDbG2Td7k/energy-prices">
+                    <Link href="https://dehnes.com/stats/d/sDbG2Td7k/energy-prices&from=now&to=now+2d">
                         <Button variant="contained" color="primary">
                             Energy prices
                         </Button>
@@ -61,29 +61,45 @@ const App = () => {
                 </li>
             </ul>
 
-            <iframe src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&theme=dark&panelId=2&refresh=5s&from=now-6h&to=now"
-                    style={{
-                        border: "none",
-                        width: "50%"
-                    }}></iframe>
-            <iframe src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&theme=dark&panelId=10&refresh=60s&from=now-24h&to=now"
-                    style={{
-                        border: "none",
-                        width: "50%"
-                    }}></iframe>
-
+            {/* Temperature last 48Hours */}
             <iframe
                 src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&refresh=5s&theme=dark&panelId=6&refresh=5s&from=now-48h&to=now"
                 style={{
                     border: "none",
-                    width: "50%"
+                    width: "100%"
                 }}></iframe>
+
+            {/* Energy cost 24h */}
             <iframe
-                src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&refresh=5s&theme=dark&panelId=8&refresh=60s&from=now-24h&to=now"
+                src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&theme=dark&panelId=10&refresh=60s"
                 style={{
                     border: "none",
-                    width: "50%"
+                    width: "33%"
                 }}></iframe>
+            {/* Energy cost month */}
+            <iframe
+                src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&theme=dark&panelId=11&refresh=60s"
+                style={{
+                    border: "none",
+                    width: "33%"
+                }}></iframe>
+
+            {/* Energy usage kWh */}
+            <iframe
+                src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&refresh=5s&theme=dark&panelId=8&refresh=60s"
+                style={{
+                    border: "none",
+                    width: "33%"
+                }}></iframe>
+
+            {/* Power in Watt */}
+            <iframe
+                src="/stats/d-solo/yvh6hxW4z/embedded-graphs?orgId=1&theme=dark&panelId=2&refresh=5s&from=now-6h&to=now"
+                style={{
+                    border: "none",
+                    width: "100%"
+                }}></iframe>
+
         </Container>
     );
 };
