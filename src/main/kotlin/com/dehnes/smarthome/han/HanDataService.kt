@@ -78,18 +78,19 @@ class HanDataService(
                 val startHour = endHour.minusSeconds(60 * 60)
 
                 if (previousTotalEnergyImport!!.first.roundToNearestFullHour() == startHour) {
-                    val delta = totalEnergyImport - previousTotalEnergyImport!!.second
-                    influxDbData.add("energyImportDeltaWh" to delta)
+                    val deltaInWh = totalEnergyImport - previousTotalEnergyImport!!.second
+                    influxDbData.add("energyImportDeltaWh" to deltaInWh)
 
                     val prices = tibberService.getCachedPrices()
 
-                    val priceInCents = prices.firstOrNull { it.isValidFor(startHour) }?.let { it.price * 100 }
+                    val energyPriceInCents = prices.firstOrNull { it.isValidFor(startHour) }?.let { it.price * 100 }
 
-                    if (priceInCents != null) {
-                        val totalPriceInCents =
-                            priceInCents + PowerDistributionPrices.getPowerDistributionPriceInCents(startHour)
-                        val totalCostInCents = (delta.toDouble() / 1000) * totalPriceInCents
-                        influxDbData.add("energyImportCostCents" to totalCostInCents.toLong())
+                    if (energyPriceInCents != null) {
+                        val priceInCents = energyPriceInCents +
+                                PowerDistributionPrices.getPowerDistributionPriceInCents(startHour)
+                        val costInCents = (deltaInWh.toDouble() / 1000) * priceInCents
+                        val costInNOK = costInCents / 100
+                        influxDbData.add("energyImportCostLastHour" to costInNOK)
                     }
                 }
             }
@@ -99,17 +100,17 @@ class HanDataService(
                 val startHour = endHour.minusSeconds(60 * 60)
 
                 if (previousTotalEnergyExport!!.first.roundToNearestFullHour() == startHour) {
-                    val delta = hanData.totalEnergyExport - previousTotalEnergyExport!!.second
-                    influxDbData.add("energyExportDeltaWh" to delta)
+                    val deltaInWh = hanData.totalEnergyExport - previousTotalEnergyExport!!.second
+                    influxDbData.add("energyExportDeltaWh" to deltaInWh)
 
                     val prices = tibberService.getCachedPrices()
 
                     val priceInCents = prices.firstOrNull { it.isValidFor(startHour) }?.let { it.price * 100 }
 
                     if (priceInCents != null) {
-                        val totalPriceInCents = priceInCents
-                        val totalCostInCents = (delta.toDouble() / 1000) * totalPriceInCents * -1
-                        influxDbData.add("energyExportCostCents" to totalCostInCents.toLong())
+                        val costInCents = (deltaInWh.toDouble() / 1000) * priceInCents * -1
+                        val costInNOK = costInCents / 100
+                        influxDbData.add("energyExportCostLastHour" to costInNOK)
                     }
                 }
             }
