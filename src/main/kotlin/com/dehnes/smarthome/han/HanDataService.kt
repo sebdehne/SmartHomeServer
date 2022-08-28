@@ -23,10 +23,10 @@ class HanDataService(
                     "voltageL1" to hanData.voltageL1, // in Volt
                     "voltageL2" to hanData.voltageL2, // in Volt
                     "voltageL3" to hanData.voltageL3, // in Volt
-                    hanData.totalEnergyImport?.let { "totalEnergyImport" to it },
-                    hanData.totalEnergyExport?.let { "totalEnergyExport" to it },
-                    hanData.totalReactiveEnergyImport?.let { "totalReactiveEnergyImport" to it },
-                    hanData.totalReactiveEnergyExport?.let { "totalReactiveEnergyExport" to it },
+                    hanData.totalEnergyImport?.let { "totalEnergyImport" to it * 10 }, // Wh
+                    hanData.totalEnergyExport?.let { "totalEnergyExport" to it * 10 }, // Wh
+                    hanData.totalReactiveEnergyImport?.let { "totalReactiveEnergyImport" to it * 10 }, // Wh
+                    hanData.totalReactiveEnergyExport?.let { "totalReactiveEnergyExport" to it * 10 }, // Wh
                 ).toMap(),
                 mapOf(
                     "sensor" to "MainMeter"
