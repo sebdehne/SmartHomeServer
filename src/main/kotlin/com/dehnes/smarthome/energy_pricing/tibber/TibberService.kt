@@ -41,6 +41,12 @@ class TibberService(
     override fun logger() = logger
 
     @Synchronized
+    fun getCachedPrices(): List<Price> {
+        ensureCacheLoaded()
+        return priceCache
+    }
+
+    @Synchronized
     fun mustWaitUntilV2(skipPercentExpensiveHours: Int): Instant? {
         check(skipPercentExpensiveHours in 0..100)
         ensureCacheLoaded()

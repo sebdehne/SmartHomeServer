@@ -1,11 +1,11 @@
 package com.dehnes.smarthome.han
 
+import com.dehnes.smarthome.utils.DateTimeUtils.zoneId
 import com.dehnes.smarthome.utils.merge
 import com.dehnes.smarthome.utils.readLong32Bits
 import com.dehnes.smarthome.utils.toUnsignedInt
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 data class DLMSMessage(
     val timestamp: Instant,
@@ -34,8 +34,6 @@ data class NumberElement(
 
 
 object DLMSDecoder {
-
-    val zoneId = ZoneId.of("Europe/Oslo") // TODO configable
 
     fun decode(hdlcFrame: HDLCFrame): DLMSMessage {
 

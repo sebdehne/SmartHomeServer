@@ -2,18 +2,18 @@ package com.dehnes.smarthome.datalogging
 
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
 import org.apache.http.HttpResponse
 import org.apache.http.client.fluent.Request
 import org.apache.http.client.fluent.Response
 import org.apache.http.client.utils.URIBuilder
 import org.apache.http.entity.ContentType
+import org.apache.http.entity.StringEntity
 import java.io.IOException
 import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
-import java.util.*
 import java.util.concurrent.TimeUnit
 
 data class InfluxDBRecord(
@@ -74,40 +74,59 @@ class InfluxDBClient(
         }
     }
 
-    fun queryRaw(
-        type: String,
-        targetTag: Pair<String, String>?,
-        timeMin: Optional<Long>,
-        timeMax: Optional<Long>,
-        limit: Int
-    ): Map<String, Any> {
-        var query = "SELECT * FROM $type WHERE 1 = 1"
-        if (targetTag != null) {
-            query += " AND " + targetTag.first + "=" + targetTag.second
-        }
-        if (timeMin.isPresent) {
-            query += " AND time > " + timeMin.get() / 1000 + "s"
-        }
-        if (timeMax.isPresent) {
-            query += " AND time < " + timeMax.get() / 1000 + "s"
-        }
-        query += " order by time desc LIMIT $limit"
+    fun query(
+        query: String
+    ): List<InfluxDbQueryRecord> {
+        val execute: Response = Request
+            .Post(
+                URIBuilder("$baseUrl/api/v2/query")
+                    .addParameter("orgID", "b351a5d22d7de2aa")
+                    .build()
+            )
+            .addHeader("Authorization", "Token " + persistenceService["influxDbAuthToken", null]!!)
+            .body(StringEntity(query, ContentType.create("application/vnd.flux", StandardCharsets.UTF_8)))
+            .execute()
 
-        val b = URIBuilder("$baseUrl/query")
-        b.addParameter("db", bucketName)
-        b.addParameter("q", query)
-        val execute: Response = Request.Get(b.build()).execute()
-        return objectMapper.readValue(execute.returnContent().asString())
+        val responseBody = execute.returnContent().asString()
+
+        val lines = responseBody.split("\r\n")
+            .map { it.trim() }
+            .filterNot { it.isBlank() }
+            .filterNot { it.startsWith("#") }
+
+        val headerLine = lines.first()
+        val dataLines = lines.subList(1, lines.size)
+
+        val headerFields = headerLine.split(",")
+
+        val data = dataLines.map { line ->
+            val dataFields = line.split(",")
+            dataFields.mapIndexed { index, s ->
+                headerFields[index] to s
+            }.toMap().let { d ->
+                InfluxDbQueryRecord(
+                    Instant.parse(d["_time"]),
+                    d["_value"]!!.toLong(),
+                    d["_field"]!!,
+                    d["_measurement"]!!,
+                    d.entries
+                        .filterNot { it.key.startsWith("_") }
+                        .filterNot { it.key == "" }
+                        .filterNot { it.key == "result" }
+                        .filterNot { it.key == "table" }
+                        .associate { it.key to it.value })
+            }
+        }.sortedBy { it.time }
+
+        return data
     }
 
-    fun avgTempDuringLastHour(room: String): Map<String, Any> {
-        val b = URIBuilder("$baseUrl/query")
-        b.addParameter("db", bucketName)
-        b.addParameter(
-            "q",
-            "SELECT mean(temperature) from sensor where room = '" + room + "' and time > " + (System.currentTimeMillis() - 3600 * 1000) / 1000 + "s"
-        )
-        val execute: Response = Request.Get(b.build()).execute()
-        return objectMapper.readValue(execute.returnContent().asString())
-    }
 }
+
+data class InfluxDbQueryRecord(
+    val time: Instant,
+    val value: Long,
+    val field: String,
+    val measurement: String,
+    val tags: Map<String, String>
+)

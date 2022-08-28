@@ -78,7 +78,7 @@ data class Price(
     var to: Instant,
     var price: Double
 ) {
-    fun isValidFor(input: Instant) = (input.isAfter(from) || input == from) && input.isBefore(to)
+    fun isValidFor(input: Instant) = input.toEpochMilli() in (from.toEpochMilli() until to.toEpochMilli())
 
     fun toInfluxDbRecords(): List<InfluxDBRecord> {
         var current = from

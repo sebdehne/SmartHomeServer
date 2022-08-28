@@ -13,6 +13,7 @@ import com.dehnes.smarthome.han.HanPortListeningService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.utils.AES265GCM
+import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -20,7 +21,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import mu.KotlinLogging
 import java.time.Clock
-import java.time.ZoneId
 import java.util.concurrent.Executors
 import kotlin.reflect.KClass
 
@@ -39,7 +39,7 @@ class Configuration {
         val persistenceService = PersistenceService(objectMapper)
         val influxDBClient = InfluxDBClient(persistenceService, objectMapper)
 
-        val clock = Clock.system(ZoneId.of("Europe/Oslo"))
+        val clock = Clock.system(DateTimeUtils.zoneId)
 
         val tibberService = TibberService(
             clock,
@@ -50,7 +50,7 @@ class Configuration {
         )
         tibberService.start()
 
-        val hanDataService = HanDataService(influxDBClient)
+        val hanDataService = HanDataService(influxDBClient, tibberService)
 
         val hanPortListeningService = HanPortListeningService("192.168.1.1", 23000, executorService)
         hanPortListeningService.listeners.add { hanData ->
