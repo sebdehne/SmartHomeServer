@@ -35,6 +35,8 @@ class HanPortListeningService(
 
     @Volatile
     private var isStarted = false
+    @Volatile
+    private var hanPortConnection: HanPortConnection? = null
 
     fun start() {
         if (isStarted) {
@@ -46,6 +48,8 @@ class HanPortListeningService(
                 try {
                     readLoop()
                 } catch (e: Exception) {
+                    kotlin.runCatching { hanPortConnection?.close() }
+                    hanPortConnection = null
                     logger.error("", e)
                 }
                 Thread.sleep(10 * 1000)
@@ -61,65 +65,50 @@ class HanPortListeningService(
     }
 
     private fun readLoop() {
-        var hanPortConnection: HanPortConnection? = null
         val buffer = ByteArray(1024 * 10)
         var writePos = 0
         val hanDecoder = HanDecoder()
 
         while (true) {
             if (hanPortConnection == null) {
-                hanPortConnection = try {
-                    HanPortConnection.open(host, port).also {
-                        logger.info { "Connected" }
-                        writePos = 0
-                    }
-                } catch (e: Exception) {
-                    logger.warn(e) { "Could not connect" }
-                    Thread.sleep(10000)
-                    null
+                hanPortConnection = HanPortConnection.open(host, port).also {
+                    logger.info { "Connected" }
+                    writePos = 0
                 }
             }
 
 
             if (hanPortConnection != null) {
-                try {
-                    if (writePos + 1 >= buffer.size) error("Buffer full")
-                    val read = hanPortConnection.read(buffer, writePos, buffer.size - writePos)
-                    if (read > -1) {
-                        writePos += read
+                if (writePos + 1 >= buffer.size) error("Buffer full")
+                val read = hanPortConnection!!.read(buffer, writePos, buffer.size - writePos)
+                if (read > -1) {
+                    writePos += read
 
-                        val consumed = hanDecoder.decode(buffer, writePos) { hdlcFrame ->
-                            val dlmsMessage = DLMSDecoder.decode(hdlcFrame)
-                            logger.info { "Got new msg=${hdlcFrame}" }
-                            executorService.submit {
-                                listeners.forEach { l ->
-                                    try {
-                                        l(mapToHanData(dlmsMessage))
-                                    } catch (e: Exception) {
-                                        logger.error(e) { "Error from hanListener" }
-                                    }
+                    val consumed = hanDecoder.decode(buffer, writePos) { hdlcFrame ->
+                        val dlmsMessage = DLMSDecoder.decode(hdlcFrame)
+                        logger.info { "Got new msg=${hdlcFrame}" }
+                        executorService.submit {
+                            listeners.forEach { l ->
+                                try {
+                                    l(mapToHanData(dlmsMessage))
+                                } catch (e: Exception) {
+                                    logger.error(e) { "Error from hanListener" }
                                 }
                             }
                         }
-
-                        if (consumed > 0) {
-                            // wrap the buffer
-                            System.arraycopy(
-                                buffer,
-                                consumed,
-                                buffer,
-                                0,
-                                writePos - consumed
-                            )
-                            writePos -= consumed
-                        }
                     }
 
-
-                } catch (e: Exception) {
-                    logger.warn(e) { "Error while reading from Han" }
-                    kotlin.runCatching { hanPortConnection!!.close() }
-                    hanPortConnection = null
+                    if (consumed > 0) {
+                        // wrap the buffer
+                        System.arraycopy(
+                            buffer,
+                            consumed,
+                            buffer,
+                            0,
+                            writePos - consumed
+                        )
+                        writePos -= consumed
+                    }
                 }
             }
         }
