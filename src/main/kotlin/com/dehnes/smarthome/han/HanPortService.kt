@@ -1,5 +1,7 @@
 package com.dehnes.smarthome.han
 
+import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.energy_pricing.tibber.TibberService
 import mu.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
@@ -24,11 +26,18 @@ data class HanData(
     val createdAt: Instant = Instant.now()
 )
 
-class HanPortListeningService(
+class HanPortService(
     private val host: String,
     private val port: Int,
-    private val executorService: ExecutorService
+    private val executorService: ExecutorService,
+    influxDBClient: InfluxDBClient,
+    tibberService: TibberService,
 ) {
+
+    private val hanDataService = HanDataService(
+        influxDBClient,
+        tibberService
+    )
 
     private val logger = KotlinLogging.logger { }
     val listeners = CopyOnWriteArrayList<(HanData) -> Unit>()
@@ -87,11 +96,13 @@ class HanPortListeningService(
 
                 val consumed = hanDecoder.decode(buffer, writePos) { hdlcFrame ->
                     val dlmsMessage = DLMSDecoder.decode(hdlcFrame)
-                    logger.info { "Got new msg=${hdlcFrame}" }
+                    val hanData = mapToHanData(dlmsMessage)
+                    logger.info { "Got new msg=${hdlcFrame} hanData=$hanData" }
                     executorService.submit {
+                        val listeners = listOf(hanDataService::onNewData) + this.listeners
                         listeners.forEach { l ->
                             try {
-                                l(mapToHanData(dlmsMessage))
+                                l(hanData)
                             } catch (e: Exception) {
                                 logger.error(e) { "Error from hanListener" }
                             }

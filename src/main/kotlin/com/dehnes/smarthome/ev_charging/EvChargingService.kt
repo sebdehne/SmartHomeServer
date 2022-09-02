@@ -99,6 +99,7 @@ class EvChargingService(
                         }
                     }
                 }
+
                 else -> logger.debug { "Ignored ${event.eventType}" }
             }
         }
@@ -219,6 +220,7 @@ class EvChargingService(
                 mode == EvChargingMode.OFF -> {
                     reasonCannotCharge = "Switched Off"
                 }
+
                 mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour != null -> {
                     reasonCannotCharge = "starting @ " + nextCheapHour.atZone(clock.zone).toLocalTime()
                 }
@@ -263,6 +265,7 @@ class EvChargingService(
                     existingState
                 }
             }
+
             ConnectedChargingUnavailable -> {
                 if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
                     existingState.changeState(Unconnected, clock.millis())
@@ -273,10 +276,11 @@ class EvChargingService(
                     if (reasonCannotCharge == null) {
                         existingState.changeState(ConnectedChargingAvailable, clock.millis())
                     } else {
-                        existingState
+                        existingState.changeState(ConnectedChargingUnavailable, clock.millis(), reasonCannotCharge)
                     }
                 }
             }
+
             ConnectedChargingAvailable -> {
                 if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
                     existingState.changeState(Unconnected, clock.millis())
@@ -306,6 +310,7 @@ class EvChargingService(
                     }
                 }
             }
+
             Error -> {
                 if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
                     existingState.changeState(Unconnected, clock.millis())
@@ -313,6 +318,7 @@ class EvChargingService(
                     existingState
                 }
             }
+
             StoppingCharging -> {
                 if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
                     existingState.changeState(Unconnected, clock.millis())
@@ -346,6 +352,7 @@ class EvChargingService(
                     }
                 }
             }
+
             ChargingRequested -> {
                 if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
                     existingState.changeState(Unconnected, clock.millis())
@@ -366,6 +373,7 @@ class EvChargingService(
                     existingState
                 }
             }
+
             Charging -> {
                 if (dataResponse.pilotVoltage == PilotVoltage.Volt_12) {
                     existingState.changeState(Unconnected, clock.millis())
@@ -590,6 +598,7 @@ data class InternalState(
                 measuredCurrentInAmpsAvg = null,
                 measuredCurrentPeakAt = null
             )
+
             amps >= LOWEST_CHARGE_RATE -> copy(pwmDutyCyclePercent = chargeRateToPwmPercent(amps))
             else -> error("Impossible this=$this amps=$amps")
         }
@@ -620,7 +629,7 @@ data class InternalState(
         }
 
         return if (this.chargingState == chargingState) {
-            this
+            this.copy(reasonChargingUnavailable = reasonChargingUnavailable)
         } else {
             if (!fake) {
                 EvChargingService.logger.info { "StateChange for ${this.clientId}:  ${this.chargingState} -> $chargingState" }

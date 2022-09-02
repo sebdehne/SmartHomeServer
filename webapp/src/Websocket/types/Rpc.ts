@@ -4,6 +4,7 @@ import {UnderFloorHeaterRequest, UnderFloorHeaterResponse} from "./UnderFloorHea
 import {EvChargingStationRequest, EvChargingStationResponse} from "./EVChargingStation";
 import { EnvironmentSensorRequest, EnvironmentSensorResponse } from "./EnvironmentSensors";
 import { VideoBrowserRequest, VideoBrowserResponse } from "./Video";
+import { QuickStatsResponse } from "./QuickStats";
 
 export enum RequestType {
     subscribe = "subscribe",
@@ -13,7 +14,8 @@ export enum RequestType {
     underFloorHeaterRequest = "underFloorHeaterRequest",
     evChargingStationRequest = "evChargingStationRequest",
     environmentSensorRequest = "environmentSensorRequest",
-    videoBrowser = "videoBrowser"
+    videoBrowser = "videoBrowser",
+    quickStats = "quickStats",
 }
 
 export class RpcRequest {
@@ -48,8 +50,9 @@ export class RpcResponse {
     public evChargingStationResponse: EvChargingStationResponse | null;
     public environmentSensorResponse: EnvironmentSensorResponse | null;
     public videoBrowserResponse: VideoBrowserResponse | null;
+    public quickStatsResponse: QuickStatsResponse | null;
 
-    public constructor(subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageResponse: GarageResponse | null, underFloorHeaterResponse: UnderFloorHeaterResponse | null, evChargingStationResponse: EvChargingStationResponse | null, environmentSensorResponse: EnvironmentSensorResponse | null, videoBrowserResponse: VideoBrowserResponse | null) {
+    public constructor(subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageResponse: GarageResponse | null, underFloorHeaterResponse: UnderFloorHeaterResponse | null, evChargingStationResponse: EvChargingStationResponse | null, environmentSensorResponse: EnvironmentSensorResponse | null, videoBrowserResponse: VideoBrowserResponse | null, quickStatsResponse: QuickStatsResponse | null) {
         this.subscriptionCreated = subscriptionCreated;
         this.subscriptionRemoved = subscriptionRemoved;
         this.garageResponse = garageResponse;
@@ -57,5 +60,6 @@ export class RpcResponse {
         this.evChargingStationResponse = evChargingStationResponse;
         this.environmentSensorResponse = environmentSensorResponse;
         this.videoBrowserResponse = videoBrowserResponse;
+        this.quickStatsResponse = quickStatsResponse;
     }
 }

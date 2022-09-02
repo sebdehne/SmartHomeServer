@@ -17,7 +17,6 @@ class HanDataService(
     private var previousTotalEnergyExport: Pair<Instant, Long>? = null
 
     private val logger = KotlinLogging.logger { }
-
     fun onNewData(hanData: HanData) {
         val data = hanDataToInfluxDb(hanData)
 
@@ -142,7 +141,7 @@ class HanDataService(
         )
 
         return data.lastOrNull()?.let {
-            it.time to it.value
+            it.time to it.value.toLong()
         }
     }
 }

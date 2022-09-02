@@ -4,7 +4,8 @@ enum class SubscriptionType {
     getGarageStatus,
     getUnderFloorHeaterStatus,
     evChargingStationEvents,
-    environmentSensorEvents
+    environmentSensorEvents,
+    quickStatsEvents
 }
 
 data class Subscribe(
@@ -21,5 +22,6 @@ data class Notify(
     val garageStatus: GarageResponse?,
     val underFloorHeaterStatus: UnderFloorHeaterResponse?,
     val evChargingStationEvent: EvChargingEvent?,
-    val environmentSensorEvent: EnvironmentSensorEvent?
+    val environmentSensorEvent: EnvironmentSensorEvent?,
+    val quickStatsResponse: QuickStatsResponse?,
 )

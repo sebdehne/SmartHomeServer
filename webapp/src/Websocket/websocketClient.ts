@@ -1,5 +1,3 @@
-import { plainToClass, serialize } from 'class-transformer';
-
 import { v4 as uuidv4 } from 'uuid';
 import { RequestType, RpcRequest, RpcResponse } from "./types/Rpc";
 import { Notify, Subscribe, SubscriptionType, Unsubscribe } from "./types/Subscription";
@@ -67,7 +65,7 @@ function send(msg: WebsocketMessage) {
         reconnect();
     } else if (connectionStatus === ConnectionStatus.connected) {
         try {
-            ws?.send(serialize(msg));
+            ws?.send(JSON.stringify(msg));
         } catch (e) {
             console.log(e);
         }
@@ -112,9 +110,7 @@ function reconnect() {
 
     };
     ws.onmessage = function (e) {
-        let plain = JSON.parse(e.data);
-        // @ts-ignore
-        const json: WebsocketMessage = plainToClass(WebsocketMessage, plain);
+        const json: WebsocketMessage = JSON.parse(e.data);
         if (json.type === WebsocketMessageType.rpcResponse) {
             let ongoingRPC = OngoingRPCsById.get(json.id);
             if (ongoingRPC) {
@@ -143,9 +139,12 @@ function reconnect() {
         }, 1000);
     };
 
-    ws.onerror = function () {
+    ws.onerror = (event) => {
+        console.log(event);
         ws?.close();
     };
+
+    console.log("Finished configuring WebSocket");
 }
 
 const WebsocketService = {

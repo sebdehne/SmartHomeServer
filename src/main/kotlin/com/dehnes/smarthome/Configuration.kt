@@ -1,6 +1,7 @@
 package com.dehnes.smarthome
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.datalogging.QuickStatsService
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
@@ -8,8 +9,7 @@ import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.garage_door.GarageController
-import com.dehnes.smarthome.han.HanDataService
-import com.dehnes.smarthome.han.HanPortListeningService
+import com.dehnes.smarthome.han.HanPortService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.utils.AES265GCM
@@ -19,7 +19,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import mu.KotlinLogging
 import java.time.Clock
 import java.util.concurrent.Executors
 import kotlin.reflect.KClass
@@ -50,15 +49,14 @@ class Configuration {
         )
         tibberService.start()
 
-        val hanDataService = HanDataService(influxDBClient, tibberService)
-
-        val hanPortListeningService = HanPortListeningService("192.168.1.1", 23000, executorService)
-        hanPortListeningService.listeners.add { hanData ->
-            KotlinLogging.logger("Han-Logger").info { "hanData=$hanData" }
-        }
-        hanPortListeningService.listeners.add(hanDataService::onNewData)
-
-        hanPortListeningService.start()
+        val hanPortService = HanPortService(
+            "192.168.1.1",
+            23000,
+            executorService,
+            influxDBClient,
+            tibberService
+        )
+        hanPortService.start()
 
         val evChargingStationConnection = EvChargingStationConnection(
             9091,
@@ -110,6 +108,8 @@ class Configuration {
 
         val videoBrowser = VideoBrowser()
 
+        val quickStatsService = QuickStatsService(influxDBClient, hanPortService, executorService)
+
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageController::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
@@ -118,6 +118,7 @@ class Configuration {
         beans[EvChargingService::class] = evChargingService
         beans[EnvironmentSensorService::class] = loRaSensorBoardService
         beans[VideoBrowser::class] = videoBrowser
+        beans[QuickStatsService::class] = quickStatsService
     }
 
     fun <T> getBean(klass: KClass<*>): T {

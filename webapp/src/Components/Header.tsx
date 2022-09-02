@@ -6,10 +6,11 @@ import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 
 type HeaderProps = {
     title: string,
-    sending: boolean
+    sending: boolean,
+    showBackButton?: boolean
 }
 
-const Header = ({ title, sending }: HeaderProps) => {
+const Header = ({ title, sending, showBackButton = true }: HeaderProps) => {
     const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.connecting);
     const navigate = useNavigate();
 
@@ -25,9 +26,12 @@ const Header = ({ title, sending }: HeaderProps) => {
             justifyContent: "space-between"
         }
         }>
-            <Button color="primary"variant="contained" onClick={() => navigate("/")}><ArrowBackIcon/>Home</Button>
+            {showBackButton &&
+                <Button color="primary" variant="contained" onClick={() => navigate("/")}><ArrowBackIcon/>Home</Button>
+            }
+            {!showBackButton && <span>&nbsp;</span>}
             {sending &&
-            <CircularProgress color="primary"/>
+                <CircularProgress color="primary"/>
             }
             <span>Server connection: {status}</span>
         </div>

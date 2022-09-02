@@ -4,6 +4,7 @@ import com.dehnes.smarthome.VideoBrowser
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
+import com.dehnes.smarthome.datalogging.QuickStatsService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
@@ -37,6 +38,8 @@ class WebSocketServer : Endpoint() {
         configuration.getBean<EnvironmentSensorService>(EnvironmentSensorService::class)
     private val videoBrowser =
         configuration.getBean<VideoBrowser>(VideoBrowser::class)
+    private val quickStatsService =
+        configuration.getBean<QuickStatsService>(QuickStatsService::class)
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info("$instanceId Socket connected: $sess")
@@ -61,6 +64,7 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            quickStats -> RpcResponse(quickStatsResponse = quickStatsService.getStats())
             subscribe -> {
                 val subscribe = rpcRequest.subscribe!!
                 val subscriptionId = subscribe.subscriptionId
@@ -68,20 +72,26 @@ class WebSocketServer : Endpoint() {
                 val existing = subscriptions[subscriptionId]
                 if (existing == null) {
                     val sub = when (subscribe.type) {
+                        SubscriptionType.quickStatsEvents  -> QuickStatsSubscription(subscriptionId, argSession).apply {
+                            quickStatsService.listeners[subscriptionId] = this::onEvent
+                        }
                         SubscriptionType.getGarageStatus -> GarageStatusSubscription(subscriptionId, argSession).apply {
                             garageDoorService.listeners[subscriptionId] = this::onEvent
                         }
+
                         SubscriptionType.getUnderFloorHeaterStatus -> UnderFloorHeaterSubscription(
                             subscriptionId, argSession
                         ).apply {
                             underFloopHeaterService.listeners[subscriptionId] = this::onEvent
                         }
+
                         SubscriptionType.evChargingStationEvents -> EvChargingStationSubscription(
                             subscriptionId,
                             argSession
                         ).apply {
                             evChargingService.listeners[subscriptionId] = this::onEvent
                         }
+
                         SubscriptionType.environmentSensorEvents -> EnvironmentSensorSubscription(
                             subscriptionId,
                             argSession
@@ -98,12 +108,14 @@ class WebSocketServer : Endpoint() {
 
                 RpcResponse(subscriptionCreated = true)
             }
+
             unsubscribe -> {
                 val subscriptionId = rpcRequest.unsubscribe!!.subscriptionId
                 subscriptions.remove(subscriptionId)?.close()
                 logger.info { "$instanceId Removed subscription id=$subscriptionId" }
                 RpcResponse(subscriptionRemoved = true)
             }
+
             garageRequest -> RpcResponse(garageResponse = garageRequest(rpcRequest.garageRequest!!))
             underFloorHeaterRequest -> RpcResponse(underFloorHeaterResponse = underFloorHeaterRequest(rpcRequest.underFloorHeaterRequest!!))
             evChargingStationRequest -> RpcResponse(evChargingStationResponse = evChargingStationRequest(rpcRequest.evChargingStationRequest!!))
@@ -130,30 +142,37 @@ class WebSocketServer : Endpoint() {
             loRaSensorBoardService.firmwareUpgrade(request.sensorId!!, true)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
+
         EnvironmentSensorRequestType.cancelFirmwareUpgrade -> {
             loRaSensorBoardService.firmwareUpgrade(request.sensorId!!, false)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
+
         EnvironmentSensorRequestType.scheduleTimeAdjustment -> {
             loRaSensorBoardService.timeAdjustment(request.sensorId, true)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
+
         EnvironmentSensorRequestType.cancelTimeAdjustment -> {
             loRaSensorBoardService.timeAdjustment(request.sensorId, false)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
+
         EnvironmentSensorRequestType.scheduleReset -> {
             loRaSensorBoardService.configureReset(request.sensorId, true)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
+
         EnvironmentSensorRequestType.cancelReset -> {
             loRaSensorBoardService.configureReset(request.sensorId, false)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
+
         EnvironmentSensorRequestType.adjustSleepTimeInSeconds -> {
             loRaSensorBoardService.adjustSleepTimeInSeconds(request.sensorId!!, request.sleepTimeInSecondsDelta!!)
             loRaSensorBoardService.getEnvironmentSensorResponse()
         }
+
         EnvironmentSensorRequestType.uploadFirmware -> {
             loRaSensorBoardService.setFirmware(request.firmwareFilename!!, request.firmwareBased64Encoded!!)
             loRaSensorBoardService.getEnvironmentSensorResponse()
@@ -168,17 +187,21 @@ class WebSocketServer : Endpoint() {
             ),
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
+
         EvChargingStationRequestType.getChargingStationsDataAndConfig -> EvChargingStationResponse(
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
+
         EvChargingStationRequestType.setLoadSharingPriority -> EvChargingStationResponse(
             configUpdated = evChargingService.setPriorityFor(request.clientId!!, request.newLoadSharingPriority!!),
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
+
         EvChargingStationRequestType.setMode -> EvChargingStationResponse(
             configUpdated = evChargingService.updateMode(request.clientId!!, request.newMode!!),
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
+
         EvChargingStationRequestType.setSkipPercentExpensiveHours -> EvChargingStationResponse(
             configUpdated = evChargingService.setSkipPercentExpensiveHours(
                 request.clientId!!,
@@ -186,6 +209,7 @@ class WebSocketServer : Endpoint() {
             ),
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
+
         EvChargingStationRequestType.setChargeRateLimit -> EvChargingStationResponse(
             configUpdated = evChargingService.setChargeRateLimitFor(
                 request.clientId!!,
@@ -202,18 +226,21 @@ class WebSocketServer : Endpoint() {
                 updateUnderFloorHeaterModeSuccess = success
             )
         }
+
         UnderFloorHeaterRequestType.setSkipPercentExpensiveHours -> {
             val success = underFloopHeaterService.setEkipPercentExpensiveHours(request.skipPercentExpensiveHours!!)
             underFloopHeaterService.getCurrentState().copy(
                 updateUnderFloorHeaterModeSuccess = success
             )
         }
+
         UnderFloorHeaterRequestType.updateTargetTemperature -> {
             val success = underFloopHeaterService.updateTargetTemperature(request.newTargetTemperature!!)
             underFloopHeaterService.getCurrentState().copy(
                 updateUnderFloorHeaterModeSuccess = success
             )
         }
+
         UnderFloorHeaterRequestType.getStatus -> underFloopHeaterService.getCurrentState()
         UnderFloorHeaterRequestType.adjustTime -> {
             val success = underFloopHeaterService.adjustTime()
@@ -221,6 +248,7 @@ class WebSocketServer : Endpoint() {
                 adjustTimeSuccess = success
             )
         }
+
         UnderFloorHeaterRequestType.firmwareUpgrade -> {
             val success = underFloopHeaterService.startFirmwareUpgrade(request.firmwareBased64Encoded!!)
             underFloopHeaterService.getCurrentState().copy(
@@ -234,24 +262,28 @@ class WebSocketServer : Endpoint() {
             garageDoorService.updateAutoCloseAfter(request.garageDoorChangeAutoCloseDeltaInSeconds!!)
             garageDoorService.getCurrentState()
         }
+
         GarageRequestType.openGarageDoor -> {
             val sendCommand = garageDoorService.sendCommand(true)
             garageDoorService.getCurrentState().copy(
                 garageCommandSendSuccess = sendCommand
             )
         }
+
         GarageRequestType.closeGarageDoor -> {
             val sendCommand = garageDoorService.sendCommand(false)
             garageDoorService.getCurrentState().copy(
                 garageCommandSendSuccess = sendCommand,
             )
         }
+
         GarageRequestType.getGarageStatus -> garageDoorService.getCurrentState()
         GarageRequestType.adjustTime -> {
             garageDoorService.getCurrentState().copy(
                 garageCommandAdjustTimeSuccess = garageDoorService.adjustTime()
             )
         }
+
         GarageRequestType.firmwareUpgrade -> {
             garageDoorService.getCurrentState().copy(
                 firmwareUploadSuccess = garageDoorService.startFirmwareUpgrade(request.firmwareBased64Encoded!!),
@@ -270,7 +302,44 @@ class WebSocketServer : Endpoint() {
                     WebsocketMessage(
                         UUID.randomUUID().toString(),
                         WebsocketMessageType.notify,
-                        notify = Notify(subscriptionId, e, null, null, null)
+                        notify = Notify(
+                            subscriptionId,
+                            e,
+                            null,
+                            null,
+                            null,
+                            null,
+                        )
+                    )
+                )
+            )
+        }
+
+        override fun close() {
+            garageDoorService.listeners.remove(subscriptionId)
+            subscriptions.remove(subscriptionId)
+        }
+    }
+
+    inner class QuickStatsSubscription(
+        subscriptionId: String,
+        sess: Session
+    ) : Subscription<QuickStatsResponse>(subscriptionId, sess) {
+        override fun onEvent(e: QuickStatsResponse) {
+            logger.info("$instanceId onEvent GarageStatusSubscription $subscriptionId ")
+            sess.basicRemote.sendText(
+                objectMapper.writeValueAsString(
+                    WebsocketMessage(
+                        UUID.randomUUID().toString(),
+                        WebsocketMessageType.notify,
+                        notify = Notify(
+                            subscriptionId,
+                            null,
+                            null,
+                            null,
+                            null,
+                            e
+                        )
                     )
                 )
             )
@@ -293,7 +362,14 @@ class WebSocketServer : Endpoint() {
                     WebsocketMessage(
                         UUID.randomUUID().toString(),
                         WebsocketMessageType.notify,
-                        notify = Notify(subscriptionId, null, null, null, e)
+                        notify = Notify(
+                            subscriptionId,
+                            null,
+                            null,
+                            null,
+                            e,
+                            null,
+                        )
                     )
                 )
             )
@@ -316,7 +392,14 @@ class WebSocketServer : Endpoint() {
                     WebsocketMessage(
                         UUID.randomUUID().toString(),
                         WebsocketMessageType.notify,
-                        notify = Notify(subscriptionId, null, null, e, null)
+                        notify = Notify(
+                            subscriptionId,
+                            null,
+                            null,
+                            e,
+                            null,
+                            null,
+                        )
                     )
                 )
             )
@@ -339,7 +422,14 @@ class WebSocketServer : Endpoint() {
                     WebsocketMessage(
                         UUID.randomUUID().toString(),
                         WebsocketMessageType.notify,
-                        notify = Notify(subscriptionId, null, e, null, null)
+                        notify = Notify(
+                            subscriptionId,
+                            null,
+                            e,
+                            null,
+                            null,
+                            null,
+                        )
                     )
                 )
             )

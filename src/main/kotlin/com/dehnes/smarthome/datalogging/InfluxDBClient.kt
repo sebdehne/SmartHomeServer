@@ -106,7 +106,7 @@ class InfluxDBClient(
             }.toMap().let { d ->
                 InfluxDbQueryRecord(
                     Instant.parse(d["_time"]),
-                    d["_value"]!!.toLong(),
+                    d["_value"]!!.toDouble(),
                     d["_field"]!!,
                     d["_measurement"]!!,
                     d.entries
@@ -125,7 +125,7 @@ class InfluxDBClient(
 
 data class InfluxDbQueryRecord(
     val time: Instant,
-    val value: Long,
+    val value: Double,
     val field: String,
     val measurement: String,
     val tags: Map<String, String>
