@@ -346,7 +346,7 @@ class WebSocketServer : Endpoint() {
         }
 
         override fun close() {
-            garageDoorService.listeners.remove(subscriptionId)
+            quickStatsService.listeners.remove(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }

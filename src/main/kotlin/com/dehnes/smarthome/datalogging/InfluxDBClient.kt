@@ -94,7 +94,7 @@ class InfluxDBClient(
             .filterNot { it.isBlank() }
             .filterNot { it.startsWith("#") }
 
-        val headerLine = lines.first()
+        val headerLine = lines.firstOrNull() ?: return emptyList()
         val dataLines = lines.subList(1, lines.size)
 
         val headerFields = headerLine.split(",")

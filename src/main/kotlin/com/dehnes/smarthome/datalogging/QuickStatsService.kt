@@ -77,7 +77,7 @@ class QuickStatsService(
           |> filter(fn: (r) => r["sensor"] == "MainMeter")
           |> yield()
     """.trimIndent()
-    ).last().value
+    ).lastOrNull()?.value ?: 0.0
 
     private fun getCostEnergyImportedToday() = influxDBClient.query(
         """
@@ -91,7 +91,7 @@ class QuickStatsService(
           |> filter(fn: (r) => r._field == "energyImportCostLastHour")
           |> cumulativeSum()
     """.trimIndent()
-    ).last().value
+    ).lastOrNull()?.value ?: 0.0
 
     private fun getCostEnergyImportedCurrentMonth() = influxDBClient.query(
         """
@@ -105,7 +105,7 @@ class QuickStatsService(
           |> filter(fn: (r) => r._field == "energyImportCostLastHour")
           |> cumulativeSum()
     """.trimIndent()
-    ).last().value
+    ).lastOrNull()?.value ?: 0.0
 
     private fun getOutsideTemperature() = influxDBClient.query(
         """
@@ -115,7 +115,7 @@ class QuickStatsService(
           |> filter(fn: (r) => r["_field"] == "temperature")
           |> filter(fn: (r) => r["room"] == "outside_combined")
     """.trimIndent()
-    ).last().value
+    ).lastOrNull()?.value ?: 0.0
 
     private fun energyUsedToday() = influxDBClient.query(
         """
@@ -130,7 +130,7 @@ class QuickStatsService(
           |> difference(keepFirst: false)
           |> cumulativeSum()
     """.trimIndent()
-    ).last().value
+    ).lastOrNull()?.value ?: 0.0
 
     private fun currentEnergyPrice() = influxDBClient.query(
         """
@@ -139,6 +139,6 @@ class QuickStatsService(
             |> filter(fn: (r) => r["_measurement"] == "energyPrice")
             |> filter(fn: (r) => r["_field"] == "price")
     """.trimIndent()
-    ).last().value
+    ).lastOrNull()?.value ?: 0.0
 
 }
