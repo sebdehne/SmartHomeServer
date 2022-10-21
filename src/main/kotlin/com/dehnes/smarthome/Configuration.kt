@@ -2,6 +2,7 @@ package com.dehnes.smarthome
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
+import com.dehnes.smarthome.energy_pricing.tibber.HvakosterstrommenClient
 import com.dehnes.smarthome.energy_pricing.tibber.TibberService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
@@ -15,6 +16,7 @@ import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.utils.PersistenceService
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -29,13 +31,17 @@ class Configuration {
     fun objectMapper() = jacksonObjectMapper()
         .registerModule(JavaTimeModule())
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
 
     fun init() {
 
         val executorService = Executors.newCachedThreadPool()
         val objectMapper = objectMapper()
-
         val persistenceService = PersistenceService(objectMapper)
+
+        //val priceSource = TibberPriceClient(objectMapper, persistenceService)
+        val priceSource = HvakosterstrommenClient(objectMapper)
+
         val influxDBClient = InfluxDBClient(persistenceService, objectMapper)
 
         val clock = Clock.system(DateTimeUtils.zoneId)
@@ -43,7 +49,7 @@ class Configuration {
         val tibberService = TibberService(
             clock,
             objectMapper,
-            persistenceService,
+            priceSource,
             influxDBClient,
             executorService
         )

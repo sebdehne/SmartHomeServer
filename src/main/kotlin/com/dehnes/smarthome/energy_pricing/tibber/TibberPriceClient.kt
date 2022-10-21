@@ -14,11 +14,11 @@ import java.time.temporal.ChronoUnit
 class TibberPriceClient(
     private val objectMapper: ObjectMapper,
     private val persistenceService: PersistenceService
-) {
+): PriceSource {
 
     private val logger = KotlinLogging.logger { }
 
-    fun getPrices() = try {
+    override fun getPrices() = try {
         val query = """
             {
               "query": "{\n  viewer {\n    homes {\n      currentSubscription {\n        priceInfo {\n          today {\n            total\n            energy\n            tax\n            startsAt\n          }\n          tomorrow {\n            total\n            energy\n            tax\n            startsAt\n          }\n        }\n      }\n    }\n  }\n}\n",

@@ -2,23 +2,25 @@ package com.dehnes.smarthome.energy_pricing.tibber
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.utils.AbstractProcess
-import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.ExecutorService
 
+interface PriceSource {
+    fun getPrices(): List<Price>?
+}
+
 class TibberService(
     private val clock: Clock,
     private val objectMapper: ObjectMapper,
-    persistenceService: PersistenceService,
+    private val priceSource: PriceSource,
     private val influxDBClient: InfluxDBClient,
     executorService: ExecutorService
 ) : AbstractProcess(executorService, 60 * 5) {
 
     private val logger = KotlinLogging.logger { }
-    private val tibberPriceClient = TibberPriceClient(objectMapper, persistenceService)
     private val tibberBackOffInMs = 60L * 60L * 1000L
     private var lastReload = 0L
     private var priceCache = listOf<Price>()
@@ -91,7 +93,7 @@ class TibberService(
 
     private fun reloadCacheNow() {
         logger.info("Fetching tibber prices...")
-        val prices = tibberPriceClient.getPrices()
+        val prices = priceSource.getPrices()
         lastReload = System.currentTimeMillis()
         if (prices != null) {
             priceCache = prices
