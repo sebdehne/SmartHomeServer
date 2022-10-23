@@ -3,7 +3,7 @@ package com.dehnes.smarthome.heating
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
-import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.environment_sensors.FirmwareDataRequest
 import com.dehnes.smarthome.environment_sensors.FirmwareHolder
 import com.dehnes.smarthome.lora.LoRaConnection
@@ -30,7 +30,7 @@ class UnderFloorHeaterService(
     private val executorService: ExecutorService,
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
-    private val tibberService: TibberService,
+    private val energyPriceService: EnergyPriceService,
     private val clock: Clock
 ) : AbstractProcess(executorService, 42) {
 
@@ -271,7 +271,7 @@ class UnderFloorHeaterService(
                 } else {
                     val targetTemperature = getTargetTemperature()
                     logger.info("Evaluating target temperature now: $targetTemperature")
-                    waitUntilCheapHour = tibberService.mustWaitUntilV2(getSkipPercentExpensiveHours())
+                    waitUntilCheapHour = energyPriceService.mustWaitUntilV2(getSkipPercentExpensiveHours())
                     if (waitUntilCheapHour == null && sensorData.temperature < targetTemperature * 100) {
                         logger.info("Setting heater to on")
                         persistenceService[HEATER_STATUS_KEY] = "on"

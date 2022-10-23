@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.energy_pricing.tibber
+package com.dehnes.smarthome.energy_pricing
 
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.utils.PersistenceService

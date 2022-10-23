@@ -1,7 +1,7 @@
 package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.*
-import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
@@ -59,7 +59,7 @@ enum class ChargingState {
 class EvChargingService(
     private val eVChargingStationConnection: EvChargingStationConnection,
     private val executorService: ExecutorService,
-    private val tibberService: TibberService,
+    private val energyPriceService: EnergyPriceService,
     private val persistenceService: PersistenceService,
     private val clock: Clock,
     private val loadSharingAlgorithms: Map<String, LoadSharing>
@@ -213,7 +213,7 @@ class EvChargingService(
          */
         val getReasonCannotCharge = {
             val mode = getMode(clientId)
-            val nextCheapHour = tibberService.mustWaitUntilV2(getSkipPercentExpensiveHours(clientId))
+            val nextCheapHour = energyPriceService.mustWaitUntilV2(getSkipPercentExpensiveHours(clientId))
             var reasonCannotCharge: String? = null
 
             when {

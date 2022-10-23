@@ -3,14 +3,14 @@ package com.dehnes.smarthome.han
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.energy_pricing.PowerDistributionPrices
-import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.utils.DateTimeUtils.roundToNearestFullHour
 import mu.KotlinLogging
 import java.time.Instant
 
 class HanDataService(
     private val influxDBClient: InfluxDBClient,
-    private val tibberService: TibberService,
+    private val energyPriceService: EnergyPriceService,
 ) {
 
     private var previousTotalEnergyImport: Pair<Instant, Long>? = null
@@ -80,7 +80,7 @@ class HanDataService(
                     val deltaInWh = totalEnergyImport - previousTotalEnergyImport!!.second
                     influxDbData.add("energyImportDeltaWh" to deltaInWh)
 
-                    val prices = tibberService.getCachedPrices()
+                    val prices = energyPriceService.getCachedPrices()
 
                     val energyPriceInCents = prices.firstOrNull { it.isValidFor(startHour) }?.let { it.price * 100 }
 
@@ -102,7 +102,7 @@ class HanDataService(
                     val deltaInWh = hanData.totalEnergyExport - previousTotalEnergyExport!!.second
                     influxDbData.add("energyExportDeltaWh" to deltaInWh)
 
-                    val prices = tibberService.getCachedPrices()
+                    val prices = energyPriceService.getCachedPrices()
 
                     val priceInCents = prices.firstOrNull { it.isValidFor(startHour) }?.let { it.price * 100 }
 

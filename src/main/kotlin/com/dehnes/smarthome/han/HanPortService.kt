@@ -1,7 +1,7 @@
 package com.dehnes.smarthome.han
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
-import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import mu.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
@@ -31,12 +31,12 @@ class HanPortService(
     private val port: Int,
     private val executorService: ExecutorService,
     influxDBClient: InfluxDBClient,
-    tibberService: TibberService,
+    energyPriceService: EnergyPriceService,
 ) {
 
     private val hanDataService = HanDataService(
         influxDBClient,
-        tibberService
+        energyPriceService
     )
 
     private val logger = KotlinLogging.logger { }

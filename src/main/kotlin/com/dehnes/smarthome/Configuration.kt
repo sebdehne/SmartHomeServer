@@ -2,8 +2,8 @@ package com.dehnes.smarthome
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
-import com.dehnes.smarthome.energy_pricing.tibber.HvakosterstrommenClient
-import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
+import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
@@ -46,21 +46,21 @@ class Configuration {
 
         val clock = Clock.system(DateTimeUtils.zoneId)
 
-        val tibberService = TibberService(
+        val energyPriceService = EnergyPriceService(
             clock,
             objectMapper,
             priceSource,
             influxDBClient,
             executorService
         )
-        tibberService.start()
+        energyPriceService.start()
 
         val hanPortService = HanPortService(
             "192.168.1.1",
             23000,
             executorService,
             influxDBClient,
-            tibberService
+            energyPriceService
         )
         hanPortService.start()
 
@@ -77,7 +77,7 @@ class Configuration {
         val evChargingService = EvChargingService(
             evChargingStationConnection,
             executorService,
-            tibberService,
+            energyPriceService,
             persistenceService,
             clock,
             mapOf(
@@ -107,7 +107,7 @@ class Configuration {
             executorService,
             persistenceService,
             influxDBClient,
-            tibberService,
+            energyPriceService,
             clock
         )
         heaterService.start()

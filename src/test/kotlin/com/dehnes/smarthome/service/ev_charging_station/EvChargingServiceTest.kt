@@ -3,7 +3,7 @@ package com.dehnes.smarthome.service.ev_charging_station
 import com.dehnes.smarthome.api.dtos.EvChargingMode
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
-import com.dehnes.smarthome.energy_pricing.tibber.TibberService
+import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.ev_charging.*
 import com.dehnes.smarthome.utils.PersistenceService
 import io.mockk.every
@@ -22,7 +22,7 @@ internal class EvChargingServiceTest {
 
     var time = Instant.now()
     var mustWaitUntil: Instant? = null
-    val tibberService = mockk<TibberService>()
+    val energyPriceService = mockk<EnergyPriceService>()
     val executorService = mockk<ExecutorService>()
     val persistenceService = mockk<PersistenceService>()
     val eVChargingStationConnection = mockk<EvChargingStationConnection>()
@@ -35,7 +35,7 @@ internal class EvChargingServiceTest {
 
     init {
         every {
-            tibberService.mustWaitUntilV2(any())
+            energyPriceService.mustWaitUntilV2(any())
         } answers {
             mustWaitUntil
         }
@@ -113,7 +113,7 @@ internal class EvChargingServiceTest {
     val evChargingService = EvChargingService(
         eVChargingStationConnection,
         executorService,
-        tibberService,
+        energyPriceService,
         persistenceService,
         clockMock,
         mapOf(

@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.energy_pricing.tibber
+package com.dehnes.smarthome.energy_pricing
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.utils.AbstractProcess
@@ -12,7 +12,7 @@ interface PriceSource {
     fun getPrices(): List<Price>?
 }
 
-class TibberService(
+class EnergyPriceService(
     private val clock: Clock,
     private val objectMapper: ObjectMapper,
     private val priceSource: PriceSource,
@@ -21,7 +21,7 @@ class TibberService(
 ) : AbstractProcess(executorService, 60 * 5) {
 
     private val logger = KotlinLogging.logger { }
-    private val tibberBackOffInMs = 60L * 60L * 1000L
+    private val backOffInMs = 60L * 60L * 1000L
     private var lastReload = 0L
     private var priceCache = listOf<Price>()
 
@@ -86,20 +86,20 @@ class TibberService(
     }
 
     private fun ensureCacheLoaded() {
-        if (lastReload + tibberBackOffInMs < System.currentTimeMillis()) {
+        if (lastReload + backOffInMs < System.currentTimeMillis()) {
             reloadCacheNow()
         }
     }
 
     private fun reloadCacheNow() {
-        logger.info("Fetching tibber prices...")
+        logger.info("Fetching energy prices...")
         val prices = priceSource.getPrices()
         lastReload = System.currentTimeMillis()
-        if (prices != null) {
+        if (!prices.isNullOrEmpty()) {
             priceCache = prices
-            logger.info("Fetching tibber prices...SUCCESS. " + objectMapper.writeValueAsString(prices))
+            logger.info("Fetching energy prices...SUCCESS. " + objectMapper.writeValueAsString(prices))
         } else {
-            logger.info("Fetching tibber prices...FAILED")
+            logger.info("Fetching energy prices...FAILED")
         }
     }
 }
