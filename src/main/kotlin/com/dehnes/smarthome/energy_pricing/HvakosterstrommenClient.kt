@@ -7,6 +7,7 @@ import org.apache.http.HttpVersion
 import org.apache.http.client.fluent.Request
 import java.time.Instant
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 class HvakosterstrommenClient(
     private val objectMapper: ObjectMapper,
@@ -29,7 +30,7 @@ class HvakosterstrommenClient(
     }
 
     private fun getDay(day: LocalDate): List<Price> = try {
-        val url = "https://www.hvakosterstrommen.no/api/v1/prices/${day.year}/${day.monthValue}-${day.dayOfMonth}_NO1.json"
+        val url = "https://www.hvakosterstrommen.no/api/v1/prices/${day.format(DateTimeFormatter.ofPattern("yyyy/MM-dd"))}_NO1.json"
         logger.info { "URl=$url" }
         val response =
             Request.Get(url)
