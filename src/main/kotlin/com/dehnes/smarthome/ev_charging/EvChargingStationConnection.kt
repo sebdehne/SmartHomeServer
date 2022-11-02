@@ -57,8 +57,6 @@ class EvChargingStationConnection(
         thread.start()
     }
 
-    fun getConnectedClients() = connectedClientsById.values.map { it.evChargingStationClient }
-
     fun ping(clientId: String) = doWithClient(clientId) { socket, getResponse ->
         send(socket, Ping())
         getResponse() is PongResponse

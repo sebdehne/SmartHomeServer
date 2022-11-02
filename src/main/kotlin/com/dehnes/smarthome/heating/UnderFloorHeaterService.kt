@@ -4,6 +4,8 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
+import com.dehnes.smarthome.enery.EnergyService
+import com.dehnes.smarthome.enery.EnergyUnit
 import com.dehnes.smarthome.environment_sensors.FirmwareDataRequest
 import com.dehnes.smarthome.environment_sensors.FirmwareHolder
 import com.dehnes.smarthome.lora.LoRaConnection
@@ -31,7 +33,8 @@ class UnderFloorHeaterService(
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
     private val energyPriceService: EnergyPriceService,
-    private val clock: Clock
+    private val clock: Clock,
+    energyService: EnergyService
 ) : AbstractProcess(executorService, 42) {
 
     private val loRaAddr = 18
@@ -67,6 +70,23 @@ class UnderFloorHeaterService(
                 true
             }
         }
+
+        energyService.addUnit(HeaterView(this))
+    }
+
+    class HeaterView(private val parent: UnderFloorHeaterService): EnergyUnit {
+        override val id: String
+            get() = "UnderFloorHeater"
+        override val name: String
+            get() = "Under Floor Heater"
+
+        override fun currentPowerL1() =
+            if (parent.lastStatus.status == OnOff.on) (7.25 * 230 * 1000 * -1).toLong() else 0L
+        override fun currentPowerL2() =
+            if (parent.lastStatus.status == OnOff.on) (7.25 * 230 * 1000 * -1).toLong() else 0L
+        override fun currentPowerL3() =
+            if (parent.lastStatus.status == OnOff.on) (7.25 * 230 * 1000 * -1).toLong() else 0L
+
     }
 
     @Volatile

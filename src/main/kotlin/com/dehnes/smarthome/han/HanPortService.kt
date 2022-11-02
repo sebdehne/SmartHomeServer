@@ -127,19 +127,19 @@ class HanPortService(
 
     // https://www.nek.no/wp-content/uploads/2018/10/Kamstrup-HAN-NVE-interface-description_rev_3_1.pdf
     private fun mapToHanData(dlmsMessage: DLMSMessage) = HanData(
-        (dlmsMessage.findElement("1.1.1.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.2.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.3.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.4.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.31.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.51.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.71.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.32.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.52.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.72.7.0.255") as NumberElement).value,
-        (dlmsMessage.findElement("1.1.1.8.0.255") as NumberElement?)?.value,
-        (dlmsMessage.findElement("1.1.2.8.0.255") as NumberElement?)?.value,
-        (dlmsMessage.findElement("1.1.3.8.0.255") as NumberElement?)?.value,
-        (dlmsMessage.findElement("1.1.4.8.0.255") as NumberElement?)?.value,
+        totalPowerImport = (dlmsMessage.findElement("1.1.1.7.0.255") as NumberElement).value,
+        totalPowerExport = (dlmsMessage.findElement("1.1.2.7.0.255") as NumberElement).value,
+        totalReactivePowerImport = (dlmsMessage.findElement("1.1.3.7.0.255") as NumberElement).value,
+        totalReactivePowerExport = (dlmsMessage.findElement("1.1.4.7.0.255") as NumberElement).value,
+        currentL1 = (dlmsMessage.findElement("1.1.31.7.0.255") as NumberElement).value * 10, // in milliAmpere
+        currentL2 = (dlmsMessage.findElement("1.1.51.7.0.255") as NumberElement).value * 10, // in milliAmpere
+        currentL3 = (dlmsMessage.findElement("1.1.71.7.0.255") as NumberElement).value * 10, // in milliAmpere
+        voltageL1 = (dlmsMessage.findElement("1.1.32.7.0.255") as NumberElement).value,
+        voltageL2 = (dlmsMessage.findElement("1.1.52.7.0.255") as NumberElement).value,
+        voltageL3 = (dlmsMessage.findElement("1.1.72.7.0.255") as NumberElement).value,
+        totalEnergyImport = (dlmsMessage.findElement("1.1.1.8.0.255") as NumberElement?)?.value?.let { it * 10 }, // Wh
+        totalEnergyExport = (dlmsMessage.findElement("1.1.2.8.0.255") as NumberElement?)?.value?.let { it * 10 }, // Wh
+        totalReactiveEnergyImport = (dlmsMessage.findElement("1.1.3.8.0.255") as NumberElement?)?.value?.let { it * 10 }, // Wh
+        totalReactiveEnergyExport = (dlmsMessage.findElement("1.1.4.8.0.255") as NumberElement?)?.value?.let { it * 10 }, // Wh
     )
 }

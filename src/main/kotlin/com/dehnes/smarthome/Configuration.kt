@@ -2,13 +2,12 @@ package com.dehnes.smarthome
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
-import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
+import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
+import com.dehnes.smarthome.enery.EnergyService
+import com.dehnes.smarthome.han.GridMonitor
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
-import com.dehnes.smarthome.ev_charging.EvChargingService
-import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
-import com.dehnes.smarthome.ev_charging.FirmwareUploadService
-import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
+import com.dehnes.smarthome.ev_charging.*
 import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.han.HanPortService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
@@ -55,6 +54,12 @@ class Configuration {
         )
         energyPriceService.start()
 
+        val gridMonitor = GridMonitor()
+
+        val energyService = EnergyService()
+        energyService.addUnit(gridMonitor)
+
+
         val hanPortService = HanPortService(
             "192.168.1.1",
             23000,
@@ -62,6 +67,7 @@ class Configuration {
             influxDBClient,
             energyPriceService
         )
+        hanPortService.listeners.add { gridMonitor.onNewHanData(it) }
         hanPortService.start()
 
         val evChargingStationConnection = EvChargingStationConnection(
@@ -74,6 +80,11 @@ class Configuration {
         )
         evChargingStationConnection.start()
 
+        EvChargingStationEnergyServices(
+            evChargingStationConnection,
+            energyService
+        )
+
         val evChargingService = EvChargingService(
             evChargingStationConnection,
             executorService,
@@ -82,7 +93,7 @@ class Configuration {
             clock,
             mapOf(
                 PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clock)
-            )
+            ),
         )
         evChargingService.start()
 
@@ -108,7 +119,8 @@ class Configuration {
             persistenceService,
             influxDBClient,
             energyPriceService,
-            clock
+            clock,
+            energyService
         )
         heaterService.start()
 

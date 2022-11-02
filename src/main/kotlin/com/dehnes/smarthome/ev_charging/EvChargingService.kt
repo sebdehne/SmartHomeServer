@@ -2,6 +2,7 @@ package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
+import com.dehnes.smarthome.enery.EnergyService
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
@@ -62,7 +63,7 @@ class EvChargingService(
     private val energyPriceService: EnergyPriceService,
     private val persistenceService: PersistenceService,
     private val clock: Clock,
-    private val loadSharingAlgorithms: Map<String, LoadSharing>
+    private val loadSharingAlgorithms: Map<String, LoadSharing>,
 ) {
     val listeners = ConcurrentHashMap<String, (EvChargingEvent) -> Unit>()
     private val currentData = ConcurrentHashMap<String, InternalState>()
@@ -104,8 +105,6 @@ class EvChargingService(
             }
         }
     }
-
-    fun getConnectedClients() = eVChargingStationConnection.getConnectedClients()
 
     fun getChargingStationsDataAndConfig() = currentData.map { entry ->
         toEvChargingStationDataAndConfig(entry.value)

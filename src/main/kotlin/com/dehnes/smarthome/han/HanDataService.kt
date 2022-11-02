@@ -30,10 +30,7 @@ class HanDataService(
         influxDBClient.recordSensorData(newRecord)
     }
 
-    fun hanDataToInfluxDb(hanData: HanData): List<Pair<String, Any>> {
-
-        val totalEnergyImport = hanData.totalEnergyImport?.let { it * 10 }
-        val totalEnergyExport = hanData.totalEnergyExport?.let { it * 10 }
+    private fun hanDataToInfluxDb(hanData: HanData): List<Pair<String, Any>> {
 
         val influxDbData: MutableList<Pair<String, Any>> = listOfNotNull(
             "totalPowerImport" to hanData.totalPowerImport, // in Watt
@@ -46,10 +43,10 @@ class HanDataService(
             "voltageL1" to hanData.voltageL1, // in Volt
             "voltageL2" to hanData.voltageL2, // in Volt
             "voltageL3" to hanData.voltageL3, // in Volt
-            totalEnergyImport?.let { "totalEnergyImport" to it }, // Wh
-            totalEnergyExport?.let { "totalEnergyExport" to it }, // Wh
-            hanData.totalReactiveEnergyImport?.let { "totalReactiveEnergyImport" to it * 10 }, // Wh
-            hanData.totalReactiveEnergyExport?.let { "totalReactiveEnergyExport" to it * 10 }, // Wh
+            hanData.totalEnergyImport?.let { "totalEnergyImport" to it }, // Wh
+            hanData.totalEnergyExport?.let { "totalEnergyExport" to it }, // Wh
+            hanData.totalReactiveEnergyImport?.let { "totalReactiveEnergyImport" to it }, // Wh
+            hanData.totalReactiveEnergyExport?.let { "totalReactiveEnergyExport" to it }, // Wh
         ).toMutableList()
 
         synchronized(this) {
@@ -72,12 +69,12 @@ class HanDataService(
                 }
             }
 
-            if (totalEnergyImport != null && previousTotalEnergyImport != null) {
+            if (hanData.totalEnergyImport != null && previousTotalEnergyImport != null) {
                 val endHour = hanData.createdAt.roundToNearestFullHour()
                 val startHour = endHour.minusSeconds(60 * 60)
 
                 if (previousTotalEnergyImport!!.first.roundToNearestFullHour() == startHour) {
-                    val deltaInWh = totalEnergyImport - previousTotalEnergyImport!!.second
+                    val deltaInWh = hanData.totalEnergyImport - previousTotalEnergyImport!!.second
                     influxDbData.add("energyImportDeltaWh" to deltaInWh)
 
                     val prices = energyPriceService.getCachedPrices()
@@ -114,7 +111,7 @@ class HanDataService(
                 }
             }
 
-            totalEnergyImport?.let {
+            hanData.totalEnergyImport?.let {
                 previousTotalEnergyImport = hanData.createdAt to it
             }
             hanData.totalEnergyExport?.let {
@@ -125,7 +122,7 @@ class HanDataService(
         return influxDbData
     }
 
-    fun getLatestValueFor(measurement: String, fieldName: String, tags: Map<String, String>): Pair<Instant, Long>? {
+    private fun getLatestValueFor(measurement: String, fieldName: String, tags: Map<String, String>): Pair<Instant, Long>? {
         val tagQueries = tags.entries.fold("") { acc, entry ->
             acc + "|> filter(fn: (r) => r[\"${entry.key}\"] == \"${entry.value}\")\r\n"
         }
