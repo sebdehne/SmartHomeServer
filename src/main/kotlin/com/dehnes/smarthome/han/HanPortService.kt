@@ -2,6 +2,7 @@ package com.dehnes.smarthome.han
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
+import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
@@ -32,6 +33,7 @@ class HanPortService(
     private val executorService: ExecutorService,
     influxDBClient: InfluxDBClient,
     energyPriceService: EnergyPriceService,
+    private val persistenceService: PersistenceService,
 ) {
 
     private val hanDataService = HanDataService(
@@ -77,7 +79,7 @@ class HanPortService(
     private fun readLoop() {
         val buffer = ByteArray(1024 * 10)
         var writePos = 0
-        val hanDecoder = HanDecoder()
+        val hanDecoder = HanDecoder(persistenceService)
 
         while (true) {
             if (hanPortConnection == null) {
