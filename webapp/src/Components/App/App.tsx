@@ -139,6 +139,12 @@ const App = () => {
                             </TableRow>
                             <TableRow>
                                 <TableCell component="th" scope="row">
+                                    Current export power</TableCell>
+                                <TableCell align="right"
+                                           style={calcPowerStyle(quickStatsResponse.powerExportInWatts)}>{quickStatsResponse.powerExportInWatts} Watt</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell component="th" scope="row">
                                     Cost imported energy today</TableCell>
                                 <TableCell align="right"
                                            style={otherStats()}>{new Intl.NumberFormat('nb-NO', {

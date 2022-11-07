@@ -37,9 +37,9 @@ class HanDataService(
             "totalPowerExport" to hanData.totalPowerExport, // in Watt
             "totalReactivePowerImport" to hanData.totalReactivePowerImport,
             "totalReactivePowerExport" to hanData.totalReactivePowerExport,
-            "currentL1" to hanData.currentL1 * 10, // in milliAmpere
-            "currentL2" to hanData.currentL2 * 10, // in milliAmpere
-            "currentL3" to hanData.currentL3 * 10, // in milliAmpere
+            "currentL1" to hanData.currentL1, // in milliAmpere
+            "currentL2" to hanData.currentL2, // in milliAmpere
+            "currentL3" to hanData.currentL3, // in milliAmpere
             "voltageL1" to hanData.voltageL1, // in Volt
             "voltageL2" to hanData.voltageL2, // in Volt
             "voltageL3" to hanData.voltageL3, // in Volt

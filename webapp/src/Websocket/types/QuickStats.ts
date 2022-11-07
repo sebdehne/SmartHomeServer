@@ -2,6 +2,7 @@
 
 export class QuickStatsResponse {
     public powerImportInWatts: number;
+    public powerExportInWatts: number;
     public costEnergyImportedToday: number;
     public costEnergyImportedCurrentMonth: number;
     public energyImportedTodayWattHours: number;
@@ -9,8 +10,9 @@ export class QuickStatsResponse {
     public currentEnergyPrice: number;
 
 
-    constructor(powerImportInWatts: number, costEnergyImportedToday: number, costEnergyImportedCurrentMonth: number, energyImportedTodayWattHours: number, outsideTemperature: number, currentEnergyPrice: number) {
+    constructor(powerImportInWatts: number, powerExportInWatts: number, costEnergyImportedToday: number, costEnergyImportedCurrentMonth: number, energyImportedTodayWattHours: number, outsideTemperature: number, currentEnergyPrice: number) {
         this.powerImportInWatts = powerImportInWatts;
+        this.powerExportInWatts = powerExportInWatts;
         this.costEnergyImportedToday = costEnergyImportedToday;
         this.costEnergyImportedCurrentMonth = costEnergyImportedCurrentMonth;
         this.energyImportedTodayWattHours = energyImportedTodayWattHours;

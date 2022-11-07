@@ -35,6 +35,7 @@ class QuickStatsService(
 
     var quickStatsResponse: QuickStatsResponse = QuickStatsResponse(
         0,
+        0,
         0.0,
         0.0,
         0,
@@ -56,6 +57,7 @@ class QuickStatsService(
     private fun refetch() {
         val quickStatsResponse1 = QuickStatsResponse(
             getPowerImport().toLong(),
+            getPowerExport().toLong(),
             getCostEnergyImportedToday(),
             getCostEnergyImportedCurrentMonth(),
             energyUsedToday().toLong(),
@@ -74,6 +76,17 @@ class QuickStatsService(
           |> range(start: -12h, stop: now())
           |> filter(fn: (r) => r["_measurement"] == "electricityData")
           |> filter(fn: (r) => r["_field"] == "totalPowerImport")
+          |> filter(fn: (r) => r["sensor"] == "MainMeter")
+          |> yield()
+    """.trimIndent()
+    ).lastOrNull()?.value ?: 0.0
+
+    private fun getPowerExport() = influxDBClient.query(
+        """
+        from(bucket:"sensor_data")
+          |> range(start: -12h, stop: now())
+          |> filter(fn: (r) => r["_measurement"] == "electricityData")
+          |> filter(fn: (r) => r["_field"] == "totalPowerExport")
           |> filter(fn: (r) => r["sensor"] == "MainMeter")
           |> yield()
     """.trimIndent()
