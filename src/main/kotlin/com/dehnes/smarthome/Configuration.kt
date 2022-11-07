@@ -65,7 +65,8 @@ class Configuration {
             23000,
             executorService,
             influxDBClient,
-            energyPriceService
+            energyPriceService,
+            persistenceService
         )
         hanPortService.listeners.add { gridMonitor.onNewHanData(it) }
         hanPortService.start()
