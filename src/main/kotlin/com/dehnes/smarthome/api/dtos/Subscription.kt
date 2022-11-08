@@ -1,11 +1,14 @@
 package com.dehnes.smarthome.api.dtos
 
+import com.dehnes.smarthome.victron.ESSValues
+
 enum class SubscriptionType {
     getGarageStatus,
     getUnderFloorHeaterStatus,
     evChargingStationEvents,
     environmentSensorEvents,
-    quickStatsEvents
+    quickStatsEvents,
+    essValues
 }
 
 data class Subscribe(
@@ -24,4 +27,5 @@ data class Notify(
     val evChargingStationEvent: EvChargingEvent?,
     val environmentSensorEvent: EnvironmentSensorEvent?,
     val quickStatsResponse: QuickStatsResponse?,
+    val essValues: ESSValues?,
 )

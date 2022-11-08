@@ -5,6 +5,7 @@ import {EvChargingStationRequest, EvChargingStationResponse} from "./EVChargingS
 import { EnvironmentSensorRequest, EnvironmentSensorResponse } from "./EnvironmentSensors";
 import { VideoBrowserRequest, VideoBrowserResponse } from "./Video";
 import { QuickStatsResponse } from "./QuickStats";
+import { EssValues } from "./Ess";
 
 export enum RequestType {
     subscribe = "subscribe",
@@ -51,8 +52,9 @@ export class RpcResponse {
     public environmentSensorResponse: EnvironmentSensorResponse | null;
     public videoBrowserResponse: VideoBrowserResponse | null;
     public quickStatsResponse: QuickStatsResponse | null;
+    public essValues: EssValues | null;
 
-    public constructor(subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageResponse: GarageResponse | null, underFloorHeaterResponse: UnderFloorHeaterResponse | null, evChargingStationResponse: EvChargingStationResponse | null, environmentSensorResponse: EnvironmentSensorResponse | null, videoBrowserResponse: VideoBrowserResponse | null, quickStatsResponse: QuickStatsResponse | null) {
+    public constructor(subscriptionCreated: boolean | null, subscriptionRemoved: boolean | null, garageResponse: GarageResponse | null, underFloorHeaterResponse: UnderFloorHeaterResponse | null, evChargingStationResponse: EvChargingStationResponse | null, environmentSensorResponse: EnvironmentSensorResponse | null, videoBrowserResponse: VideoBrowserResponse | null, quickStatsResponse: QuickStatsResponse | null, essValues: EssValues | null) {
         this.subscriptionCreated = subscriptionCreated;
         this.subscriptionRemoved = subscriptionRemoved;
         this.garageResponse = garageResponse;
@@ -61,5 +63,6 @@ export class RpcResponse {
         this.environmentSensorResponse = environmentSensorResponse;
         this.videoBrowserResponse = videoBrowserResponse;
         this.quickStatsResponse = quickStatsResponse;
+        this.essValues = essValues;
     }
 }

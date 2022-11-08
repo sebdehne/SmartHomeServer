@@ -15,6 +15,7 @@ import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.victron.VictronService
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -129,6 +130,12 @@ class Configuration {
 
         val quickStatsService = QuickStatsService(influxDBClient, hanPortService, executorService)
 
+        val victronService = VictronService(
+            "192.168.1.18",
+            objectMapper,
+            executorService
+        )
+
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageController::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
@@ -138,6 +145,7 @@ class Configuration {
         beans[EnvironmentSensorService::class] = loRaSensorBoardService
         beans[VideoBrowser::class] = videoBrowser
         beans[QuickStatsService::class] = quickStatsService
+        beans[VictronService::class] = victronService
     }
 
     fun <T> getBean(klass: KClass<*>): T {

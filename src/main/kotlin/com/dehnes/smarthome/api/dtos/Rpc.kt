@@ -1,5 +1,7 @@
 package com.dehnes.smarthome.api.dtos
 
+import com.dehnes.smarthome.victron.ESSValues
+
 enum class RequestType {
     subscribe,
     unsubscribe,
@@ -9,7 +11,9 @@ enum class RequestType {
     evChargingStationRequest,
     environmentSensorRequest,
     videoBrowser,
-    quickStats
+    quickStats,
+    essValues,
+    essRequest
 }
 
 data class RpcRequest(
@@ -21,7 +25,8 @@ data class RpcRequest(
     val underFloorHeaterRequest: UnderFloorHeaterRequest?,
     val evChargingStationRequest: EvChargingStationRequest?,
     val environmentSensorRequest: EnvironmentSensorRequest?,
-    val videoBrowserRequest: VideoBrowserRequest?
+    val videoBrowserRequest: VideoBrowserRequest?,
+    val essRequest: EssRequest?,
 )
 
 data class RpcResponse(
@@ -33,5 +38,6 @@ data class RpcResponse(
     val evChargingStationResponse: EvChargingStationResponse? = null,
     val environmentSensorResponse: EnvironmentSensorResponse? = null,
     val videoBrowserResponse: VideoBrowserResponse? = null,
-    val quickStatsResponse: QuickStatsResponse? = null
+    val quickStatsResponse: QuickStatsResponse? = null,
+    val essValues: ESSValues? = null,
 )

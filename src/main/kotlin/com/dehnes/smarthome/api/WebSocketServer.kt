@@ -10,6 +10,8 @@ import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
+import com.dehnes.smarthome.victron.ESSValues
+import com.dehnes.smarthome.victron.VictronService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import jakarta.websocket.CloseReason
@@ -40,6 +42,8 @@ class WebSocketServer : Endpoint() {
         configuration.getBean<VideoBrowser>(VideoBrowser::class)
     private val quickStatsService =
         configuration.getBean<QuickStatsService>(QuickStatsService::class)
+    private val victronService =
+        configuration.getBean<VictronService>(VictronService::class)
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info("$instanceId Socket connected: $sess")
@@ -64,6 +68,11 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            essRequest -> {
+                victronService.handleWrite(rpcRequest.essRequest!!)
+                RpcResponse(essValues = victronService.current())
+            }
+            essValues -> RpcResponse(essValues = victronService.current())
             quickStats -> RpcResponse(quickStatsResponse = quickStatsService.getStats())
             subscribe -> {
                 val subscribe = rpcRequest.subscribe!!
@@ -72,6 +81,9 @@ class WebSocketServer : Endpoint() {
                 val existing = subscriptions[subscriptionId]
                 if (existing == null) {
                     val sub = when (subscribe.type) {
+                        SubscriptionType.essValues -> EssSubscription(subscriptionId, argSession).apply {
+                            victronService.listeners[subscriptionId] = this::onEvent
+                        }
                         SubscriptionType.quickStatsEvents  -> QuickStatsSubscription(subscriptionId, argSession).apply {
                             quickStatsService.listeners[subscriptionId] = this::onEvent
                         }
@@ -309,6 +321,7 @@ class WebSocketServer : Endpoint() {
                             null,
                             null,
                             null,
+                            null,
                         )
                     )
                 )
@@ -334,6 +347,38 @@ class WebSocketServer : Endpoint() {
                         WebsocketMessageType.notify,
                         notify = Notify(
                             subscriptionId,
+                            null,
+                            null,
+                            null,
+                            null,
+                            e,
+                            null,
+                        )
+                    )
+                )
+            )
+        }
+
+        override fun close() {
+            quickStatsService.listeners.remove(subscriptionId)
+            subscriptions.remove(subscriptionId)
+        }
+    }
+
+    inner class EssSubscription(
+        subscriptionId: String,
+        sess: Session
+    ) : Subscription<ESSValues>(subscriptionId, sess) {
+        override fun onEvent(e: ESSValues) {
+            logger.info("$instanceId onEvent EssSubscription $subscriptionId ")
+            sess.basicRemote.sendText(
+                objectMapper.writeValueAsString(
+                    WebsocketMessage(
+                        UUID.randomUUID().toString(),
+                        WebsocketMessageType.notify,
+                        notify = Notify(
+                            subscriptionId,
+                            null,
                             null,
                             null,
                             null,
@@ -369,6 +414,7 @@ class WebSocketServer : Endpoint() {
                             null,
                             e,
                             null,
+                            null,
                         )
                     )
                 )
@@ -399,6 +445,7 @@ class WebSocketServer : Endpoint() {
                             e,
                             null,
                             null,
+                            null,
                         )
                     )
                 )
@@ -426,6 +473,7 @@ class WebSocketServer : Endpoint() {
                             subscriptionId,
                             null,
                             e,
+                            null,
                             null,
                             null,
                             null,

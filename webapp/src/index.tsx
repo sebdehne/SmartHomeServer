@@ -12,6 +12,7 @@ import Webcams from "./Components/Webcams/Webcams";
 import theme from "./theme";
 import { EnvironmentSensors } from "./Components/EnvironmentSensors/EnvironmentSensors";
 import { VideoRecordings } from "./Components/VideoRecordings/VideoRecordings";
+import { Energy } from "./Components/Energy/Energy";
 
 ReactDOM.render(
     <React.StrictMode>
@@ -26,6 +27,7 @@ ReactDOM.render(
                     <Route path="/environmentSensors" element={<EnvironmentSensors/>}/>
                     <Route path="/webcams" element={<Webcams/>}/>
                     <Route path="/recordings" element={<VideoRecordings/>}/>
+                    <Route path="/energy" element={<Energy/>}/>
                 </Routes>
             </BrowserRouter>
         </MuiThemeProvider>

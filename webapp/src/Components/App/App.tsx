@@ -85,6 +85,11 @@ const App = () => {
                     </Button>
                 </li>
                 <li>
+                    <Button variant="contained" color="primary" onClick={relative("/energy")}>
+                        Energy Storge System
+                    </Button>
+                </li>
+                <li>
                     <Button variant="contained" color="primary" onClick={relative("/heater")}>
                         Heater under floor
                     </Button>
