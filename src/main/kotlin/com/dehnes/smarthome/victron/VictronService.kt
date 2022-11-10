@@ -15,6 +15,7 @@ import com.hivemq.client.internal.util.collections.ImmutableList
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5RetainHandling
+import mu.KotlinLogging
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.util.*
@@ -30,6 +31,10 @@ class VictronService(
     private val executorService: ExecutorService
 ) {
 
+    companion object {
+        val logger = KotlinLogging.logger { }
+    }
+
     val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
     val asyncClient = MqttClient.builder()
@@ -43,7 +48,7 @@ class VictronService(
 
     var essValues = ESSValues()
     var lastNotify = System.currentTimeMillis()
-    val delayInMs = 2000L
+    val delayInMs = 20 * 1000L
 
     init {
         asyncClient.connect().get(20, TimeUnit.SECONDS)
@@ -73,6 +78,7 @@ class VictronService(
                 )
                 if (lastNotify < (System.currentTimeMillis() - delayInMs)) {
                     lastNotify = System.currentTimeMillis()
+                    logger.info { "sending notify $essValues listeners=${listeners.size}" }
                     executorService.submit {
                         listeners.forEach {
                             it.value(essValues)
@@ -80,12 +86,12 @@ class VictronService(
                     }
                 }
             }
-
         }.get()
 
         scheduledExecutorService.scheduleAtFixedRate({
             executorService.submit {
                 send(topic(TopicType.read, "/system/0/Serial"))
+                send(topic(TopicType.read, "/system/0/SystemState/State"))
                 send(topic(TopicType.read, "/settings/0/Settings/CGwacs/AcPowerSetPoint"))
                 send(topic(TopicType.read, "/settings/0/Settings/CGwacs/MaxChargePower"))
                 send(topic(TopicType.read, "/settings/0/Settings/CGwacs/MaxDischargePower"))
@@ -110,9 +116,11 @@ class VictronService(
     fun setAcPowerSetPoint(value: Long) {
         send(topic(TopicType.write, "/settings/0/Settings/CGwacs/AcPowerSetPoint"), value)
     }
+
     fun setMaxChargePower(value: Long) {
         send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxChargePower"), value)
     }
+
     fun setMaxDischargePower(value: Long) {
         send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxDischargePower"), value)
     }
@@ -155,6 +163,32 @@ class VictronService(
 
 }
 
+interface Profile {
+    val profileSettings: ProfileSettings
+}
+
+
+// Energy management
+// EV Charger 1:
+// EV Charger 2:
+// ESS:
+// Heater under floor:
+
+
+// auto:
+// - charge (if prices are cheap && SoC < max)
+// - discharge (if prices are !OK && SoC > min)
+// - else: passthrough
+// passthrough / stop
+// manual:
+//
+
+data class ProfileSettings(
+    val acPowerSetPoint: Long = 0, // /settings/0/Settings/CGwacs/AcPowerSetPoint
+    val maxChargePower: Long = 0, // /settings/0/Settings/CGwacs/MaxChargePower
+    val maxDischargePower: Long = 0, // /settings/0/Settings/CGwacs/MaxDischargePower
+)
+
 // https://github.com/victronenergy/venus-html5-app/blob/master/TOPICS.md
 const val portalId = "48e7da87e605"
 
@@ -171,25 +205,38 @@ fun topic(type: TopicType, path: String) = when (type) {
 } + "/$portalId$path"
 
 fun doubleValue(any: Any?) = when {
+    any == null -> 0.0
     any is Int -> any.toDouble()
     any is Long -> any.toDouble()
     any is Double -> any
-    else -> error("Unsupported type $any")
+    else -> {
+        VictronService.logger.error { "doubleValue - Unsupported type $any" }
+        0.0
+    }
 }
 
 fun intValue(any: Any?) =
     when {
+        any == null -> 0
         any is Int -> any
         any is Long -> any.toInt()
         any is Double -> any.toInt()
-        else -> error("Unsupported type $any")
+        else -> {
+            VictronService.logger.error { "intValue - Unsupported type $any" }
+            0
+        }
     }
+
 fun longValue(any: Any?) =
     when {
+        any == null -> 0L
         any is Int -> any.toLong()
         any is Long -> any
         any is Double -> any.toLong()
-        else -> error("Unsupported type $any")
+        else -> {
+            VictronService.logger.error { "longValue - Unsupported type $any" }
+            0L
+        }
     }
 
 
@@ -224,16 +271,29 @@ data class ESSValues(
 
         return when (topic) {
             "/system/0/Dc/Battery/Soc" -> this.copy(soc = doubleValue(any))
+
             "/settings/0/Settings/CGwacs/AcPowerSetPoint" -> this.copy(acPowerSetPoint = longValue(any))
             "/settings/0/Settings/CGwacs/MaxChargePower" -> this.copy(maxChargePower = longValue(any))
             "/settings/0/Settings/CGwacs/MaxDischargePower" -> this.copy(maxDischargePower = longValue(any))
+
+
             "/system/0/Dc/Battery/Current" -> this.copy(batteryCurrent = doubleValue(any))
             "/system/0/Dc/Battery/Power" -> this.copy(batteryPower = doubleValue(any))
             "/system/0/Dc/Battery/Voltage" -> this.copy(batteryVoltage = doubleValue(any))
             "/vebus/276/Ac/ActiveIn/P" -> this.copy(gridPower = doubleValue(any))
             "/vebus/276/Ac/Out/P" -> this.copy(outputPower = doubleValue(any))
-            "/vebus/276/State" -> this.copy(systemState = SystemState.values().first { it.value == intValue(any) })
-            "/vebus/276/Mode" -> this.copy(mode = Mode.values().first { it.value == intValue(any) })
+            "/system/0/SystemState/State" -> {
+                val v = intValue(any)
+                this.copy(systemState = SystemState.values().firstOrNull {
+                    it.value == v
+                } ?: SystemState.Unknown)
+            }
+
+            "/vebus/276/Mode" -> {
+                val v = intValue(any)
+                this.copy(mode = Mode.values().firstOrNull { it.value == v } ?: Mode.Unknown)
+            }
+
             else -> {
                 when {
                     topicIn.contains("/vebus/276/Ac/ActiveIn/L1") -> this.copy(gridL1 = gridL1.update(topicIn, json))
@@ -253,6 +313,7 @@ data class ESSValues(
 
 
 enum class Mode(val value: Int) {
+    Unknown(-1),
     ChargerOnly(1),
     InverterOnly(2),
     On(3),
@@ -263,6 +324,7 @@ enum class SystemState(
     val value: Int,
     val text: String
 ) {
+    Unknown(-1, "Unknown"),
     Off(0, "Off"),
     VeBusFault(2, "VE.Bus Fault condition"),
     BulkCharging(3, "Bulk charging"),
@@ -281,7 +343,6 @@ data class GridData(
     val current: Double = 0.0, // N/48e7da87e605/vebus/276/Ac/ActiveIn/L1/I
     val power: Double = 0.0, // N/48e7da87e605/vebus/276/Ac/ActiveIn/L1/P
     val freq: Double = 0.0, // N/48e7da87e605/vebus/276/Ac/ActiveIn/L1/F
-    val s: Double = 0.0, // N/48e7da87e605/vebus/276/Ac/ActiveIn/L1/S
     val voltage: Double = 0.0, // N/48e7da87e605/vebus/276/Ac/ActiveIn/L1/V
 ) {
     fun update(topicIn: String, json: Map<String, Any>): GridData {
@@ -296,9 +357,9 @@ data class GridData(
 
         return when (topic) {
             "/I" -> this.copy(current = doubleValue(any))
+            "/S" -> this
             "/P" -> this.copy(power = doubleValue(any))
             "/F" -> this.copy(freq = doubleValue(any))
-            "/S" -> this.copy(s = doubleValue(any))
             "/V" -> this.copy(voltage = doubleValue(any))
             else -> {
                 println("Ignoring $topicIn")
@@ -354,9 +415,6 @@ fun main() {
     victronService.send("W/48e7da87e605/settings/0/Settings/CGwacs/MaxDischargePower", -1)
     victronService.send("W/48e7da87e605/settings/0/Settings/CGwacs/MaxChargePower", -1)
     victronService.send("W/48e7da87e605/settings/0/Settings/CGwacs/AcPowerSetPoint", 1000)
-
-
-
 
 
     // W/48e7da87e605/settings/0/Settings/CGwacs/MaxDischargePower

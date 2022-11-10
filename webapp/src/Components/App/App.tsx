@@ -27,6 +27,7 @@ const App = () => {
                 null,
                 null,
                 null,
+                null,
             )).then(response => {
                 setQuickStatsResponse(response.quickStatsResponse);
             }));

@@ -60,3 +60,17 @@ export class GridData {
         this.voltage = voltage;
     }
 }
+
+export class EssRequest {
+    public acPowerSetPoint: number | null;
+    public maxChargePower: number | null;
+    public maxDischargePower: number | null;
+
+
+    constructor(acPowerSetPoint: number | null, maxChargePower: number | null, maxDischargePower: number | null) {
+        this.acPowerSetPoint = acPowerSetPoint;
+        this.maxChargePower = maxChargePower;
+        this.maxDischargePower = maxDischargePower;
+    }
+}
+

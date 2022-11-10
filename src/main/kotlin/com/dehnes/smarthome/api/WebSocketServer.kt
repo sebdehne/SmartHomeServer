@@ -391,7 +391,7 @@ class WebSocketServer : Endpoint() {
         }
 
         override fun close() {
-            quickStatsService.listeners.remove(subscriptionId)
+            victronService.listeners.remove(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }

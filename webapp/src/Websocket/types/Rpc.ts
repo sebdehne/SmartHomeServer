@@ -5,7 +5,7 @@ import {EvChargingStationRequest, EvChargingStationResponse} from "./EVChargingS
 import { EnvironmentSensorRequest, EnvironmentSensorResponse } from "./EnvironmentSensors";
 import { VideoBrowserRequest, VideoBrowserResponse } from "./Video";
 import { QuickStatsResponse } from "./QuickStats";
-import { EssValues } from "./Ess";
+import { EssRequest, EssValues } from "./Ess";
 
 export enum RequestType {
     subscribe = "subscribe",
@@ -17,6 +17,8 @@ export enum RequestType {
     environmentSensorRequest = "environmentSensorRequest",
     videoBrowser = "videoBrowser",
     quickStats = "quickStats",
+    essValues = "essValues",
+    essRequest = "essRequest",
 }
 
 export class RpcRequest {
@@ -29,8 +31,9 @@ export class RpcRequest {
     public evChargingStationRequest: EvChargingStationRequest | null;
     public environmentSensorRequest: EnvironmentSensorRequest | null;
     public videoBrowserRequest: VideoBrowserRequest | null;
+    public essRequest: EssRequest | null;
 
-    public constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, garageRequest: GarageRequest | null, underFloorHeaterRequest: UnderFloorHeaterRequest | null, evChargingStationRequest: EvChargingStationRequest | null, environmentSensorRequest: EnvironmentSensorRequest | null, videoBrowserRequest: VideoBrowserRequest | null) {
+    public constructor(type: RequestType, subscribe: Subscribe | null, unsubscribe: Unsubscribe | null, garageRequest: GarageRequest | null, underFloorHeaterRequest: UnderFloorHeaterRequest | null, evChargingStationRequest: EvChargingStationRequest | null, environmentSensorRequest: EnvironmentSensorRequest | null, videoBrowserRequest: VideoBrowserRequest | null, essRequest: EssRequest | null) {
         this.type = type;
         this.subscribe = subscribe;
         this.unsubscribe = unsubscribe;
@@ -39,6 +42,7 @@ export class RpcRequest {
         this.evChargingStationRequest = evChargingStationRequest;
         this.environmentSensorRequest = environmentSensorRequest;
         this.videoBrowserRequest = videoBrowserRequest;
+        this.essRequest = essRequest;
     }
 }
 

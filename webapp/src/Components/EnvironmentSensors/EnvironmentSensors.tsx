@@ -44,7 +44,8 @@ export const EnvironmentSensors = () => {
                     null,
                     null
                 ),
-                null
+                null,
+                null,
             )).then(response => {
                 setSensors(response.environmentSensorResponse!!.sensors);
                 setFirmwareInfo(response.environmentSensorResponse!!.firmwareInfo);
@@ -68,7 +69,9 @@ export const EnvironmentSensors = () => {
             null,
             null,
             req,
-            null))
+            null,
+            null,
+        ))
             .then(response => {
                 setCmdResult(true);
                 setSensors(response.environmentSensorResponse!!.sensors);
@@ -89,7 +92,7 @@ export const EnvironmentSensors = () => {
             Object.keys(byFirmwareVersions).map(v => parseInt(v)).sort().map(version => (
                 <div>
                     {Object.keys(byFirmwareVersions).length > 1 &&
-                    <h4>Firmware version: {version}</h4>
+                        <h4>Firmware version: {version}</h4>
                     }
                     {sensors
                         .filter(s => s.firmwareVersion === version)
@@ -110,7 +113,7 @@ export const EnvironmentSensors = () => {
         }
 
         {sensors.length === 0 &&
-        <h4>Currently no Environment Sensor online</h4>
+            <h4>Currently no Environment Sensor online</h4>
         }
 
         <AdminTools

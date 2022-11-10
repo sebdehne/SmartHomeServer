@@ -33,7 +33,8 @@ export const FirmwareUpload = ({ setSending, setCmdResult }: FirmwareUploadProps
                 null,
                 null,
                 null,
-                null
+                null,
+                null,
             )).then(response => {
                 setCmdResult(response.garageResponse!!.firmwareUploadSuccess!!);
                 setTimeout(() => {

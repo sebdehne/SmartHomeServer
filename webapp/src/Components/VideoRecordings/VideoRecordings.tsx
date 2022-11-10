@@ -78,7 +78,8 @@ export const VideoRecordings = () => {
                 null,
                 null,
                 null,
-                request
+                request,
+                null,
             ))
                 .then(response => setVideoResponse(response.videoBrowserResponse!!))
                 .finally(() => setSending(false));

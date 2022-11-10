@@ -42,7 +42,8 @@ export const AdminTools = ({ firmwareInfo, setSending, setCmdResult, setFirmware
                     firmwareBased64Encoded,
                     null
                 ),
-                null
+                null,
+                null,
             )).then(response => {
                 setCmdResult(true);
                 setFirmwareInfo(response.environmentSensorResponse!!.firmwareInfo);
