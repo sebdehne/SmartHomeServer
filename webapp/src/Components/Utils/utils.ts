@@ -7,3 +7,23 @@ export const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
     }
     return window.btoa(binary);
 };
+
+export const numberTo2Decimal = (n: number | null | undefined) => {
+    if (n) {
+        return new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(n)
+    } else {
+        return undefined;
+    }
+}
+
+export const numberNok = (n: number | null | undefined) => {
+    if (n) {
+        return new Intl.NumberFormat('nb-NO', {
+            style: 'currency',
+            currency: 'NOK'
+        }).format(n)
+    } else {
+        return undefined;
+    }
+}
+

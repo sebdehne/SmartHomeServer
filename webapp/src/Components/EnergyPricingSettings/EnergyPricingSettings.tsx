@@ -8,6 +8,7 @@ import {
 } from "../../Websocket/types/EnergyPricingSettings";
 import WebsocketService from "../../Websocket/websocketClient";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import { numberNok } from "../Utils/utils";
 
 
 export const EnergyPricingSettings = () => {
@@ -60,10 +61,7 @@ export const EnergyPricingSettings = () => {
                         }}
                     >
                         <div>Always OK under:</div>
-                        <div>{new Intl.NumberFormat('nb-NO', {
-                            style: 'currency',
-                            currency: 'NOK'
-                        }).format(settings!!.pricingThreshold)}</div>
+                        <div>{numberNok(settings!!.pricingThreshold)}</div>
                     </div>
                 </AccordionSummary>
                 <AccordionDetails>

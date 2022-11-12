@@ -1,6 +1,7 @@
 import { ESSValues, GridData } from "../../Websocket/types/EnergyStorageSystem";
 import { Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@material-ui/core";
 import React from "react";
+import { numberTo2Decimal } from "../Utils/utils";
 
 
 export type VisualizationProps = {
@@ -16,10 +17,27 @@ export const Visualization = ({ essValues }: VisualizationProps) => {
                     <TableCell component="th" scope="row">Status</TableCell>
                     <TableCell align="right">{essValues.systemState}</TableCell>
                 </TableRow>
-
                 <TableRow>
                     <TableCell component="th" scope="row">
+                        Input
                     </TableCell>
+                    <TableCell align="right">{essValues.gridPower} W</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">
+                        Battery
+                    </TableCell>
+                    <TableCell align="right">{essValues.batteryPower} W</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">
+                        Output
+                    </TableCell>
+                    <TableCell align="right">{essValues.outputPower} W</TableCell>
+                </TableRow>
+
+                <TableRow>
+                    <TableCell component="th" scope="row"></TableCell>
                     <TableCell align="right"></TableCell>
                 </TableRow>
                 <TableRow>
@@ -41,31 +59,16 @@ export const Visualization = ({ essValues }: VisualizationProps) => {
                     <AcTableCell data={essValues.gridL3}></AcTableCell>
                 </TableRow>
                 <TableRow>
-                    <TableCell component="th" scope="row">
-                        Ac Input Total
-                    </TableCell>
-                    <TableCell align="right">{essValues.gridPower} W</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell component="th" scope="row">
-                    </TableCell>
+                    <TableCell component="th" scope="row"></TableCell>
                     <TableCell align="right"></TableCell>
                 </TableRow>
                 <TableRow>
-                    <TableCell component="th" scope="row">Battery power</TableCell>
-                    <TableCell align="right">{essValues.batteryPower} W</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell component="th" scope="row">Battery SoC</TableCell>
-                    <TableCell align="right">{essValues.soc} %</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell component="th" scope="row">Battery current</TableCell>
-                    <TableCell align="right">{new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(essValues.batteryCurrent)} A</TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell component="th" scope="row">Battery current</TableCell>
-                    <TableCell align="right">{new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(essValues.batteryVoltage)} V</TableCell>
+                    <TableCell component="th" scope="row">Battery</TableCell>
+                    <TableCell align="right">
+                        <span style={{ marginRight: "5px" }}>{essValues.soc} % |</span>
+                        <span style={{ marginRight: "5px" }}>{numberTo2Decimal(essValues.batteryCurrent)} A |</span>
+                        <span>{numberTo2Decimal(essValues.batteryVoltage)} V</span>
+                    </TableCell>
                 </TableRow>
                 <TableRow>
                     <TableCell component="th" scope="row">
@@ -90,13 +93,6 @@ export const Visualization = ({ essValues }: VisualizationProps) => {
                     </TableCell>
                     <AcTableCell data={essValues.outputL3}></AcTableCell>
                 </TableRow>
-                <TableRow>
-                    <TableCell component="th" scope="row">
-                        Ac Output Total
-                    </TableCell>
-                    <TableCell align="right">{essValues.outputPower} W</TableCell>
-                </TableRow>
-
             </TableBody>
         </Table>
     </TableContainer>
@@ -108,8 +104,8 @@ type AcTableCellProps = {
 }
 const AcTableCell = ({ data }: AcTableCellProps) => {
     return <TableCell align="right">
-        <span style={{marginRight: "5px"}}>{data.power} W | </span>
-        <span style={{marginRight: "5px"}}>{new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(data.voltage)} V |</span>
-        <span>{new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(data.freq)} Hz</span>
+        <span style={{ marginRight: "5px" }}>{data.power} W | </span>
+        <span style={{ marginRight: "5px" }}>{numberTo2Decimal(data.voltage)} V |</span>
+        <span>{numberTo2Decimal(data.freq)} Hz</span>
     </TableCell>
 }

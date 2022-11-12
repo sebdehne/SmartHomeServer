@@ -5,6 +5,7 @@ import './App.css';
 import { QuickStatsResponse } from "../../Websocket/types/QuickStats";
 import WebsocketService from "../../Websocket/websocketClient";
 import Header from "../Header";
+import { numberNok } from "../Utils/utils";
 
 const App = () => {
 
@@ -163,28 +164,19 @@ const App = () => {
                                 <TableCell component="th" scope="row">
                                     Cost imported energy today</TableCell>
                                 <TableCell align="right"
-                                           style={otherStats()}>{new Intl.NumberFormat('nb-NO', {
-                                    style: 'currency',
-                                    currency: 'NOK'
-                                }).format(quickStatsResponse.costEnergyImportedToday)}</TableCell>
+                                           style={otherStats()}>{numberNok(quickStatsResponse.costEnergyImportedToday)}</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell component="th" scope="row"
                                            onClick={() => window.open("https://dehnes.com/stats/d/sDbG2Td7k/energy-prices&from=now&to=now+2d", "_parent")}>
                                     Current Energy price</TableCell>
                                 <TableCell align="right"
-                                           style={otherStats()}>{new Intl.NumberFormat('nb-NO', {
-                                    style: 'currency',
-                                    currency: 'NOK'
-                                }).format(quickStatsResponse.currentEnergyPrice)} / kWh</TableCell>
+                                           style={otherStats()}>{numberNok(quickStatsResponse.currentEnergyPrice)} / kWh</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell component="th" scope="row">Cost imported energy current month</TableCell>
                                 <TableCell align="right"
-                                           style={otherStats()}>{new Intl.NumberFormat('nb-NO', {
-                                    style: 'currency',
-                                    currency: 'NOK'
-                                }).format(quickStatsResponse.costEnergyImportedCurrentMonth)}</TableCell>
+                                           style={otherStats()}>{numberNok(quickStatsResponse.costEnergyImportedCurrentMonth)}</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell component="th" scope="row">Energy imported today</TableCell>
