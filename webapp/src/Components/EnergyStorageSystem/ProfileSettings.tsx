@@ -1,5 +1,5 @@
 import React, { Dispatch, SetStateAction, useState } from "react";
-import { ESSState, ProfileSettings, SoCLimit } from "../../Websocket/types/EnergyStorageSystem";
+import { ESSState, ProfileSettings } from "../../Websocket/types/EnergyStorageSystem";
 import { Accordion, AccordionDetails, AccordionSummary, Button, Grid, TextField } from "@material-ui/core";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import WebsocketClient from "../../Websocket/websocketClient";
@@ -64,30 +64,37 @@ const ProfileSetting = ({ settings, setSending, onNewData }: ProfileSettingProps
             </div>
         </AccordionSummary>
         <AccordionDetails>
-            <Grid container spacing={2} direction={"column"}>
-                <Grid container spacing={2} direction={"row"} alignItems={"center"}>
-                    <Grid item xs={7}>Ac power set point:</Grid>
-                    <Grid item xs={3}><TextField value={acPowerSetPoint}
-                                                 onChange={e => setAcPowerSetPoint(e.target.value.trim())}/></Grid>
-                    <Grid item xs={2}><Button variant={"contained"} onClick={() => {
-                        write({acPowerSetPoint: parseInt(acPowerSetPoint)})
-                    }}>Update</Button></Grid>
-                </Grid>
-                <Grid container spacing={2} direction={"row"} alignItems={"center"}>
-                    <Grid item xs={7}>Max charge power:</Grid>
-                    <Grid item xs={3}><TextField value={maxChargePower} onChange={e => setMaxChargePower(e.target.value.trim())}/></Grid>
-                    <Grid item xs={2}><Button variant={"contained"} onClick={() => {
-                        write({maxChargePower: parseInt(maxChargePower)})
-                    }}>Update</Button></Grid>
-                </Grid>
-                <Grid container spacing={2} direction={"row"} alignItems={"center"}>
-                    <Grid item xs={7}>Max discharge power:</Grid>
-                    <Grid item xs={3}><TextField value={maxDischargePower} onChange={e => setMaxDischargePower(e.target.value.trim())}/></Grid>
-                    <Grid item xs={2}><Button variant={"contained"} onClick={() => {
-                        write({maxDischargePower: parseInt(maxDischargePower)})
-                    }}>Update</Button></Grid>
-                </Grid>
-            </Grid>
+            <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Ac power set point:</div>
+                    <div>
+                        <TextField value={acPowerSetPoint}
+                                   onChange={e => setAcPowerSetPoint(e.target.value.trim())}/>
+                        <Button variant={"contained"} onClick={() => {
+                            write({ acPowerSetPoint: parseInt(acPowerSetPoint) })
+                        }}>Update</Button>
+                    </div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Max charge power:</div>
+                    <div>
+                        <TextField value={maxChargePower} onChange={e => setMaxChargePower(e.target.value.trim())}/>
+                        <Button variant={"contained"} onClick={() => {
+                            write({ maxChargePower: parseInt(maxChargePower) })
+                        }}>Update</Button>
+                    </div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Max discharge power:</div>
+                    <div>
+                        <TextField value={maxDischargePower}
+                                   onChange={e => setMaxDischargePower(e.target.value.trim())}/>
+                        <Button variant={"contained"} onClick={() => {
+                            write({ maxDischargePower: parseInt(maxDischargePower) })
+                        }}>Update</Button>
+                    </div>
+                </div>
+            </div>
         </AccordionDetails>
     </Accordion>
 }

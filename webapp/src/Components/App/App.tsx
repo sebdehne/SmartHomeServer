@@ -6,6 +6,17 @@ import { QuickStatsResponse } from "../../Websocket/types/QuickStats";
 import WebsocketService from "../../Websocket/websocketClient";
 import Header from "../Header";
 import { numberNok } from "../Utils/utils";
+import Icon from '@mdi/react'
+import {
+    mdiCctv,
+    mdiEvStation,
+    mdiGarageVariant,
+    mdiHeatingCoil,
+    mdiHomeBattery,
+    mdiHomeThermometer,
+    mdiTransmissionTower,
+    mdiVhs
+} from '@mdi/js'
 
 const App = () => {
 
@@ -80,12 +91,12 @@ const App = () => {
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                         <Button fullWidth variant="contained" color="primary" onClick={relative("/garage")}>
-                            Garage door
+                            <Icon path={mdiGarageVariant} size={3}/>
                         </Button>
                     </div>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                         <Button fullWidth variant="contained" color="primary" onClick={relative("/evChargingStations")}>
-                            EV Charging
+                            <Icon path={mdiEvStation} size={3}/>
                         </Button>
                     </div>
                 </div>
@@ -93,13 +104,13 @@ const App = () => {
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                         <Button fullWidth variant="contained" color="primary" onClick={relative("/energy")}>
-                            Energy Storage
+                            <Icon path={mdiHomeBattery} size={3}/>
                         </Button>
                     </div>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                         <Button fullWidth variant="contained" color="primary"
                                 onClick={relative("/energy_price_settings")}>
-                            Price thresholds
+                            <Icon path={mdiTransmissionTower} size={3}/>
                         </Button>
                     </div>
                 </div>
@@ -107,12 +118,12 @@ const App = () => {
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                         <Button fullWidth variant="contained" color="primary" onClick={relative("/heater")}>
-                            Under floor Heater
+                            <Icon path={mdiHeatingCoil} size={3}/>
                         </Button>
                     </div>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                         <Button fullWidth variant="contained" color="primary" onClick={relative("/environmentSensors")}>
-                            Environment Sensors
+                            <Icon path={mdiHomeThermometer} size={3}/>
                         </Button>
                     </div>
                 </div>
@@ -120,12 +131,12 @@ const App = () => {
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                         <Button fullWidth variant="contained" color="primary" onClick={relative("/webcams\"")}>
-                            Cameras
+                            <Icon path={mdiCctv} size={3}/>
                         </Button>
                     </div>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                         <Button fullWidth variant="contained" color="primary" onClick={relative("/recordings")}>
-                            Video Recording
+                            <Icon path={mdiVhs} size={3}/>
                         </Button>
                     </div>
                 </div>

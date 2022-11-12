@@ -80,38 +80,32 @@ const OperationModeSwitch = ({ soCLimit, operationMode, setSending, onNewData }:
             .finally(() => setSending(false))
     };
 
-    return <Grid container spacing={2} direction="column" alignItems="center">
-        <Grid container direction="row">
-            <Grid item xs={2}></Grid>
-            <Grid item xs={8}>
-                <ButtonGroup variant="contained" style={{
-                    margin: "10px"
-                }}>
-                    <Button
-                        color={operationMode === "automatic" ? 'secondary' : 'primary'}
-                        onClick={() => updateModeTo("automatic")}>Automatic</Button>
-                    <Button color={operationMode === "passthrough" ? 'secondary' : 'primary'}
-                            onClick={() => updateModeTo("passthrough")}>Passthrough</Button>
-                    <Button
-                        color={operationMode === "manual" ? 'secondary' : 'primary'}
-                        onClick={() => updateModeTo("manual")}
-                    >Manual</Button>
-                </ButtonGroup>
-            </Grid>
-            <Grid item xs={2}></Grid>
-        </Grid>
+    return <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "center" }}>
+            <ButtonGroup variant="contained" style={{
+                margin: "10px"
+            }}>
+                <Button
+                    color={operationMode === "automatic" ? 'secondary' : 'primary'}
+                    onClick={() => updateModeTo("automatic")}>Automatic</Button>
+                <Button color={operationMode === "passthrough" ? 'secondary' : 'primary'}
+                        onClick={() => updateModeTo("passthrough")}>Passthrough</Button>
+                <Button
+                    color={operationMode === "manual" ? 'secondary' : 'primary'}
+                    onClick={() => updateModeTo("manual")}
+                >Manual</Button>
+            </ButtonGroup>
+        </div>
 
-        <Grid container direction="row">
-            <Grid item xs={12}>
-                <SoCLimitComponent
-                    soCLimit={soCLimit}
-                    setSending={setSending}
-                    onNewData={onNewData}
-                />
-            </Grid>
-        </Grid>
+        <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "center" }}>
+            <SoCLimitComponent
+                soCLimit={soCLimit}
+                setSending={setSending}
+                onNewData={onNewData}
+            />
+        </div>
 
-    </Grid>
+    </div>
 }
 
 type SoCLimitProps = {
@@ -136,7 +130,7 @@ const SoCLimitComponent = ({ soCLimit, setSending, onNewData }: SoCLimitProps) =
             .finally(() => setSending(false))
     }
 
-    return <Accordion>
+    return <Accordion style={{width: "100%"}}>
         <AccordionSummary
             expandIcon={<ExpandMoreIcon/>}
             aria-controls="panel1a-content"
@@ -154,30 +148,35 @@ const SoCLimitComponent = ({ soCLimit, setSending, onNewData }: SoCLimitProps) =
             </div>
         </AccordionSummary>
         <AccordionDetails>
-            <Grid container spacing={2} direction={"column"}>
-                <Grid container spacing={2} direction={"row"} alignItems={"center"}>
-                    <Grid item xs={7}>From:</Grid>
-                    <Grid item xs={3}><TextField value={from} onChange={e => setFrom(e.target.value.trim())}/></Grid>
-                    <Grid item xs={2}><Button variant={"contained"} onClick={() => {
-                        const limit: SoCLimit = {
-                            from: parseInt(from),
-                            to: soCLimit.to
-                        }
-                        update(limit)
-                    }}>Update</Button></Grid>
-                </Grid>
-                <Grid container spacing={2} direction={"row"} alignItems={"center"}>
-                    <Grid item xs={7}>To:</Grid>
-                    <Grid item xs={3}><TextField value={to} onChange={e => setTo(e.target.value.trim())}/></Grid>
-                    <Grid item xs={2}><Button variant={"contained"} onClick={() => {
-                        const limit: SoCLimit = {
-                            from: soCLimit.from,
-                            to: parseInt(to)
-                        }
-                        update(limit)
-                    }}>Update</Button></Grid>
-                </Grid>
-            </Grid>
+            <div style={{display: "flex", flexDirection: "column", width: "100%"}}>
+                <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between"}}>
+                    <div>From:</div>
+                    <div>
+                        <TextField value={from} onChange={e => setFrom(e.target.value.trim())}/>
+                        <Button variant={"contained"} onClick={() => {
+                            const limit: SoCLimit = {
+                                from: parseInt(from),
+                                to: soCLimit.to
+                            }
+                            update(limit)
+                        }}>Update</Button>
+                    </div>
+                </div>
+                <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between"}}>
+                    <div>To:</div>
+                    <div>
+                        <TextField value={to} onChange={e => setTo(e.target.value.trim())}/>
+                        <Button variant={"contained"} onClick={() => {
+                            const limit: SoCLimit = {
+                                from: soCLimit.from,
+                                to: parseInt(to)
+                            }
+                            update(limit)
+                        }}>Update</Button>
+                    </div>
+                </div>
+
+            </div>
         </AccordionDetails>
     </Accordion>;
 }
