@@ -1,7 +1,7 @@
 # SmartHomeServer
 Smarthome backend and frontend
 
-![Main Menu](/docs/main_menu.png | width=200)
+<img src="docs/main_menu.png" width="200">
 
 ### Features:
 - Management of [Victron](https://www.victronenergy.com/) ESS system, [using mode 3](https://www.victronenergy.com/live/ess:ess_mode_2_and_3)
