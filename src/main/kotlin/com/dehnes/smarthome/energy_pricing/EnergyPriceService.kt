@@ -15,6 +15,8 @@ interface PriceSource {
 
 private const val skipPercentExpensiveHoursPrefix = "EnergyPriceService.skipPercentExpensiveHours."
 
+const val serviceEnergyStorage = "EnergyStorage"
+
 class EnergyPriceService(
     private val clock: Clock,
     private val objectMapper: ObjectMapper,
@@ -28,6 +30,8 @@ class EnergyPriceService(
     private val backOffInMs = 60L * 60L * 1000L
     private var lastReload = 0L
     private var priceCache = listOf<Price>()
+
+    var gridIsOffline: Boolean = false
 
     @Synchronized
     override fun tickLocked(): Boolean {

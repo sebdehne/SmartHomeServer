@@ -143,6 +143,8 @@ class VictronService(
         }
     }
 
+    fun isGridOk() = essValues.isGridOk()
+
     fun send(topic: String) {
         sendAny(topic, null)
     }
@@ -251,6 +253,13 @@ data class ESSValues(
     val maxDischargePower: Long = 0, // /settings/0/Settings/CGwacs/MaxDischargePower
 
 ) {
+
+    fun isGridOk() = listOf(
+        gridL1,
+        gridL2,
+        gridL3,
+    ).all { it.voltage > 200 }
+
     fun update(topicIn: String, json: Map<String, Any>): ESSValues {
         val topic = topicIn.replace("N/$portalId", "")
 

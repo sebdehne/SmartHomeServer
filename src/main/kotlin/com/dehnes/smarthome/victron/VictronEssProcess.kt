@@ -3,6 +3,7 @@ package com.dehnes.smarthome.victron
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
+import com.dehnes.smarthome.energy_pricing.serviceEnergyStorage
 import com.dehnes.smarthome.utils.AbstractProcess
 import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.victron.VictronEssCalculation.VictronEssCalculationInput
@@ -96,7 +97,7 @@ class VictronEssProcess(
         return targetProfile
     }
 
-    private fun energyPricesAreCheap() = energyPriceService.mustWaitUntilV2("EnergyStorage") == null
+    private fun energyPricesAreCheap() = energyPriceService.mustWaitUntilV2(serviceEnergyStorage) == null
 
     private fun isSoCTooLow(): Boolean {
         val soc = victronService.current().soc.toInt()

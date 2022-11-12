@@ -6,6 +6,7 @@ import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.ev_charging.*
 import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.victron.VictronService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -32,6 +33,7 @@ internal class EvChargingServiceTest {
     val allChargingsStations = mutableMapOf<String, TestChargingStation>()
     val onlineChargingStations = mutableSetOf<String>()
     var currentPowerConnectionCapacity = 32
+    val victronService = mockk<VictronService>()
 
     init {
         every {
@@ -108,6 +110,10 @@ internal class EvChargingServiceTest {
         } answers {
             time.toEpochMilli()
         }
+
+        every {
+            victronService.isGridOk()
+        } returns true
     }
 
     val evChargingService = EvChargingService(
@@ -118,7 +124,8 @@ internal class EvChargingServiceTest {
         clockMock,
         mapOf(
             PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clockMock)
-        )
+        ),
+        victronService
     )
 
     @Test

@@ -4,8 +4,6 @@ import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
-import com.dehnes.smarthome.enery.EnergyService
-import com.dehnes.smarthome.han.GridMonitor
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.*
 import com.dehnes.smarthome.garage_door.GarageController
@@ -57,12 +55,6 @@ class Configuration {
         )
         energyPriceService.start()
 
-        val gridMonitor = GridMonitor()
-
-        val energyService = EnergyService()
-        energyService.addUnit(gridMonitor)
-
-
         val hanPortService = HanPortService(
             "192.168.1.1",
             23000,
@@ -71,7 +63,6 @@ class Configuration {
             energyPriceService,
             persistenceService
         )
-        hanPortService.listeners.add { gridMonitor.onNewHanData(it) }
         hanPortService.start()
 
         val evChargingStationConnection = EvChargingStationConnection(
@@ -84,9 +75,11 @@ class Configuration {
         )
         evChargingStationConnection.start()
 
-        EvChargingStationEnergyServices(
-            evChargingStationConnection,
-            energyService
+        val victronService = VictronService(
+            "192.168.1.18",
+            objectMapper,
+            executorService,
+            persistenceService
         )
 
         val evChargingService = EvChargingService(
@@ -98,6 +91,7 @@ class Configuration {
             mapOf(
                 PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clock)
             ),
+            victronService
         )
         evChargingService.start()
 
@@ -124,18 +118,12 @@ class Configuration {
             influxDBClient,
             energyPriceService,
             clock,
-            energyService
+            victronService,
         )
         heaterService.start()
 
         val videoBrowser = VideoBrowser()
 
-        val victronService = VictronService(
-            "192.168.1.18",
-            objectMapper,
-            executorService,
-            persistenceService
-        )
 
         val victronEssProcess = VictronEssProcess(
             executorService,

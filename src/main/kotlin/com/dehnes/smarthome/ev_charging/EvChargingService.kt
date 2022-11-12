@@ -4,6 +4,7 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
 import java.lang.Integer.min
 import java.time.Clock
@@ -63,6 +64,7 @@ class EvChargingService(
     private val persistenceService: PersistenceService,
     private val clock: Clock,
     private val loadSharingAlgorithms: Map<String, LoadSharing>,
+    private val victronService: VictronService
 ) {
     val listeners = ConcurrentHashMap<String, (EvChargingEvent) -> Unit>()
     private val currentData = ConcurrentHashMap<String, InternalState>()
@@ -200,6 +202,7 @@ class EvChargingService(
          */
         val getReasonCannotCharge = {
             val mode = getMode(clientId)
+            val gridOk = victronService.isGridOk()
             val nextCheapHour = energyPriceService.mustWaitUntilV2("EvCharger$clientId")
             var reasonCannotCharge: String? = null
 
@@ -208,6 +211,9 @@ class EvChargingService(
                     reasonCannotCharge = "Switched Off"
                 }
 
+                mode == EvChargingMode.ChargeDuringCheapHours && !gridOk -> {
+                    reasonCannotCharge = "Grid is offline"
+                }
                 mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour != null -> {
                     reasonCannotCharge = "starting @ " + nextCheapHour.atZone(clock.zone).toLocalTime()
                 }

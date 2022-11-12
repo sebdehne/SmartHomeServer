@@ -3,6 +3,7 @@ package com.dehnes.smarthome.energy_pricing.tibber
 import com.dehnes.smarthome.Configuration
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
+import com.dehnes.smarthome.energy_pricing.serviceEnergyStorage
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.mockk.mockk
@@ -30,8 +31,8 @@ internal class EnergyPriceServiceTest {
 
 
         (0..10).map { it * 10 }.forEach { p ->
-            energyPriceService.setSkipPercentExpensiveHours("EnergyStorage", p)
-            println("p=$p " + energyPriceService.mustWaitUntilV2("EnergyStorage"))
+            energyPriceService.setSkipPercentExpensiveHours(serviceEnergyStorage, p)
+            println("p=$p " + energyPriceService.mustWaitUntilV2(serviceEnergyStorage))
         }
     }
 }

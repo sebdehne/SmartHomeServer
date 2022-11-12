@@ -70,48 +70,69 @@ const App = () => {
                 sending={false}
                 showBackButton={false}
             />
-            <ul className="Menu">
-                <li>
-                    <Button variant="contained" color="primary" onClick={relative("/garage")}>
-                        Garage door
-                    </Button>
-                </li>
-                <li>
-                    <Button variant="contained" color="primary" onClick={relative("/energy")}>
-                        Energy Storge System
-                    </Button>
-                </li>
-                <li>
-                    <Button variant="contained" color="primary" onClick={relative("/heater")}>
-                        Heater under floor
-                    </Button>
-                </li>
-                <li>
-                    <Button variant="contained" color="primary" onClick={relative("/evChargingStations")}>
-                        EV Charging
-                    </Button>
-                </li>
-                <li>
-                    <Button variant="contained" color="primary" onClick={relative("/environmentSensors")}>
-                        Environment Sensors
-                    </Button>
-                </li>
-                <li>
-                    <Button variant="contained" color="primary" onClick={relative("/webcams")}>
-                        Cameras
-                    </Button>
-                </li>
-                <li>
-                    <Button variant="contained" color="primary" onClick={relative("/recordings")}>
-                        Video recordings
-                    </Button>
-                </li>
-                <li>
-                    <Button variant="contained" color="primary" onClick={relative("/energy_price_settings")}>
-                        Energy pricing settings
-                    </Button>
-                </li>
-            </ul>
+
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: "column"
+                }}
+            >
+                <div style={{ display: "flex", flexDirection: "row" }}>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button fullWidth variant="contained" color="primary" onClick={relative("/garage")}>
+                            Garage door
+                        </Button>
+                    </div>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button fullWidth variant="contained" color="primary" onClick={relative("/evChargingStations")}>
+                            EV Charging
+                        </Button>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "row" }}>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button fullWidth variant="contained" color="primary" onClick={relative("/energy")}>
+                            Energy Storage
+                        </Button>
+                    </div>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button fullWidth variant="contained" color="primary"
+                                onClick={relative("/energy_price_settings")}>
+                            Price thresholds
+                        </Button>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "row" }}>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button fullWidth variant="contained" color="primary" onClick={relative("/heater")}>
+                            Under floor Heater
+                        </Button>
+                    </div>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button fullWidth variant="contained" color="primary" onClick={relative("/environmentSensors")}>
+                            Environment Sensors
+                        </Button>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "row" }}>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button fullWidth variant="contained" color="primary" onClick={relative("/webcams\"")}>
+                            Cameras
+                        </Button>
+                    </div>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button fullWidth variant="contained" color="primary" onClick={relative("/recordings")}>
+                            Video Recording
+                        </Button>
+                    </div>
+                </div>
+
+
+            </div>
+
 
             {quickStatsResponse &&
                 <TableContainer component={Paper} style={{
@@ -148,15 +169,18 @@ const App = () => {
 
                             <TableRow>
                                 <TableCell component="th" scope="row">ESS State</TableCell>
-                                <TableCell align="right" style={otherStats()}>{quickStatsResponse.essSystemStatus}</TableCell>
+                                <TableCell align="right"
+                                           style={otherStats()}>{quickStatsResponse.essSystemStatus}</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell component="th" scope="row">ESS Battery Power</TableCell>
-                                <TableCell align="right" style={otherStats()}>{quickStatsResponse.essBatteryPower} Watt</TableCell>
+                                <TableCell align="right"
+                                           style={otherStats()}>{quickStatsResponse.essBatteryPower} Watt</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell component="th" scope="row">ESS Battery SoC</TableCell>
-                                <TableCell align="right" style={otherStats()}>{quickStatsResponse.essBatterySoC} %</TableCell>
+                                <TableCell align="right"
+                                           style={otherStats()}>{quickStatsResponse.essBatterySoC} %</TableCell>
                             </TableRow>
 
 
@@ -171,10 +195,11 @@ const App = () => {
                                            onClick={() => window.open("https://dehnes.com/stats/d/sDbG2Td7k/energy-prices&from=now&to=now+2d", "_parent")}>
                                     Current Energy price</TableCell>
                                 <TableCell align="right"
-                                           style={otherStats()}>{numberNok(quickStatsResponse.currentEnergyPrice)} / kWh</TableCell>
+                                           style={otherStats()}>{numberNok(quickStatsResponse.currentEnergyPrice)} /
+                                    kWh</TableCell>
                             </TableRow>
                             <TableRow>
-                                <TableCell component="th" scope="row">Cost imported energy current month</TableCell>
+                                <TableCell component="th" scope="row">Cost imported energy this month</TableCell>
                                 <TableCell align="right"
                                            style={otherStats()}>{numberNok(quickStatsResponse.costEnergyImportedCurrentMonth)}</TableCell>
                             </TableRow>

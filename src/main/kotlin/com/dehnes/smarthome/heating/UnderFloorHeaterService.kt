@@ -4,8 +4,6 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
-import com.dehnes.smarthome.enery.EnergyService
-import com.dehnes.smarthome.enery.EnergyUnit
 import com.dehnes.smarthome.environment_sensors.FirmwareDataRequest
 import com.dehnes.smarthome.environment_sensors.FirmwareHolder
 import com.dehnes.smarthome.lora.LoRaConnection
@@ -13,6 +11,7 @@ import com.dehnes.smarthome.lora.LoRaInboundPacketDecrypted
 import com.dehnes.smarthome.lora.LoRaPacketType
 import com.dehnes.smarthome.lora.maxPayload
 import com.dehnes.smarthome.utils.*
+import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
 import java.nio.ByteBuffer
 import java.time.Clock
@@ -33,7 +32,7 @@ class UnderFloorHeaterService(
     private val influxDBClient: InfluxDBClient,
     private val energyPriceService: EnergyPriceService,
     private val clock: Clock,
-    energyService: EnergyService
+    private val victronService: VictronService,
 ) : AbstractProcess(executorService, 42) {
 
     private val loRaAddr = 18
@@ -52,6 +51,7 @@ class UnderFloorHeaterService(
     private val logger = KotlinLogging.logger { }
 
     val listeners = ConcurrentHashMap<String, (UnderFloorHeaterResponse) -> Unit>()
+    var gridOK = true
 
     init {
         loRaConnection.listeners.add { packet ->
@@ -69,23 +69,14 @@ class UnderFloorHeaterService(
                 true
             }
         }
-
-        energyService.addUnit(HeaterView(this))
-    }
-
-    class HeaterView(private val parent: UnderFloorHeaterService): EnergyUnit {
-        override val id: String
-            get() = "UnderFloorHeater"
-        override val name: String
-            get() = "Under Floor Heater"
-
-        override fun currentPowerL1() =
-            if (parent.lastStatus.status == OnOff.on) (7.25 * 230 * 1000 * -1).toLong() else 0L
-        override fun currentPowerL2() =
-            if (parent.lastStatus.status == OnOff.on) (7.25 * 230 * 1000 * -1).toLong() else 0L
-        override fun currentPowerL3() =
-            if (parent.lastStatus.status == OnOff.on) (7.25 * 230 * 1000 * -1).toLong() else 0L
-
+        victronService.listeners["UnderFloorHeaterService"] = {
+            val previousGridOk = gridOK
+            gridOK = it.isGridOk()
+            if (previousGridOk && !gridOK) {
+                logger.warn { "Grid went offline, running control loop now" }
+                tick()
+            }
+        }
     }
 
     @Volatile
@@ -281,7 +272,14 @@ class UnderFloorHeaterService(
         // evaluate state
         when (currentMode) {
             Mode.OFF -> persistenceService[HEATER_STATUS_KEY] = "off"
-            Mode.ON -> persistenceService[HEATER_STATUS_KEY] = "on"
+            Mode.ON -> {
+                if (victronService.isGridOk()) {
+                    persistenceService[HEATER_STATUS_KEY] = "on"
+                } else {
+                    persistenceService[HEATER_STATUS_KEY] = "off"
+                }
+            }
+
             Mode.MANUAL -> {
                 if (sensorData.temperatureError > 0) {
                     logger.info("Forcing heater off due to temperature error=${sensorData.temperatureError}")
@@ -290,6 +288,9 @@ class UnderFloorHeaterService(
                     val targetTemperature = getTargetTemperature()
                     logger.info("Evaluating target temperature now: $targetTemperature")
                     waitUntilCheapHour = energyPriceService.mustWaitUntilV2("HeaterUnderFloor")
+                    if (!victronService.isGridOk()) {
+                        waitUntilCheapHour = Instant.MAX
+                    }
                     if (waitUntilCheapHour == null && sensorData.temperature < targetTemperature * 100) {
                         logger.info("Setting heater to on")
                         persistenceService[HEATER_STATUS_KEY] = "on"
