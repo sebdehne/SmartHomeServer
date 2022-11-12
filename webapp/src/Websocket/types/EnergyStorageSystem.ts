@@ -43,6 +43,10 @@ export type ESSValues = {
 
     systemState: string;
     mode: string;
+
+    inverterAlarms: string[];
+    batteryAlarm: number,
+    batteryAlarms: string[];
 }
 
 export type GridData = {

@@ -93,9 +93,6 @@ class VictronService(
             executorService.submit {
                 send(topic(TopicType.read, "/system/0/Serial"))
                 send(topic(TopicType.read, "/system/0/SystemState/State"))
-                send(topic(TopicType.read, "/settings/0/Settings/CGwacs/AcPowerSetPoint"))
-                send(topic(TopicType.read, "/settings/0/Settings/CGwacs/MaxChargePower"))
-                send(topic(TopicType.read, "/settings/0/Settings/CGwacs/MaxDischargePower"))
 
                 send(topic(TopicType.read, "/vebus/276/Hub4/L1/AcPowerSetpoint"))
                 send(topic(TopicType.read, "/vebus/276/Hub4/L2/AcPowerSetpoint"))
@@ -107,24 +104,6 @@ class VictronService(
     fun current() = essValues
 
     fun writeEnabled() = persistenceService["VictronService.writeEnabled", "false"]!! == "true"
-
-    fun essMode2_setAcPowerSetPoint(value: Long) {
-        send(topic(TopicType.write, "/settings/0/Settings/CGwacs/AcPowerSetPoint"), value)
-    }
-
-    fun essMode2_setMaxChargePower(value: Long) {
-        send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxChargePower"), value)
-    }
-
-    fun essMode2_setMaxDischargePower(value: Long) {
-        if (value == 0L) {
-            send(topic(TopicType.write, "/vebus/276/Hub4/DisableFeedIn"), 1)
-            send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxDischargePower"), 0)
-        } else {
-            send(topic(TopicType.write, "/vebus/276/Hub4/DisableFeedIn"), 0)
-            send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxDischargePower"), value)
-        }
-    }
 
     fun essMode3_setAcPowerSetPointMode(acSetPoints: VictronEssCalculation.VictronEssCalculationResult?) {
         if (acSetPoints == null) {
@@ -204,6 +183,17 @@ fun doubleValue(any: Any?) = when {
     }
 }
 
+fun booleanValue(any: Any?) = when {
+    any == null -> false
+    any is Int -> any != 0
+    any is Long -> any != 0L
+    any is Double -> any.toLong() != 0L
+    else -> {
+        VictronService.logger.error { "booleanValue - Unsupported type $any" }
+        false
+    }
+}
+
 fun intValue(any: Any?) =
     when {
         any == null -> 0
@@ -248,17 +238,16 @@ data class ESSValues(
     val systemState: SystemState = SystemState.Off, // /system/0/SystemState/State
     val mode: Mode = Mode.Off, // /vebus/276/Mode
 
-    val acPowerSetPoint: Long = 0, // /settings/0/Settings/CGwacs/AcPowerSetPoint
-    val maxChargePower: Long = 0, // /settings/0/Settings/CGwacs/MaxChargePower
-    val maxDischargePower: Long = 0, // /settings/0/Settings/CGwacs/MaxDischargePower
-
+    val inverterAlarms: List<InverterAlarms> = emptyList(),
+    val batteryAlarm: Int = 0,
+    val batteryAlarms: List<BatteryAlarms> = emptyList(),
 ) {
 
     fun isGridOk() = listOf(
         gridL1,
         gridL2,
         gridL3,
-    ).all { it.voltage > 200 }
+    ).all { it.voltage > 200 } && (InverterAlarms.GridLost !in inverterAlarms)
 
     fun update(topicIn: String, json: Map<String, Any>): ESSValues {
         val topic = topicIn.replace("N/$portalId", "")
@@ -267,11 +256,6 @@ data class ESSValues(
 
         return when (topic) {
             "/system/0/Dc/Battery/Soc" -> this.copy(soc = doubleValue(any))
-
-            "/settings/0/Settings/CGwacs/AcPowerSetPoint" -> this.copy(acPowerSetPoint = longValue(any))
-            "/settings/0/Settings/CGwacs/MaxChargePower" -> this.copy(maxChargePower = longValue(any))
-            "/settings/0/Settings/CGwacs/MaxDischargePower" -> this.copy(maxDischargePower = longValue(any))
-
 
             "/system/0/Dc/Battery/Current" -> this.copy(batteryCurrent = doubleValue(any))
             "/system/0/Dc/Battery/Power" -> this.copy(batteryPower = doubleValue(any))
@@ -289,6 +273,8 @@ data class ESSValues(
                 this.copy(mode = Mode.values().firstOrNull { it.value == v } ?: Mode.Unknown)
             }
 
+            "/battery/0/Alarms/Alarm" -> this.copy(batteryAlarm = intValue(any))
+
             else -> {
                 when {
                     topicIn.contains("/vebus/276/Ac/ActiveIn/L1") -> this.copy(gridL1 = gridL1.update(topicIn, json))
@@ -297,6 +283,8 @@ data class ESSValues(
                     topicIn.contains("/vebus/276/Ac/Out/L1") -> this.copy(outputL1 = outputL1.update(topicIn, json))
                     topicIn.contains("/vebus/276/Ac/Out/L2") -> this.copy(outputL2 = outputL2.update(topicIn, json))
                     topicIn.contains("/vebus/276/Ac/Out/L3") -> this.copy(outputL3 = outputL3.update(topicIn, json))
+                    topicIn.contains("/vebus/276/Alarms") -> this.updateInverterAlarms(topicIn, json)
+                    topicIn.contains("/battery/0/Alarms") -> this.updateBatteryAlarms(topicIn, json)
                     else -> {
                         this
                     }
@@ -304,8 +292,65 @@ data class ESSValues(
             }
         }
     }
+
+    private fun updateInverterAlarms(topicIn: String, json: Map<String, Any>): ESSValues {
+        val topic = topicIn.replace("N/$portalId", "")
+        val any = json["value"]
+        val (alarm, triggered) = when (topic) {
+            "/vebus/276/Alarms/GridLost" -> InverterAlarms.GridLost to booleanValue(any)
+            "/vebus/276/Alarms/HighTemperature" -> InverterAlarms.HighTemperature to booleanValue(any)
+            "/vebus/276/Alarms/LowBattery" -> InverterAlarms.LowBattery to booleanValue(any)
+            "/vebus/276/Alarms/Overload" -> InverterAlarms.Overload to booleanValue(any)
+            "/vebus/276/Alarms/Ripple" -> InverterAlarms.Ripple to booleanValue(any)
+            "/vebus/276/Alarms/TemperatureSensor" -> InverterAlarms.TemperatureSensor to booleanValue(any)
+            else -> return this
+        }
+        return if (triggered) {
+            this.copy(inverterAlarms = (this.inverterAlarms + alarm).distinct().sorted())
+        } else {
+            this.copy(inverterAlarms = this.inverterAlarms.filterNot { it == alarm })
+        }
+    }
+
+    private fun updateBatteryAlarms(topicIn: String, json: Map<String, Any>): ESSValues {
+        val topic = topicIn.replace("N/$portalId", "")
+        val any = json["value"]
+        val (alarm, triggered) = when (topic) {
+            "/battery/0/Alarms/FuseBlown" -> BatteryAlarms.FuseBlown to booleanValue(any)
+            "/battery/0/Alarms/HighInternalTemperature" -> BatteryAlarms.HighInternalTemperature to booleanValue(any)
+            "/battery/0/Alarms/HighTemperature" -> BatteryAlarms.HighTemperature to booleanValue(any)
+            "/battery/0/Alarms/HighVoltage" -> BatteryAlarms.HighVoltage to booleanValue(any)
+            "/battery/0/Alarms/LowSoc" -> BatteryAlarms.LowSoc to booleanValue(any)
+            "/battery/0/Alarms/LowTemperature" -> BatteryAlarms.LowTemperature to booleanValue(any)
+            "/battery/0/Alarms/LowVoltage" -> BatteryAlarms.LowVoltage to booleanValue(any)
+            else -> return this
+        }
+        return if (triggered) {
+            this.copy(batteryAlarms = (this.batteryAlarms + alarm).distinct().sorted())
+        } else {
+            this.copy(batteryAlarms = this.batteryAlarms.filterNot { it == alarm })
+        }
+    }
 }
 
+enum class BatteryAlarms {
+    FuseBlown,
+    HighInternalTemperature,
+    HighTemperature,
+    HighVoltage,
+    LowSoc,
+    LowTemperature,
+    LowVoltage,
+}
+
+enum class InverterAlarms {
+    GridLost,
+    HighTemperature,
+    LowBattery,
+    Overload,
+    Ripple,
+    TemperatureSensor,
+}
 
 enum class Mode(val value: Int) {
     Unknown(-1),

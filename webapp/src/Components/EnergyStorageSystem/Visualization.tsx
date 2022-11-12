@@ -1,7 +1,7 @@
 import { ESSValues, GridData } from "../../Websocket/types/EnergyStorageSystem";
 import { Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@material-ui/core";
 import React from "react";
-import { numberTo2Decimal } from "../Utils/utils";
+import { eesAlarms, numberTo2Decimal } from "../Utils/utils";
 
 
 export type VisualizationProps = {
@@ -17,6 +17,24 @@ export const Visualization = ({ essValues }: VisualizationProps) => {
                     <TableCell component="th" scope="row">Status</TableCell>
                     <TableCell align="right">{essValues.systemState}</TableCell>
                 </TableRow>
+                {essValues.inverterAlarms.length > 0 &&
+                    <TableRow>
+                        <TableCell component="th" scope="row">Inverter Alarms</TableCell>
+                        <TableCell align="right">{eesAlarms(essValues.inverterAlarms)}</TableCell>
+                    </TableRow>
+                }
+                {essValues.batteryAlarms.length > 0 &&
+                    <TableRow>
+                        <TableCell component="th" scope="row">Battery Alarms</TableCell>
+                        <TableCell align="right">{eesAlarms(essValues.batteryAlarms)}</TableCell>
+                    </TableRow>
+                }
+                {essValues.batteryAlarm > 0 &&
+                    <TableRow>
+                        <TableCell component="th" scope="row">Battery Alarm code</TableCell>
+                        <TableCell align="right">{essValues.batteryAlarm}</TableCell>
+                    </TableRow>
+                }
                 <TableRow>
                     <TableCell component="th" scope="row">
                         Input

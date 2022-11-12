@@ -1,3 +1,5 @@
+import { ESSValues } from "../../Websocket/types/EnergyStorageSystem";
+
 export const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -27,3 +29,10 @@ export const numberNok = (n: number | null | undefined) => {
     }
 }
 
+export const eesAlarms = (alarms: string[]) => {
+    if (alarms.length < 1) {
+        return null;
+    } else {
+        return alarms.join(",")
+    }
+}

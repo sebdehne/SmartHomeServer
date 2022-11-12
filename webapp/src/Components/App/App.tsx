@@ -130,7 +130,7 @@ const App = () => {
 
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary" onClick={relative("/webcams\"")}>
+                        <Button fullWidth variant="contained" color="primary" onClick={relative("/webcams")}>
                             <Icon path={mdiCctv} size={3}/>
                         </Button>
                     </div>
