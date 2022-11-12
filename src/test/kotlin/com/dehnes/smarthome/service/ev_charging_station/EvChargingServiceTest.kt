@@ -35,7 +35,7 @@ internal class EvChargingServiceTest {
 
     init {
         every {
-            energyPriceService.mustWaitUntilV2(any())
+            energyPriceService.mustWaitUntilV2(any<String>())
         } answers {
             mustWaitUntil
         }

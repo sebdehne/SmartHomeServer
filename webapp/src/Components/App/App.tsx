@@ -4,9 +4,7 @@ import { useNavigate } from "react-router-dom";
 import './App.css';
 import { QuickStatsResponse } from "../../Websocket/types/QuickStats";
 import WebsocketService from "../../Websocket/websocketClient";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import Header from "../Header";
-import { SubscriptionType } from "../../Websocket/types/Subscription";
 
 const App = () => {
 
@@ -15,21 +13,13 @@ const App = () => {
     const [quickStatsResponse, setQuickStatsResponse] = useState<QuickStatsResponse | null>(null);
 
     useEffect(() => {
-        const subId = WebsocketService.subscribe(SubscriptionType.quickStatsEvents, notify => {
-                setQuickStatsResponse(notify.quickStatsResponse);
+        const subId = WebsocketService.subscribe("quickStatsEvents", notify => {
+                setQuickStatsResponse(notify.quickStatsResponse!!);
             },
-            () => WebsocketService.rpc(new RpcRequest(
-                RequestType.quickStats,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-            )).then(response => {
-                setQuickStatsResponse(response.quickStatsResponse);
+            () => WebsocketService.rpc({
+                type: "quickStats",
+            }).then(response => {
+                setQuickStatsResponse(response.quickStatsResponse!!);
             }));
 
         return () => WebsocketService.unsubscribe(subId);
@@ -115,6 +105,11 @@ const App = () => {
                         Video recordings
                     </Button>
                 </li>
+                <li>
+                    <Button variant="contained" color="primary" onClick={relative("/energy_price_settings")}>
+                        Energy pricing settings
+                    </Button>
+                </li>
             </ul>
 
             {quickStatsResponse &&
@@ -149,6 +144,21 @@ const App = () => {
                                 <TableCell align="right"
                                            style={calcPowerStyle(quickStatsResponse.powerExportInWatts)}>{quickStatsResponse.powerExportInWatts} Watt</TableCell>
                             </TableRow>
+
+                            <TableRow>
+                                <TableCell component="th" scope="row">ESS State</TableCell>
+                                <TableCell align="right" style={otherStats()}>{quickStatsResponse.essSystemStatus}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell component="th" scope="row">ESS Battery Power</TableCell>
+                                <TableCell align="right" style={otherStats()}>{quickStatsResponse.essBatteryPower} Watt</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell component="th" scope="row">ESS Battery SoC</TableCell>
+                                <TableCell align="right" style={otherStats()}>{quickStatsResponse.essBatterySoC} %</TableCell>
+                            </TableRow>
+
+
                             <TableRow>
                                 <TableCell component="th" scope="row">
                                     Cost imported energy today</TableCell>

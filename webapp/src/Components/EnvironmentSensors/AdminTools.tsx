@@ -1,23 +1,24 @@
 import { Button, Grid, Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@material-ui/core";
 import React from "react";
 import WebsocketService from "../../Websocket/websocketClient";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
-import {
-    EnvironmentSensorRequest,
-    EnvironmentSensorRequestType,
-    FirmwareInfo
-} from "../../Websocket/types/EnvironmentSensors";
+import { EnvironmentSensorRequest, FirmwareInfo } from "../../Websocket/types/EnvironmentSensors";
 import { arrayBufferToBase64 } from "../Utils/utils";
 
 type AdminToolsProps = {
-    firmwareInfo: FirmwareInfo | null;
+    firmwareInfo?: FirmwareInfo;
     setSending: (sending: boolean) => void;
     setCmdResult: (sending: boolean | null) => void;
-    setFirmwareInfo: (firmwareInfo: FirmwareInfo | null) => void;
+    setFirmwareInfo: (firmwareInfo?: FirmwareInfo) => void;
     sendUpdate: (req: EnvironmentSensorRequest) => void;
 }
 
-export const AdminTools = ({ firmwareInfo, setSending, setCmdResult, setFirmwareInfo, sendUpdate }: AdminToolsProps) => {
+export const AdminTools = ({
+                               firmwareInfo,
+                               setSending,
+                               setCmdResult,
+                               setFirmwareInfo,
+                               sendUpdate
+                           }: AdminToolsProps) => {
 
     const uploadFirmware = (file: File) => {
         setSending(true);
@@ -28,25 +29,16 @@ export const AdminTools = ({ firmwareInfo, setSending, setCmdResult, setFirmware
             const rawData = ev!!.target!!.result as ArrayBuffer;
             const firmwareBased64Encoded = arrayBufferToBase64(rawData);
 
-            WebsocketService.rpc(new RpcRequest(
-                RequestType.environmentSensorRequest,
-                null,
-                null,
-                null,
-                null,
-                null,
-                new EnvironmentSensorRequest(
-                    EnvironmentSensorRequestType.uploadFirmware,
-                    null,
-                    file.name,
-                    firmwareBased64Encoded,
-                    null
-                ),
-                null,
-                null,
-            )).then(response => {
+            WebsocketService.rpc({
+                type: "environmentSensorRequest",
+                environmentSensorRequest: {
+                    type: "uploadFirmware",
+                    firmwareFilename: file.name,
+                    firmwareBased64Encoded
+                }
+            }).then(response => {
                 setCmdResult(true);
-                setFirmwareInfo(response.environmentSensorResponse!!.firmwareInfo);
+                setFirmwareInfo(response.environmentSensorResponse!!.firmwareInfo!!);
                 setTimeout(() => {
                     setCmdResult(null);
                 }, 2000);
@@ -60,20 +52,12 @@ export const AdminTools = ({ firmwareInfo, setSending, setCmdResult, setFirmware
         reader.readAsArrayBuffer(file);
     };
 
-    const scheduleTimeAdjustment = () => sendUpdate(new EnvironmentSensorRequest(
-        EnvironmentSensorRequestType.scheduleTimeAdjustment,
-        null,
-        null,
-        null,
-        null
-    ));
-    const scheduleReset = () => sendUpdate(new EnvironmentSensorRequest(
-        EnvironmentSensorRequestType.scheduleReset,
-        null,
-        null,
-        null,
-        null
-    ));
+    const scheduleTimeAdjustment = () => sendUpdate({
+        type: "scheduleTimeAdjustment"
+    });
+    const scheduleReset = () => sendUpdate({
+        type: "scheduleReset"
+    });
 
     return (
         <Grid item xs={12}>
@@ -84,16 +68,16 @@ export const AdminTools = ({ firmwareInfo, setSending, setCmdResult, setFirmware
                     <Table aria-label="simple table">
                         <TableBody>
                             {firmwareInfo &&
-                            <>
-                                <TableRow>
-                                    <TableCell component="th" scope="row">Filename</TableCell>
-                                    <TableCell align="right">{firmwareInfo.filename}</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell component="th" scope="row">Size</TableCell>
-                                    <TableCell align="right">{firmwareInfo.size} bytes</TableCell>
-                                </TableRow>
-                            </>
+                                <>
+                                    <TableRow>
+                                        <TableCell component="th" scope="row">Filename</TableCell>
+                                        <TableCell align="right">{firmwareInfo.filename}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell component="th" scope="row">Size</TableCell>
+                                        <TableCell align="right">{firmwareInfo.size} bytes</TableCell>
+                                    </TableRow>
+                                </>
                             }
                             <TableRow>
                                 <TableCell component="th" scope="row">Upload new</TableCell>

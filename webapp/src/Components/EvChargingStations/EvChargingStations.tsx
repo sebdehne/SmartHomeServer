@@ -1,12 +1,6 @@
 import React, { useEffect, useState } from "react";
-import {
-    EvChargingStationDataAndConfig,
-    EvChargingStationRequest,
-    EvChargingStationRequestType
-} from "../../Websocket/types/EVChargingStation";
+import { EvChargingStationDataAndConfig } from "../../Websocket/types/EVChargingStation";
 import WebsocketService from "../../Websocket/websocketClient";
-import { SubscriptionType } from "../../Websocket/types/Subscription";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { Container } from "@material-ui/core";
 import Header from "../Header";
 import { EvChargingStation } from "./EvChargingStation";
@@ -23,27 +17,12 @@ export const EvChargingStations = () => {
     }, [currentMilliSeconds]);
 
     useEffect(() => {
-        const subId = WebsocketService.subscribe(SubscriptionType.evChargingStationEvents, notify =>
+        const subId = WebsocketService.subscribe("evChargingStationEvents", notify =>
                 setStations(notify.evChargingStationEvent!!.chargingStationsDataAndConfig),
-            () => WebsocketService.rpc(new RpcRequest(
-                RequestType.evChargingStationRequest,
-                null,
-                null,
-                null,
-                null,
-                new EvChargingStationRequest(
-                    EvChargingStationRequestType.getChargingStationsDataAndConfig,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
-                ),
-                null,
-                null,
-                null,
-            )).then(response => setStations(response.evChargingStationResponse!!.chargingStationsDataAndConfig)));
+            () => WebsocketService.rpc({
+                type: "evChargingStationRequest",
+                evChargingStationRequest: { type: "getChargingStationsDataAndConfig" }
+            }).then(response => setStations(response.evChargingStationResponse!!.chargingStationsDataAndConfig)));
 
         return () => WebsocketService.unsubscribe(subId);
     }, []);
@@ -55,25 +34,25 @@ export const EvChargingStations = () => {
         />
 
         {stations.length > 0 &&
-        <div>
-            {stations
-                .sort((a, b) => {
-                    return b.clientConnection.clientId.localeCompare(a.clientConnection.clientId);
-                })
-                .map(station => (
-                <EvChargingStation
-                    key={station.clientConnection.clientId}
-                    station={station}
-                    setCmdResult={setCmdResult}
-                    setSending={setSending}
-                    setStations={setStations}
-                    currentMilliSeconds={currentMilliSeconds}
-                />
-            ))}
-        </div>
+            <div>
+                {stations
+                    .sort((a, b) => {
+                        return b.clientConnection.clientId.localeCompare(a.clientConnection.clientId);
+                    })
+                    .map(station => (
+                        <EvChargingStation
+                            key={station.clientConnection.clientId}
+                            station={station}
+                            setCmdResult={setCmdResult}
+                            setSending={setSending}
+                            setStations={setStations}
+                            currentMilliSeconds={currentMilliSeconds}
+                        />
+                    ))}
+            </div>
         }
         {stations.length === 0 &&
-        <h4>Currently no EV charging stations online</h4>
+            <h4>Currently no EV charging stations online</h4>
         }
 
 

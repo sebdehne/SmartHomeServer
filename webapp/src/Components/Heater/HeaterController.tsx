@@ -14,14 +14,9 @@ import WebsocketService from "../../Websocket/websocketClient";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 import Header from "../Header";
 import './HeaterController.css';
-import {
-    UnderFloorHeaterMode,
-    UnderFloorHeaterRequest,
-    UnderFloorHeaterRequestType,
-    UnderFloorHeaterResponse
-} from "../../Websocket/types/UnderFloorHeater";
-import { Notify, SubscriptionType } from "../../Websocket/types/Subscription";
-import { RequestType, RpcRequest, RpcResponse } from "../../Websocket/types/Rpc";
+import { UnderFloorHeaterRequest, UnderFloorHeaterResponse } from "../../Websocket/types/UnderFloorHeater";
+import { Notify } from "../../Websocket/types/Subscription";
+import { RpcResponse } from "../../Websocket/types/Rpc";
 import { formateDateTime } from "../Utils/dateUtils";
 import { FirmwareUpgradeState } from "../../Websocket/types/EnvironmentSensors";
 import { FirmwareUpload } from "./FirmwareUpload";
@@ -38,18 +33,11 @@ const HeaterController = () => {
 
     const sendUpdate = (underFloorHeaterRequest: UnderFloorHeaterRequest) => {
         setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.underFloorHeaterRequest,
-            null,
-            null,
-            null,
-            underFloorHeaterRequest,
-            null,
-            null,
-            null,
-            null,
-        )).then((response: RpcResponse) => {
-            setCmdResult(response.underFloorHeaterResponse!!.updateUnderFloorHeaterModeSuccess);
+        WebsocketService.rpc({
+            type: "underFloorHeaterRequest",
+            underFloorHeaterRequest: underFloorHeaterRequest
+        }).then((response: RpcResponse) => {
+            setCmdResult(response.underFloorHeaterResponse!!.updateUnderFloorHeaterModeSuccess!!);
             setUnderFloorHeaterStatus(response.underFloorHeaterResponse!!);
             setTimeout(() => {
                 setCmdResult(null);
@@ -59,23 +47,10 @@ const HeaterController = () => {
 
     const adjustTime = () => {
         setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.underFloorHeaterRequest,
-            null,
-            null,
-            null,
-            new UnderFloorHeaterRequest(
-                UnderFloorHeaterRequestType.adjustTime,
-                null,
-                null,
-                null,
-                null
-            ),
-            null,
-            null,
-            null,
-            null,
-        )).then((response: RpcResponse) => {
+        WebsocketService.rpc({
+            type: "underFloorHeaterRequest",
+            underFloorHeaterRequest: { type: "adjustTime" }
+        }).then((response: RpcResponse) => {
             setCmdResult(response.underFloorHeaterResponse!!.adjustTimeSuccess!!);
             setTimeout(() => {
                 setCmdResult(null);
@@ -85,27 +60,13 @@ const HeaterController = () => {
 
     useEffect(() => {
         const subId = WebsocketService.subscribe(
-            SubscriptionType.getUnderFloorHeaterStatus,
+            "getUnderFloorHeaterStatus",
             (notify: Notify) => setUnderFloorHeaterStatus(notify.underFloorHeaterStatus!!),
             () => {
-                WebsocketService.rpc(new RpcRequest(
-                    RequestType.underFloorHeaterRequest,
-                    null,
-                    null,
-                    null,
-                    new UnderFloorHeaterRequest(
-                        UnderFloorHeaterRequestType.getStatus,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
-                    null,
-                    null,
-                    null,
-                    null,
-                    ))
-                    .then(response => setUnderFloorHeaterStatus(response.underFloorHeaterResponse!!));
+                WebsocketService.rpc({
+                    type: "underFloorHeaterRequest",
+                    underFloorHeaterRequest: { type: "getStatus" }
+                }).then(response => setUnderFloorHeaterStatus(response.underFloorHeaterResponse!!));
             }
         )
 
@@ -134,49 +95,40 @@ const HeaterController = () => {
                         <Button
                             variant="contained"
                             color={
-                                underFloorHeaterStatus.underFloorHeaterStatus.mode === UnderFloorHeaterMode.constantTemperature
+                                underFloorHeaterStatus.underFloorHeaterStatus.mode === "constantTemperature"
                                     ? 'secondary'
                                     : 'primary'
                             }
-                            onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                UnderFloorHeaterRequestType.updateMode,
-                                UnderFloorHeaterMode.constantTemperature,
-                                null,
-                                null,
-                                null
-                            ))}>
+                            onClick={() => sendUpdate({
+                                type: "updateMode",
+                                newMode: "constantTemperature"
+                            })}>
                             Constant Temp
                         </Button>
                         <Button
                             variant="contained"
                             color={
-                                underFloorHeaterStatus.underFloorHeaterStatus.mode === UnderFloorHeaterMode.permanentOn
+                                underFloorHeaterStatus.underFloorHeaterStatus.mode === "permanentOn"
                                     ? 'secondary'
                                     : 'primary'
                             }
-                            onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                UnderFloorHeaterRequestType.updateMode,
-                                UnderFloorHeaterMode.permanentOn,
-                                null,
-                                null,
-                                null
-                            ))}>
+                            onClick={() => sendUpdate({
+                                type: "updateMode",
+                                newMode: "permanentOn"
+                            })}>
                             On
                         </Button>
                         <Button
                             variant="contained"
                             color={
-                                underFloorHeaterStatus.underFloorHeaterStatus.mode === UnderFloorHeaterMode.permanentOff
+                                underFloorHeaterStatus.underFloorHeaterStatus.mode === "permanentOff"
                                     ? 'secondary'
                                     : 'primary'
                             }
-                            onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                UnderFloorHeaterRequestType.updateMode,
-                                UnderFloorHeaterMode.permanentOff,
-                                null,
-                                null,
-                                null
-                            ))}>
+                            onClick={() => sendUpdate({
+                                type: "updateMode",
+                                newMode: "permanentOff"
+                            })}>
                             Off
                         </Button>
                     </div>
@@ -207,22 +159,16 @@ const HeaterController = () => {
                                         }}>
                                         <Button
                                             disabled={underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature <= 10}
-                                            onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                                UnderFloorHeaterRequestType.updateTargetTemperature,
-                                                null,
-                                                underFloorHeaterStatus?.underFloorHeaterStatus.targetTemperature - 1,
-                                                null,
-                                                null
-                                            ))}>-</Button>
+                                            onClick={() => sendUpdate({
+                                                type: "updateTargetTemperature",
+                                                newTargetTemperature: underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature - 1
+                                            })}>-</Button>
                                         <Button
                                             disabled={underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature >= 50}
-                                            onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                                UnderFloorHeaterRequestType.updateTargetTemperature,
-                                                null,
-                                                underFloorHeaterStatus?.underFloorHeaterStatus.targetTemperature + 1,
-                                                null,
-                                                null
-                                            ))}>+</Button>
+                                            onClick={() => sendUpdate({
+                                                type: "updateTargetTemperature",
+                                                newTargetTemperature: underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature + 1
+                                            })}>+</Button>
                                     </ButtonGroup>
                                     </TableCell>
                                 </TableRow>
@@ -241,36 +187,6 @@ const HeaterController = () => {
                                     </>
                                 }
 
-                                <TableRow>
-                                    <TableCell component="th" scope="row">Skip most expensive hours %/day:</TableCell>
-                                    <TableCell align="right">
-                                        {underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours}
-                                        <ButtonGroup variant="contained"
-                                                     aria-label="contained primary button group"
-                                                     style={{
-                                                         margin: "10px"
-                                                     }}>
-                                            <Button
-                                                disabled={underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours <= 0}
-                                                onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                                    UnderFloorHeaterRequestType.setSkipPercentExpensiveHours,
-                                                    null,
-                                                    null,
-                                                    underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours - 1,
-                                                    null
-                                                ))}>-</Button>
-                                            <Button
-                                                disabled={underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours >= 100}
-                                                onClick={() => sendUpdate(new UnderFloorHeaterRequest(
-                                                    UnderFloorHeaterRequestType.setSkipPercentExpensiveHours,
-                                                    null,
-                                                    null,
-                                                    underFloorHeaterStatus.underFloorHeaterStatus.skipPercentExpensiveHours + 1,
-                                                    null
-                                                ))}>+</Button>
-                                        </ButtonGroup>
-                                    </TableCell>
-                                </TableRow>
                                 <TableRow>
                                     <TableCell component="th" scope="row">Waiting for low energy price:</TableCell>
                                     <TableCell align="right">

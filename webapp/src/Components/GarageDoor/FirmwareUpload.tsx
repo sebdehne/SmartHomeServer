@@ -1,9 +1,7 @@
 import { Button } from "@material-ui/core";
 import React from "react";
 import WebsocketService from "../../Websocket/websocketClient";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { arrayBufferToBase64 } from "../Utils/utils";
-import { GarageRequest, GarageRequestType } from "../../Websocket/types/Garage";
 
 type FirmwareUploadProps = {
     setSending: (sending: boolean) => void;
@@ -21,21 +19,10 @@ export const FirmwareUpload = ({ setSending, setCmdResult }: FirmwareUploadProps
             const rawData = ev!!.target!!.result as ArrayBuffer;
             const firmwareBased64Encoded = arrayBufferToBase64(rawData);
 
-            WebsocketService.rpc(new RpcRequest(
-                RequestType.garageRequest,
-                null,
-                null,
-                new GarageRequest(
-                    GarageRequestType.firmwareUpgrade,
-                    null,
-                    firmwareBased64Encoded
-                ),
-                null,
-                null,
-                null,
-                null,
-                null,
-            )).then(response => {
+            WebsocketService.rpc({
+                type: "garageRequest",
+                garageRequest: { type: "firmwareUpgrade", firmwareBased64Encoded }
+            }).then(response => {
                 setCmdResult(response.garageResponse!!.firmwareUploadSuccess!!);
                 setTimeout(() => {
                     setCmdResult(null);

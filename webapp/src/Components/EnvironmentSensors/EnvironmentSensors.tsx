@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from "react";
 import WebsocketService from "../../Websocket/websocketClient";
-import { SubscriptionType } from "../../Websocket/types/Subscription";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { Container } from "@material-ui/core";
 import Header from "../Header";
 import {
     EnvironmentSensorRequest,
-    EnvironmentSensorRequestType,
     EnvironmentSensorState,
     FirmwareInfo
 } from "../../Websocket/types/EnvironmentSensors";
@@ -19,34 +16,21 @@ export const EnvironmentSensors = () => {
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
     const [sensors, setSensors] = useState<EnvironmentSensorState[]>([]);
-    const [firmwareInfo, setFirmwareInfo] = useState<FirmwareInfo | null>(null);
+    const [firmwareInfo, setFirmwareInfo] = useState<FirmwareInfo | undefined>(undefined);
 
     useEffect(() => {
         setTimeout(() => setCurrentSeconds(Date.now()), 1000)
     }, [currentSeconds]);
 
     useEffect(() => {
-        const subId = WebsocketService.subscribe(SubscriptionType.environmentSensorEvents, notify => {
+        const subId = WebsocketService.subscribe("environmentSensorEvents", notify => {
                 setSensors(notify.environmentSensorEvent!!.sensors);
-                setFirmwareInfo(notify.environmentSensorEvent!!.firmwareInfo);
+                setFirmwareInfo(notify.environmentSensorEvent!!.firmwareInfo!!);
             },
-            () => WebsocketService.rpc(new RpcRequest(
-                RequestType.environmentSensorRequest,
-                null,
-                null,
-                null,
-                null,
-                null,
-                new EnvironmentSensorRequest(
-                    EnvironmentSensorRequestType.getAllEnvironmentSensorData,
-                    null,
-                    null,
-                    null,
-                    null
-                ),
-                null,
-                null,
-            )).then(response => {
+            () => WebsocketService.rpc({
+                type: "environmentSensorRequest",
+                environmentSensorRequest: { type: "getAllEnvironmentSensorData" }
+            }).then(response => {
                 setSensors(response.environmentSensorResponse!!.sensors);
                 setFirmwareInfo(response.environmentSensorResponse!!.firmwareInfo);
             }));
@@ -61,17 +45,7 @@ export const EnvironmentSensors = () => {
 
     const sendUpdate = (req: EnvironmentSensorRequest) => {
         setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.environmentSensorRequest,
-            null,
-            null,
-            null,
-            null,
-            null,
-            req,
-            null,
-            null,
-        ))
+        WebsocketService.rpc({ type: "environmentSensorRequest", environmentSensorRequest: req })
             .then(response => {
                 setCmdResult(true);
                 setSensors(response.environmentSensorResponse!!.sensors);

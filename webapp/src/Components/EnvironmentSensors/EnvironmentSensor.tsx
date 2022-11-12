@@ -85,7 +85,7 @@ const firmwareUpgradeProgress = (sensor: EnvironmentSensorState) => {
 type EnvironmentSensorProps = {
     sensor: EnvironmentSensorState;
     currentMilliSeconds: number;
-    firmwareInfo: FirmwareInfo | null;
+    firmwareInfo?: FirmwareInfo;
     sendUpdate: (req: EnvironmentSensorRequest) => void;
 };
 
@@ -96,20 +96,15 @@ export const EnvironmentSensor = ({
                                       sendUpdate
                                   }: EnvironmentSensorProps) => {
 
-    const sendCommand = (cmd: EnvironmentSensorRequestType) => sendUpdate(new EnvironmentSensorRequest(
-        cmd,
-        sensor.sensorId,
-        null,
-        null,
-        null
-    ));
-    const adjustSleepTimeInSeconds = (delta: number) => sendUpdate(new EnvironmentSensorRequest(
-        EnvironmentSensorRequestType.adjustSleepTimeInSeconds,
-        sensor.sensorId,
-        null,
-        null,
-        delta
-    ));
+    const sendCommand = (cmd: EnvironmentSensorRequestType) => sendUpdate({
+        type: cmd,
+        sensorId: sensor.sensorId
+    });
+    const adjustSleepTimeInSeconds = (delta: number) => sendUpdate({
+        type: "adjustSleepTimeInSeconds",
+        sensorId: sensor.sensorId,
+        sleepTimeInSecondsDelta: delta
+    });
 
     return <Accordion key={sensor.sensorId}>
         <AccordionSummary
@@ -146,8 +141,8 @@ export const EnvironmentSensor = ({
                                 color={sensor.timeAdjustmentSchedule ? 'secondary' : 'primary'}
                                 onClick={() =>
                                     sensor.timeAdjustmentSchedule
-                                        ? sendCommand(EnvironmentSensorRequestType.cancelTimeAdjustment)
-                                        : sendCommand(EnvironmentSensorRequestType.scheduleTimeAdjustment)
+                                        ? sendCommand("cancelTimeAdjustment")
+                                        : sendCommand("scheduleTimeAdjustment")
                                 }
                             >Adjust time</Button>
                             <Button
@@ -155,45 +150,110 @@ export const EnvironmentSensor = ({
                                 color={sensor.firmwareUpgradeScheduled ? 'secondary' : 'primary'}
                                 onClick={() =>
                                     sensor.firmwareUpgradeScheduled
-                                        ? sendCommand(EnvironmentSensorRequestType.cancelFirmwareUpgrade)
-                                        : sendCommand(EnvironmentSensorRequestType.scheduleFirmwareUpgrade)
+                                        ? sendCommand("cancelFirmwareUpgrade")
+                                        : sendCommand("scheduleFirmwareUpgrade")
                                 }
                             >Upgrade firmware</Button>
                             <Button
                                 color={sensor.resetScheduled ? 'secondary' : 'primary'}
                                 onClick={() =>
                                     sensor.resetScheduled
-                                        ? sendCommand(EnvironmentSensorRequestType.cancelReset)
-                                        : sendCommand(EnvironmentSensorRequestType.scheduleReset)
+                                        ? sendCommand("cancelReset")
+                                        : sendCommand("scheduleReset")
                                 }
                             >Reset</Button>
                         </ButtonGroup>
                     </Grid>
                 </Grid>
                 {sensor.sensorData &&
-                <>
-                    <Grid item xs={12}>
-                        <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
+                    <>
+                        <Grid item xs={12}>
+                            <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
 
-                            <Grid item xs={8}>
-                                <span>Set sleep time: </span>
-                                <span>{sensor.sleepTimeInSeconds} seconds</span>
-                            </Grid>
-                            <Grid item xs={4}>
-                                <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
-                                    margin: "10px"
-                                }}>
-                                    <Button
-                                        disabled={sensor.sleepTimeInSeconds < 11}
-                                        onClick={() => adjustSleepTimeInSeconds(-10)}>-</Button>
-                                    <Button
-                                        disabled={sensor.sleepTimeInSeconds >= 590}
-                                        onClick={() => adjustSleepTimeInSeconds(10)}>+</Button>
-                                </ButtonGroup>
+                                <Grid item xs={8}>
+                                    <span>Set sleep time: </span>
+                                    <span>{sensor.sleepTimeInSeconds} seconds</span>
+                                </Grid>
+                                <Grid item xs={4}>
+                                    <ButtonGroup variant="contained" aria-label="contained primary button group"
+                                                 style={{
+                                                     margin: "10px"
+                                                 }}>
+                                        <Button
+                                            disabled={sensor.sleepTimeInSeconds < 11}
+                                            onClick={() => adjustSleepTimeInSeconds(-10)}>-</Button>
+                                        <Button
+                                            disabled={sensor.sleepTimeInSeconds >= 590}
+                                            onClick={() => adjustSleepTimeInSeconds(10)}>+</Button>
+                                    </ButtonGroup>
+                                </Grid>
                             </Grid>
                         </Grid>
-                    </Grid>
 
+                        <Grid item xs={12}>
+                            <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
+                                <TableContainer component={Paper} style={{
+                                    marginTop: "20px"
+                                }}>
+                                    <Table aria-label="simple table">
+                                        <TableBody>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Temperature</TableCell>
+                                                <TableCell
+                                                    align="right">{(sensor.sensorData!!.temperature / 100).toFixed(2)} &deg;C</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Temperature Error</TableCell>
+                                                <TableCell
+                                                    align="right">{sensor.sensorData.temperatureError ? 'true' : 'false'}</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Humidity</TableCell>
+                                                <TableCell
+                                                    align="right">{(sensor.sensorData!!.humidity / 100).toFixed(2)} %</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Light</TableCell>
+                                                <TableCell align="right">{sensor.sensorData!!.adcLight}</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Battery</TableCell>
+                                                <TableCell
+                                                    align="right">{(sensor.sensorData!!.batteryMilliVolts / 1000).toFixed(2)} V</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Actual sleep time</TableCell>
+                                                <TableCell
+                                                    align="right">{sensor.sensorData!!.sleepTimeInSeconds} seconds</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Firmware version</TableCell>
+                                                <TableCell align="right">{sensor.firmwareVersion}</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Clock slew</TableCell>
+                                                <TableCell
+                                                    align="right">{sensor.sensorData!!.timestampDelta} seconds</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Received:</TableCell>
+                                                <TableCell
+                                                    align="right">{timeToDelta(currentMilliSeconds, sensor.sensorData!!.receivedAt)} ago</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell component="th" scope="row">Rssi:</TableCell>
+                                                <TableCell
+                                                    align="right">{sensor.sensorData!!.rssi}dB</TableCell>
+                                            </TableRow>
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </Grid>
+                        </Grid>
+                    </>
+                }
+
+                {sensor.firmwareUpgradeState &&
                     <Grid item xs={12}>
                         <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
                             <TableContainer component={Paper} style={{
@@ -202,93 +262,29 @@ export const EnvironmentSensor = ({
                                 <Table aria-label="simple table">
                                     <TableBody>
                                         <TableRow>
-                                            <TableCell component="th" scope="row">Temperature</TableCell>
-                                            <TableCell
-                                                align="right">{(sensor.sensorData!!.temperature / 100).toFixed(2)} &deg;C</TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell component="th" scope="row">Temperature Error</TableCell>
-                                            <TableCell
-                                                align="right">{sensor.sensorData.temperatureError ? 'true' : 'false'}</TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell component="th" scope="row">Humidity</TableCell>
-                                            <TableCell
-                                                align="right">{(sensor.sensorData!!.humidity / 100).toFixed(2)} %</TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell component="th" scope="row">Light</TableCell>
-                                            <TableCell align="right">{sensor.sensorData!!.adcLight}</TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell component="th" scope="row">Battery</TableCell>
-                                            <TableCell
-                                                align="right">{(sensor.sensorData!!.batteryMilliVolts / 1000).toFixed(2)} V</TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell component="th" scope="row">Actual sleep time</TableCell>
-                                            <TableCell
-                                                align="right">{sensor.sensorData!!.sleepTimeInSeconds} seconds</TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell component="th" scope="row">Firmware version</TableCell>
-                                            <TableCell align="right">{sensor.firmwareVersion}</TableCell>
+                                            <TableCell component="th" scope="row">Progress:</TableCell>
+                                            <TableCell align="right">{firmwareUpgradeProgress(sensor)}%</TableCell>
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Clock slew</TableCell>
                                             <TableCell
-                                                align="right">{sensor.sensorData!!.timestampDelta} seconds</TableCell>
+                                                align="right">{sensor.firmwareUpgradeState!!.timestampDelta} seconds</TableCell>
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Received:</TableCell>
                                             <TableCell
-                                                align="right">{timeToDelta(currentMilliSeconds, sensor.sensorData!!.receivedAt)} ago</TableCell>
+                                                align="right">{timeToDelta(currentMilliSeconds, sensor.firmwareUpgradeState!!.receivedAt)} ago</TableCell>
                                         </TableRow>
                                         <TableRow>
                                             <TableCell component="th" scope="row">Rssi:</TableCell>
                                             <TableCell
-                                                align="right">{sensor.sensorData!!.rssi}dB</TableCell>
+                                                align="right">{sensor.firmwareUpgradeState!!.rssi}dB</TableCell>
                                         </TableRow>
                                     </TableBody>
                                 </Table>
                             </TableContainer>
                         </Grid>
                     </Grid>
-                </>
-                }
-
-                {sensor.firmwareUpgradeState &&
-                <Grid item xs={12}>
-                    <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
-                        <TableContainer component={Paper} style={{
-                            marginTop: "20px"
-                        }}>
-                            <Table aria-label="simple table">
-                                <TableBody>
-                                    <TableRow>
-                                        <TableCell component="th" scope="row">Progress:</TableCell>
-                                        <TableCell align="right">{firmwareUpgradeProgress(sensor)}%</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell component="th" scope="row">Clock slew</TableCell>
-                                        <TableCell
-                                            align="right">{sensor.firmwareUpgradeState!!.timestampDelta} seconds</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell component="th" scope="row">Received:</TableCell>
-                                        <TableCell
-                                            align="right">{timeToDelta(currentMilliSeconds, sensor.firmwareUpgradeState!!.receivedAt)} ago</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell component="th" scope="row">Rssi:</TableCell>
-                                        <TableCell
-                                            align="right">{sensor.firmwareUpgradeState!!.rssi}dB</TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </Grid>
-                </Grid>
                 }
 
             </Grid>

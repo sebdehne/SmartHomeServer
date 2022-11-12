@@ -12,7 +12,8 @@ import Webcams from "./Components/Webcams/Webcams";
 import theme from "./theme";
 import { EnvironmentSensors } from "./Components/EnvironmentSensors/EnvironmentSensors";
 import { VideoRecordings } from "./Components/VideoRecordings/VideoRecordings";
-import { Energy } from "./Components/Energy/Energy";
+import { EnergyPricingSettings } from "./Components/EnergyPricingSettings/EnergyPricingSettings";
+import { EnergyStorageSystem } from "./Components/EnergyStorageSystem/EnergyStorageSystem";
 
 ReactDOM.render(
     <React.StrictMode>
@@ -27,7 +28,8 @@ ReactDOM.render(
                     <Route path="/environmentSensors" element={<EnvironmentSensors/>}/>
                     <Route path="/webcams" element={<Webcams/>}/>
                     <Route path="/recordings" element={<VideoRecordings/>}/>
-                    <Route path="/energy" element={<Energy/>}/>
+                    <Route path="/energy_price_settings" element={<EnergyPricingSettings/>}/>
+                    <Route path="/energy" element={<EnergyStorageSystem/>}/>
                 </Routes>
             </BrowserRouter>
         </MuiThemeProvider>

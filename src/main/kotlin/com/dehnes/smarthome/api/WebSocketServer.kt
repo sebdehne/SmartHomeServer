@@ -5,13 +5,14 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
 import com.dehnes.smarthome.datalogging.QuickStatsService
+import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
-import com.dehnes.smarthome.victron.ESSValues
-import com.dehnes.smarthome.victron.VictronService
+import com.dehnes.smarthome.victron.ESSState
+import com.dehnes.smarthome.victron.VictronEssProcess
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import jakarta.websocket.CloseReason
@@ -42,8 +43,10 @@ class WebSocketServer : Endpoint() {
         configuration.getBean<VideoBrowser>(VideoBrowser::class)
     private val quickStatsService =
         configuration.getBean<QuickStatsService>(QuickStatsService::class)
-    private val victronService =
-        configuration.getBean<VictronService>(VictronService::class)
+    private val victronEssProcess =
+        configuration.getBean<VictronEssProcess>(VictronEssProcess::class)
+    private val energyPriceService =
+        configuration.getBean<EnergyPriceService>(EnergyPriceService::class)
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info("$instanceId Socket connected: $sess")
@@ -68,11 +71,12 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
-            essRequest -> {
-                victronService.handleWrite(rpcRequest.essRequest!!)
-                RpcResponse(essValues = victronService.current())
+            essRead -> RpcResponse(essState = victronEssProcess.current())
+            essWrite -> {
+                victronEssProcess.handleWrite(rpcRequest.essWrite!!)
+                RpcResponse(essState = victronEssProcess.current())
             }
-            essValues -> RpcResponse(essValues = victronService.current())
+
             quickStats -> RpcResponse(quickStatsResponse = quickStatsService.getStats())
             subscribe -> {
                 val subscribe = rpcRequest.subscribe!!
@@ -81,12 +85,14 @@ class WebSocketServer : Endpoint() {
                 val existing = subscriptions[subscriptionId]
                 if (existing == null) {
                     val sub = when (subscribe.type) {
-                        SubscriptionType.essValues -> EssSubscription(subscriptionId, argSession).apply {
-                            victronService.listeners[subscriptionId] = this::onEvent
+                        SubscriptionType.essState -> EssSubscription(subscriptionId, argSession).apply {
+                            victronEssProcess.listeners[subscriptionId] = this::onEvent
                         }
-                        SubscriptionType.quickStatsEvents  -> QuickStatsSubscription(subscriptionId, argSession).apply {
+
+                        SubscriptionType.quickStatsEvents -> QuickStatsSubscription(subscriptionId, argSession).apply {
                             quickStatsService.listeners[subscriptionId] = this::onEvent
                         }
+
                         SubscriptionType.getGarageStatus -> GarageStatusSubscription(subscriptionId, argSession).apply {
                             garageDoorService.listeners[subscriptionId] = this::onEvent
                         }
@@ -133,6 +139,23 @@ class WebSocketServer : Endpoint() {
             evChargingStationRequest -> RpcResponse(evChargingStationResponse = evChargingStationRequest(rpcRequest.evChargingStationRequest!!))
             environmentSensorRequest -> RpcResponse(environmentSensorResponse = environmentSensorRequest(rpcRequest.environmentSensorRequest!!))
             RequestType.videoBrowser -> RpcResponse(videoBrowserResponse = videoBrowser.rpc(rpcRequest.videoBrowserRequest!!))
+            readEnergyPricingSettings -> RpcResponse(energyPricingSettingsRead = EnergyPricingSettingsRead(
+                energyPriceService.getAllSettings(),
+                energyPriceService.getPricingThreshold()
+            ))
+            writeEnergyPricingSettings -> {
+                val energyPricingSettingsWrite = rpcRequest.energyPricingSettingsWrite!!
+                if (energyPricingSettingsWrite.pricingThreshold != null) {
+                    energyPriceService.setPricingThreshold(energyPricingSettingsWrite.pricingThreshold)
+                }
+                energyPricingSettingsWrite.serviceToSkipPercentExpensiveHours.entries.forEach { (service, percentage) ->
+                    energyPriceService.setSkipPercentExpensiveHours(service, percentage)
+                }
+                RpcResponse(energyPricingSettingsRead = EnergyPricingSettingsRead(
+                    energyPriceService.getAllSettings(),
+                    energyPriceService.getPricingThreshold()
+                ))
+            }
         }
 
         argSession.basicRemote.sendText(
@@ -214,14 +237,6 @@ class WebSocketServer : Endpoint() {
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
         )
 
-        EvChargingStationRequestType.setSkipPercentExpensiveHours -> EvChargingStationResponse(
-            configUpdated = evChargingService.setSkipPercentExpensiveHours(
-                request.clientId!!,
-                request.skipPercentExpensiveHours!!
-            ),
-            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
-        )
-
         EvChargingStationRequestType.setChargeRateLimit -> EvChargingStationResponse(
             configUpdated = evChargingService.setChargeRateLimitFor(
                 request.clientId!!,
@@ -234,13 +249,6 @@ class WebSocketServer : Endpoint() {
     private fun underFloorHeaterRequest(request: UnderFloorHeaterRequest) = when (request.type) {
         UnderFloorHeaterRequestType.updateMode -> {
             val success = underFloopHeaterService.updateMode(request.newMode!!)
-            underFloopHeaterService.getCurrentState().copy(
-                updateUnderFloorHeaterModeSuccess = success
-            )
-        }
-
-        UnderFloorHeaterRequestType.setSkipPercentExpensiveHours -> {
-            val success = underFloopHeaterService.setEkipPercentExpensiveHours(request.skipPercentExpensiveHours!!)
             underFloopHeaterService.getCurrentState().copy(
                 updateUnderFloorHeaterModeSuccess = success
             )
@@ -368,8 +376,8 @@ class WebSocketServer : Endpoint() {
     inner class EssSubscription(
         subscriptionId: String,
         sess: Session
-    ) : Subscription<ESSValues>(subscriptionId, sess) {
-        override fun onEvent(e: ESSValues) {
+    ) : Subscription<ESSState>(subscriptionId, sess) {
+        override fun onEvent(e: ESSState) {
             logger.info("$instanceId onEvent EssSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
@@ -391,7 +399,7 @@ class WebSocketServer : Endpoint() {
         }
 
         override fun close() {
-            victronService.listeners.remove(subscriptionId)
+            victronEssProcess.listeners.remove(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }

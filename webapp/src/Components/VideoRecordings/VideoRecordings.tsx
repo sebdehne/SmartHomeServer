@@ -17,7 +17,6 @@ import {
 } from "@material-ui/core";
 import { VideoBrowserRequest, VideoBrowserResponse, VideoFile } from "../../Websocket/types/Video";
 import websocketClient from "../../Websocket/websocketClient";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
 
@@ -62,25 +61,18 @@ export const VideoRecordings = () => {
             || previousRequestSent?.maxFileSize !== (fileSizeRange[1] * 1000000)
         ) {
 
-            let request = new VideoBrowserRequest(
-                (fileSizeRange[0] * 1000000),
-                (fileSizeRange[1] * 1000000),
-                dateRange[0].getTime(),
-                dateRange[1].getTime()
-            );
+            let request: VideoBrowserRequest = {
+                minFileSize: (fileSizeRange[0] * 1000000),
+                maxFileSize: (fileSizeRange[1] * 1000000),
+                fromDate: dateRange[0].getTime(),
+                toDate: dateRange[1].getTime()
+            };
             setPreviousRequestSent(request);
             setSending(true);
-            websocketClient.rpc(new RpcRequest(
-                RequestType.videoBrowser,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                request,
-                null,
-            ))
+            websocketClient.rpc({
+                type: "videoBrowser",
+                videoBrowserRequest: request
+            })
                 .then(response => setVideoResponse(response.videoBrowserResponse!!))
                 .finally(() => setSending(false));
         }
@@ -191,7 +183,6 @@ const formatDate = (date: Date) =>
     + " " + date.getHours().toString().padStart(2, '0')
     + ":" + date.getMinutes().toString().padStart(2, '0')
     + ":" + date.getSeconds().toString().padStart(2, '0');
-
 
 
 function humanFileSize(bytes: number, si = false, dp = 1) {

@@ -2,6 +2,8 @@ package com.dehnes.smarthome.datalogging
 
 import com.dehnes.smarthome.api.dtos.QuickStatsResponse
 import com.dehnes.smarthome.han.HanPortService
+import com.dehnes.smarthome.victron.SystemState
+import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
 import java.time.Duration
 import java.time.Instant
@@ -11,7 +13,8 @@ import java.util.concurrent.ExecutorService
 class QuickStatsService(
     private val influxDBClient: InfluxDBClient,
     hanPortService: HanPortService,
-    private val executorService: ExecutorService
+    private val executorService: ExecutorService,
+    private val victronService: VictronService,
 ) {
 
     val listeners = ConcurrentHashMap<String, (QuickStatsResponse) -> Unit>()
@@ -20,13 +23,21 @@ class QuickStatsService(
     init {
         hanPortService.listeners.add { hanData ->
             refetch()
-            executorService.submit {
-                listeners.forEach { (t, u) ->
-                    try {
-                        u(getStats())
-                    } catch (e: Exception) {
-                        logger.error("t=$t", e)
-                    }
+            notifyListeners()
+        }
+        victronService.listeners["QuickStatsService"] = {
+            refetch()
+            notifyListeners()
+        }
+    }
+
+    private fun notifyListeners() {
+        executorService.submit {
+            listeners.forEach { (t, u) ->
+                try {
+                    u(getStats())
+                } catch (e: Exception) {
+                    logger.error("t=$t", e)
                 }
             }
         }
@@ -40,7 +51,10 @@ class QuickStatsService(
         0.0,
         0,
         0.0,
-        0.0
+        0.0,
+        SystemState.Off,
+        0,
+        0
     )
 
     @Volatile
@@ -55,6 +69,7 @@ class QuickStatsService(
     }
 
     private fun refetch() {
+        val essValues = victronService.current()
         val quickStatsResponse1 = QuickStatsResponse(
             getPowerImport().toLong(),
             getPowerExport().toLong(),
@@ -62,7 +77,10 @@ class QuickStatsService(
             getCostEnergyImportedCurrentMonth(),
             energyUsedToday().toLong(),
             getOutsideTemperature(),
-            currentEnergyPrice()
+            currentEnergyPrice(),
+            essValues.systemState,
+            essValues.batteryPower.toLong(),
+            essValues.soc.toInt()
         )
         synchronized(this) {
             quickStatsResponse = quickStatsResponse1

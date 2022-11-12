@@ -1,9 +1,7 @@
 package com.dehnes.smarthome.victron
 
-import com.dehnes.smarthome.api.dtos.EssRequest
+import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.kotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.hivemq.client.internal.mqtt.datatypes.MqttTopicFilterImpl
 import com.hivemq.client.internal.mqtt.datatypes.MqttTopicImpl
@@ -28,12 +26,9 @@ import java.util.concurrent.TimeUnit
 class VictronService(
     victronHost: String,
     private val objectMapper: ObjectMapper,
-    private val executorService: ExecutorService
+    private val executorService: ExecutorService,
+    private val persistenceService: PersistenceService,
 ) {
-
-    companion object {
-        val logger = KotlinLogging.logger { }
-    }
 
     val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
@@ -46,9 +41,15 @@ class VictronService(
 
     val listeners = ConcurrentHashMap<String, (data: ESSValues) -> Unit>()
 
+    @Volatile
     var essValues = ESSValues()
     var lastNotify = System.currentTimeMillis()
-    val delayInMs = 20 * 1000L
+    val delayInMs = 2 * 1000L
+
+
+    companion object {
+        val logger = KotlinLogging.logger { }
+    }
 
     init {
         asyncClient.connect().get(20, TimeUnit.SECONDS)
@@ -95,34 +96,51 @@ class VictronService(
                 send(topic(TopicType.read, "/settings/0/Settings/CGwacs/AcPowerSetPoint"))
                 send(topic(TopicType.read, "/settings/0/Settings/CGwacs/MaxChargePower"))
                 send(topic(TopicType.read, "/settings/0/Settings/CGwacs/MaxDischargePower"))
+
+                send(topic(TopicType.read, "/vebus/276/Hub4/L1/AcPowerSetpoint"))
+                send(topic(TopicType.read, "/vebus/276/Hub4/L2/AcPowerSetpoint"))
+                send(topic(TopicType.read, "/vebus/276/Hub4/L3/AcPowerSetpoint"))
             }
         }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
     }
 
     fun current() = essValues
 
-    fun handleWrite(req: EssRequest) {
-        if (req.acPowerSetPoint != null) {
-            setAcPowerSetPoint(req.acPowerSetPoint)
-        }
-        if (req.maxChargePower != null) {
-            setMaxChargePower(req.maxChargePower)
-        }
-        if (req.maxDischargePower != null) {
-            setMaxDischargePower(req.maxDischargePower)
-        }
-    }
+    fun writeEnabled() = persistenceService["VictronService.writeEnabled", "false"]!! == "true"
 
-    fun setAcPowerSetPoint(value: Long) {
+    fun essMode2_setAcPowerSetPoint(value: Long) {
         send(topic(TopicType.write, "/settings/0/Settings/CGwacs/AcPowerSetPoint"), value)
     }
 
-    fun setMaxChargePower(value: Long) {
+    fun essMode2_setMaxChargePower(value: Long) {
         send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxChargePower"), value)
     }
 
-    fun setMaxDischargePower(value: Long) {
-        send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxDischargePower"), value)
+    fun essMode2_setMaxDischargePower(value: Long) {
+        if (value == 0L) {
+            send(topic(TopicType.write, "/vebus/276/Hub4/DisableFeedIn"), 1)
+            send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxDischargePower"), 0)
+        } else {
+            send(topic(TopicType.write, "/vebus/276/Hub4/DisableFeedIn"), 0)
+            send(topic(TopicType.write, "/settings/0/Settings/CGwacs/MaxDischargePower"), value)
+        }
+    }
+
+    fun essMode3_setAcPowerSetPointMode(acSetPoints: VictronEssCalculation.VictronEssCalculationResult?) {
+        if (acSetPoints == null) {
+            // passthrough
+            send(topic(TopicType.write, "/vebus/276/Hub4/DisableFeedIn"), 1)
+            send(topic(TopicType.write, "/vebus/276/Hub4/DisableCharge"), 1)
+            send(topic(TopicType.write, "/vebus/276/Hub4/L1/AcPowerSetpoint"), 0)
+            send(topic(TopicType.write, "/vebus/276/Hub4/L2/AcPowerSetpoint"), 0)
+            send(topic(TopicType.write, "/vebus/276/Hub4/L3/AcPowerSetpoint"), 0)
+        } else {
+            send(topic(TopicType.write, "/vebus/276/Hub4/DisableFeedIn"), 0)
+            send(topic(TopicType.write, "/vebus/276/Hub4/DisableCharge"), 0)
+            send(topic(TopicType.write, "/vebus/276/Hub4/L1/AcPowerSetpoint"), acSetPoints.acPowerSetPointL1)
+            send(topic(TopicType.write, "/vebus/276/Hub4/L2/AcPowerSetpoint"), acSetPoints.acPowerSetPointL2)
+            send(topic(TopicType.write, "/vebus/276/Hub4/L3/AcPowerSetpoint"), acSetPoints.acPowerSetPointL3)
+        }
     }
 
     fun send(topic: String) {
@@ -130,18 +148,14 @@ class VictronService(
     }
 
     fun send(topic: String, value: Long) {
-        sendAny(
-            topic, mapOf(
-                "value" to value
-            )
-        )
-    }
-
-    fun send(topic: String, topics: List<String>) {
-        sendAny(topic, topics)
+        sendAny(topic, mapOf("value" to value))
     }
 
     private fun sendAny(topic: String, value: Any?) {
+        if (topic.startsWith("W/") && !writeEnabled()) {
+            logger.warn { "Could not publish to Victron - write disabled" }
+            return
+        }
 
         val msg = value?.let { objectMapper.writeValueAsBytes(it) }
         asyncClient.publish(
@@ -160,34 +174,7 @@ class VictronService(
             )
         ).get()
     }
-
 }
-
-interface Profile {
-    val profileSettings: ProfileSettings
-}
-
-
-// Energy management
-// EV Charger 1:
-// EV Charger 2:
-// ESS:
-// Heater under floor:
-
-
-// auto:
-// - charge (if prices are cheap && SoC < max)
-// - discharge (if prices are !OK && SoC > min)
-// - else: passthrough
-// passthrough / stop
-// manual:
-//
-
-data class ProfileSettings(
-    val acPowerSetPoint: Long = 0, // /settings/0/Settings/CGwacs/AcPowerSetPoint
-    val maxChargePower: Long = 0, // /settings/0/Settings/CGwacs/MaxChargePower
-    val maxDischargePower: Long = 0, // /settings/0/Settings/CGwacs/MaxDischargePower
-)
 
 // https://github.com/victronenergy/venus-html5-app/blob/master/TOPICS.md
 const val portalId = "48e7da87e605"
@@ -256,7 +243,7 @@ data class ESSValues(
     val outputL3: GridData = GridData(),
     val outputPower: Double = 0.0, // /vebus/276/Ac/Out/P
 
-    val systemState: SystemState = SystemState.Off, // /vebus/276/State
+    val systemState: SystemState = SystemState.Off, // /system/0/SystemState/State
     val mode: Mode = Mode.Off, // /vebus/276/Mode
 
     val acPowerSetPoint: Long = 0, // /settings/0/Settings/CGwacs/AcPowerSetPoint
@@ -284,9 +271,8 @@ data class ESSValues(
             "/vebus/276/Ac/Out/P" -> this.copy(outputPower = doubleValue(any))
             "/system/0/SystemState/State" -> {
                 val v = intValue(any)
-                this.copy(systemState = SystemState.values().firstOrNull {
-                    it.value == v
-                } ?: SystemState.Unknown)
+                val systemState1 = SystemState.values().firstOrNull { it.value == v } ?: SystemState.Unknown
+                this.copy(systemState = systemState1)
             }
 
             "/vebus/276/Mode" -> {
@@ -367,58 +353,4 @@ data class GridData(
             }
         }
     }
-}
-
-
-fun main() {
-    val objectMapper = jacksonObjectMapper().registerModule(kotlinModule())
-    val victronService = VictronService("192.168.1.18", objectMapper, Executors.newCachedThreadPool())
-
-    victronService.listeners["me"] = {
-        println(it)
-    }
-
-    Thread.sleep(50000)
-
-    victronService.asyncClient.disconnect().get()
-
-    if (true) return
-
-    //victronService.send(topic(TopicType.write, "/settings/0/Settings/CGwacs/AcPowerSetPoint"), 0)
-
-    while (true) {
-
-        victronService.send(topic(TopicType.read, "/system/0/Serial"))
-//        victronService.send("R/48e7da87e605/system/0/Ac/Grid/L1/Power", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/Grid/L1/Current", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/Grid/L2/Power", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/Grid/L2/Current", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/Grid/L3/Power", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/Grid/L3/Current", 2)
-
-//        victronService.send("R/48e7da87e605/system/0/Dc/Battery/Current", 2)
-//        victronService.send("R/48e7da87e605/system/0/Dc/Battery/Power", 2)
-
-//        victronService.send("R/48e7da87e605/battery/0/Dc/0/Current", 2)
-//        victronService.send("R/48e7da87e605/battery/0/Dc/0/Power", 2)
-//        victronService.send("R/48e7da87e605/battery/0/Dc/0/Voltage", 2)
-//
-//        victronService.send("R/48e7da87e605/system/0/Ac/ConsumptionOnOutput/L1/Current", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/ConsumptionOnOutput/L1/Power", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/ConsumptionOnOutput/L2/Current", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/ConsumptionOnOutput/L2/Power", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/ConsumptionOnOutput/L3/Current", 2)
-//        victronService.send("R/48e7da87e605/system/0/Ac/ConsumptionOnOutput/L3/Power", 2)
-    }
-
-    victronService.send("W/48e7da87e605/settings/0/Settings/CGwacs/Hub4Mode", 2)
-    victronService.send("W/48e7da87e605/settings/0/Settings/CGwacs/MaxDischargePower", -1)
-    victronService.send("W/48e7da87e605/settings/0/Settings/CGwacs/MaxChargePower", -1)
-    victronService.send("W/48e7da87e605/settings/0/Settings/CGwacs/AcPowerSetPoint", 1000)
-
-
-    // W/48e7da87e605/settings/0/Settings/CGwacs/MaxDischargePower
-    // W/48e7da87e605/settings/0/Settings/CGwacs/MaxChargePower
-    // W/48e7da87e605/settings/0/Settings/CGwacs/AcPowerSetPoint
-
 }

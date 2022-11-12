@@ -5,7 +5,6 @@ import {
     EvChargingStationClient,
     EvChargingStationDataAndConfig,
     EvChargingStationRequest,
-    EvChargingStationRequestType,
     LoadSharingPriority,
     ProximityPilotAmps
 } from "../../Websocket/types/EVChargingStation";
@@ -28,18 +27,17 @@ import {
 } from "@material-ui/core";
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import WebsocketService from "../../Websocket/websocketClient";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 import { FirmwareUpload } from "./FirmwareUpload";
 
 const stateToText = (state: ChargingState, reasonChargingUnavailable: string | null) => {
-    if (state === ChargingState.Unconnected) {
+    if (state === "Unconnected") {
         return "No EV connected";
     }
-    if (state === ChargingState.ConnectedChargingUnavailable) {
+    if (state === "ConnectedChargingUnavailable") {
         return "EV connected: " + reasonChargingUnavailable;
     }
-    if (state === ChargingState.ConnectedChargingAvailable) {
+    if (state === "ConnectedChargingAvailable") {
         return "EV connected, ready";
     }
     return state.toString()
@@ -65,17 +63,10 @@ export const EvChargingStation = ({
 
     const sendUpdate = (req: EvChargingStationRequest) => {
         setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.evChargingStationRequest,
-            null,
-            null,
-            null,
-            null,
-            req,
-            null,
-            null,
-            null,
-            ))
+        WebsocketService.rpc({
+            type: "evChargingStationRequest",
+            evChargingStationRequest: req
+        })
             .then(response => {
                 setCmdResult(response.evChargingStationResponse!!.configUpdated!!);
                 setStations(response.evChargingStationResponse!!.chargingStationsDataAndConfig);
@@ -86,46 +77,21 @@ export const EvChargingStation = ({
             .finally(() => setSending(false));
     };
 
-    const updateModeTo = (mode: EvChargingMode) => sendUpdate(new EvChargingStationRequest(
-        EvChargingStationRequestType.setMode,
-        station.clientConnection.clientId,
-        null,
-        mode,
-        null,
-        null,
-        null
-    ));
-    const updatePriorityTo = (priority: LoadSharingPriority) => sendUpdate(new EvChargingStationRequest(
-        EvChargingStationRequestType.setLoadSharingPriority,
-        station.clientConnection.clientId,
-        null,
-        null,
-        priority,
-        null,
-        null
-    ));
-    const setSkipPercentExpensiveHours = (delta: number) => sendUpdate(
-        new EvChargingStationRequest(
-            EvChargingStationRequestType.setSkipPercentExpensiveHours,
-            station.clientConnection.clientId,
-            null,
-            null,
-            null,
-            station.config.skipPercentExpensiveHours + delta,
-            null
-        )
-    );
-    const setChargeRateLimit = (delta: number) => sendUpdate(
-        new EvChargingStationRequest(
-            EvChargingStationRequestType.setChargeRateLimit,
-            station.clientConnection.clientId,
-            null,
-            null,
-            null,
-            null,
-            station.config.chargeRateLimit + delta
-        )
-    );
+    const updateModeTo = (mode: EvChargingMode) => sendUpdate({
+        type: "setMode",
+        clientId: station.clientConnection.clientId,
+        newMode: mode
+    });
+    const updatePriorityTo = (priority: LoadSharingPriority) => sendUpdate({
+        type: "setLoadSharingPriority",
+        clientId: station.clientConnection.clientId,
+        newLoadSharingPriority: priority
+    });
+    const setChargeRateLimit = (delta: number) => sendUpdate({
+        type: "setChargeRateLimit",
+        clientId: station.clientConnection.clientId,
+        chargeRateLimit: station.config.chargeRateLimit + delta
+    });
 
     return <Accordion key={station.clientConnection.clientId}>
         <AccordionSummary
@@ -152,14 +118,14 @@ export const EvChargingStation = ({
                             margin: "10px"
                         }}>
                             <Button
-                                color={station.config.mode === EvChargingMode.ON ? 'secondary' : 'primary'}
-                                onClick={() => updateModeTo(EvChargingMode.ON)}>On</Button>
-                            <Button color={station.config.mode === EvChargingMode.OFF ? 'secondary' : 'primary'}
-                                    onClick={() => updateModeTo(EvChargingMode.OFF)}>Off</Button>
+                                color={station.config.mode === "ON" ? 'secondary' : 'primary'}
+                                onClick={() => updateModeTo("ON")}>On</Button>
+                            <Button color={station.config.mode === "OFF" ? 'secondary' : 'primary'}
+                                    onClick={() => updateModeTo("OFF")}>Off</Button>
                             <Button
 
-                                color={station.config.mode === EvChargingMode.ChargeDuringCheapHours ? 'secondary' : 'primary'}
-                                onClick={() => updateModeTo(EvChargingMode.ChargeDuringCheapHours)}
+                                color={station.config.mode === "ChargeDuringCheapHours" ? 'secondary' : 'primary'}
+                                onClick={() => updateModeTo("ChargeDuringCheapHours")}
                             >Low-cost</Button>
                         </ButtonGroup>
                         <Link
@@ -177,43 +143,18 @@ export const EvChargingStation = ({
                             margin: "10px"
                         }}>
                             <Button
-                                color={station.config.loadSharingPriority === LoadSharingPriority.HIGH ? 'secondary' : 'primary'}
-                                onClick={() => updatePriorityTo(LoadSharingPriority.HIGH)}>High priority</Button>
+                                color={station.config.loadSharingPriority === "HIGH" ? 'secondary' : 'primary'}
+                                onClick={() => updatePriorityTo("HIGH")}>High priority</Button>
                             <Button
-                                color={station.config.loadSharingPriority === LoadSharingPriority.NORMAL ? 'secondary' : 'primary'}
-                                onClick={() => updatePriorityTo(LoadSharingPriority.NORMAL)}>Normal priority</Button>
+                                color={station.config.loadSharingPriority === "NORMAL" ? 'secondary' : 'primary'}
+                                onClick={() => updatePriorityTo("NORMAL")}>Normal priority</Button>
                             <Button
-                                color={station.config.loadSharingPriority === LoadSharingPriority.LOW ? 'secondary' : 'primary'}
-                                onClick={() => updatePriorityTo(LoadSharingPriority.LOW)}>Low priority</Button>
+                                color={station.config.loadSharingPriority === "LOW" ? 'secondary' : 'primary'}
+                                onClick={() => updatePriorityTo("LOW")}>Low priority</Button>
                         </ButtonGroup>
 
                     </Grid>
                 </Grid>
-                {station.config.mode === EvChargingMode.ChargeDuringCheapHours &&
-
-                <Grid item xs={12}>
-                    <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
-
-                        <Grid item xs={4}>
-                            <span>Skip most expensive hours %/day: </span>
-                            <span>{station.config.skipPercentExpensiveHours}</span>
-                        </Grid>
-                        <Grid item xs={8}>
-                            <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
-                                margin: "10px"
-                            }}>
-                                <Button
-                                    disabled={station.config.skipPercentExpensiveHours <= 0}
-                                    onClick={() => setSkipPercentExpensiveHours(-1)}>-</Button>
-                                <Button
-                                    disabled={station.config.skipPercentExpensiveHours >= 100}
-                                    onClick={() => setSkipPercentExpensiveHours(1)}>+</Button>
-                            </ButtonGroup>
-                        </Grid>
-                    </Grid>
-                </Grid>
-
-                }
 
                 <Grid item xs={12}>
                     <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
@@ -251,37 +192,37 @@ export const EvChargingStation = ({
                 </Grid>
 
                 {showData &&
-                <>
-                    <Grid item xs={12}>
-                        <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
-                            <PowerComponent
-                                phase1volts={station.data.phase1Millivolts / 1000}
-                                phase2volts={station.data.phase2Millivolts / 1000}
-                                phase3volts={station.data.phase3Millivolts / 1000}
-                                phase1amps={station.data.phase1Milliamps / 1000}
-                                phase2amps={station.data.phase2Milliamps / 1000}
-                                phase3amps={station.data.phase3Milliamps / 1000}
-                            />
+                    <>
+                        <Grid item xs={12}>
+                            <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
+                                <PowerComponent
+                                    phase1volts={station.data.phase1Millivolts / 1000}
+                                    phase2volts={station.data.phase2Millivolts / 1000}
+                                    phase3volts={station.data.phase3Millivolts / 1000}
+                                    phase1amps={station.data.phase1Milliamps / 1000}
+                                    phase2amps={station.data.phase2Milliamps / 1000}
+                                    phase3amps={station.data.phase3Milliamps / 1000}
+                                />
+                            </Grid>
                         </Grid>
-                    </Grid>
 
-                    <Grid item xs={12}>
-                        <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
-                            <StationsDetails
-                                maxChargingRate={station.data.maxChargingRate}
-                                proximityPilotAmps={station.data.proximityPilotAmps}
-                                reasonChargingUnavailable={station.data.reasonChargingUnavailable}
-                                systemUptime={station.data.systemUptime}
-                                utcTimestampInMs={station.data.utcTimestampInMs}
-                                wifiRSSI={station.data.wifiRSSI}
-                                currentSeconds={currentMilliSeconds}
-                                clientConnection={station.clientConnection}
-                                setSending={setSending}
-                                setCmdResult={setCmdResult}
-                            />
+                        <Grid item xs={12}>
+                            <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
+                                <StationsDetails
+                                    maxChargingRate={station.data.maxChargingRate}
+                                    proximityPilotAmps={station.data.proximityPilotAmps}
+                                    reasonChargingUnavailable={station.data.reasonChargingUnavailable}
+                                    systemUptime={station.data.systemUptime}
+                                    utcTimestampInMs={station.data.utcTimestampInMs}
+                                    wifiRSSI={station.data.wifiRSSI}
+                                    currentSeconds={currentMilliSeconds}
+                                    clientConnection={station.clientConnection}
+                                    setSending={setSending}
+                                    setCmdResult={setCmdResult}
+                                />
+                            </Grid>
                         </Grid>
-                    </Grid>
-                </>
+                    </>
                 }
 
             </Grid>

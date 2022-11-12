@@ -1,6 +1,7 @@
 package com.dehnes.smarthome.api.dtos
 
-import com.dehnes.smarthome.victron.ESSValues
+import com.dehnes.smarthome.victron.ESSState
+import com.dehnes.smarthome.victron.ESSWrite
 
 enum class RequestType {
     subscribe,
@@ -12,8 +13,12 @@ enum class RequestType {
     environmentSensorRequest,
     videoBrowser,
     quickStats,
-    essValues,
-    essRequest
+
+    essRead,
+    essWrite,
+
+    readEnergyPricingSettings,
+    writeEnergyPricingSettings,
 }
 
 data class RpcRequest(
@@ -26,7 +31,8 @@ data class RpcRequest(
     val evChargingStationRequest: EvChargingStationRequest?,
     val environmentSensorRequest: EnvironmentSensorRequest?,
     val videoBrowserRequest: VideoBrowserRequest?,
-    val essRequest: EssRequest?,
+    val essWrite: ESSWrite?,
+    val energyPricingSettingsWrite: EnergyPricingSettingsWrite?,
 )
 
 data class RpcResponse(
@@ -39,5 +45,6 @@ data class RpcResponse(
     val environmentSensorResponse: EnvironmentSensorResponse? = null,
     val videoBrowserResponse: VideoBrowserResponse? = null,
     val quickStatsResponse: QuickStatsResponse? = null,
-    val essValues: ESSValues? = null,
+    val essState: ESSState? = null,
+    val energyPricingSettingsRead: EnergyPricingSettingsRead? = null,
 )

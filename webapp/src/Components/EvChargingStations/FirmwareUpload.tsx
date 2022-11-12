@@ -1,8 +1,6 @@
 import { Button } from "@material-ui/core";
 import React from "react";
 import WebsocketService from "../../Websocket/websocketClient";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
-import { EvChargingStationRequest, EvChargingStationRequestType } from "../../Websocket/types/EVChargingStation";
 import { arrayBufferToBase64 } from "../Utils/utils";
 
 type FirmwareUploadProps = {
@@ -22,25 +20,10 @@ export const FirmwareUpload = ({ setSending, setCmdResult, clientId }: FirmwareU
             const rawData = ev!!.target!!.result as ArrayBuffer;
             const firmwareBased64Encoded = arrayBufferToBase64(rawData);
 
-            WebsocketService.rpc(new RpcRequest(
-                RequestType.evChargingStationRequest,
-                null,
-                null,
-                null,
-                null,
-                new EvChargingStationRequest(
-                    EvChargingStationRequestType.uploadFirmwareToClient,
-                    clientId,
-                    firmwareBased64Encoded,
-                    null,
-                    null,
-                    null,
-                    null
-                ),
-                null,
-                null,
-                null,
-            )).then(response => {
+            WebsocketService.rpc({
+                type: "evChargingStationRequest",
+                evChargingStationRequest: { type: "uploadFirmwareToClient", clientId, firmwareBased64Encoded }
+            }).then(response => {
                 setCmdResult(response.evChargingStationResponse!!.uploadFirmwareToClientResult!!);
                 setTimeout(() => {
                     setCmdResult(null);

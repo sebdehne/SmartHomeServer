@@ -3,9 +3,9 @@ import { Button, Container, Grid } from "@material-ui/core";
 import WebsocketService from "../../Websocket/websocketClient";
 import Header from "../Header";
 import { ArrowDownward, ArrowUpward } from "@material-ui/icons";
-import { DoorStatus, GarageRequest, GarageRequestType, GarageResponse } from "../../Websocket/types/Garage";
-import { RequestType, RpcRequest, RpcResponse } from "../../Websocket/types/Rpc";
-import { Notify, SubscriptionType } from "../../Websocket/types/Subscription";
+import { DoorStatus, GarageRequestType, GarageResponse } from "../../Websocket/types/Garage";
+import { RpcResponse } from "../../Websocket/types/Rpc";
+import { Notify } from "../../Websocket/types/Subscription";
 import { FirmwareUpload } from "./FirmwareUpload";
 import { FirmwareUpgradeState } from "../../Websocket/types/EnvironmentSensors";
 
@@ -21,25 +21,13 @@ const GarageDoor = () => {
 
     useEffect(() => {
         const subId = WebsocketService.subscribe(
-            SubscriptionType.getGarageStatus,
-            (notify: Notify) => setGarageStatus(notify.garageStatus),
+            "getGarageStatus",
+            (notify: Notify) => setGarageStatus(notify.garageStatus!!),
             () => {
-                WebsocketService.rpc(new RpcRequest(
-                    RequestType.garageRequest,
-                    null,
-                    null,
-                    new GarageRequest(
-                        GarageRequestType.getGarageStatus,
-                        null,
-                        null
-                    ),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    ))
-                    .then(response => setGarageStatus(response.garageResponse!!));
+                WebsocketService.rpc({
+                    type: "garageRequest",
+                    garageRequest: { type: "getGarageStatus" }
+                }).then(response => setGarageStatus(response.garageResponse!!));
             }
         )
 
@@ -48,21 +36,13 @@ const GarageDoor = () => {
 
     const adjustAutoClose = (deltaInMinutes: number) => {
         setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.garageRequest,
-            null,
-            null,
-            new GarageRequest(
-                GarageRequestType.garageDoorExtendAutoClose,
-                deltaInMinutes * 60,
-                null
-            ),
-            null,
-            null,
-            null,
-            null,
-            null,
-        )).then((response: RpcResponse) => {
+        WebsocketService.rpc({
+            type: "garageRequest",
+            garageRequest: {
+                type: "garageDoorExtendAutoClose",
+                garageDoorChangeAutoCloseDeltaInSeconds: deltaInMinutes * 60
+            }
+        }).then((response: RpcResponse) => {
             setCmdResult(true);
             setTimeout(() => {
                 setCmdResult(null);
@@ -73,21 +53,10 @@ const GarageDoor = () => {
 
     const adjustTime = () => {
         setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.garageRequest,
-            null,
-            null,
-            new GarageRequest(
-                GarageRequestType.adjustTime,
-                null,
-                null
-            ),
-            null,
-            null,
-            null,
-            null,
-            null,
-        )).then((response: RpcResponse) => {
+        WebsocketService.rpc({
+            type: "garageRequest",
+            garageRequest: { type: "adjustTime" }
+        }).then((response: RpcResponse) => {
             setCmdResult(response.garageResponse!!.garageCommandAdjustTimeSuccess!!);
             setTimeout(() => {
                 setCmdResult(null);
@@ -97,19 +66,12 @@ const GarageDoor = () => {
 
     const sendCmd = (cmd: GarageRequestType) => {
         setSending(true);
-        WebsocketService.rpc(new RpcRequest(
-            RequestType.garageRequest,
-            null,
-            null,
-            new GarageRequest(cmd, null, null),
-            null,
-            null,
-            null,
-            null,
-            null,
-        )).then((response: RpcResponse) => {
+        WebsocketService.rpc({
+            type: "garageRequest",
+            garageRequest: { type: cmd }
+        }).then((response: RpcResponse) => {
             setGarageStatus(response.garageResponse!!);
-            setCmdResult(response.garageResponse!!.garageCommandSendSuccess);
+            setCmdResult(response.garageResponse!!.garageCommandSendSuccess!!);
             setTimeout(() => {
                 setCmdResult(null);
             }, 2000);
@@ -124,33 +86,33 @@ const GarageDoor = () => {
             />
 
             {garageStatus?.firmwareUpgradeState &&
-            <div>
-                <ul>
-                    <li>Progress: {firmwareUpgradeProgress(garageStatus.firmwareUpgradeState)}%</li>
-                    <li>Clock slew: {garageStatus.firmwareUpgradeState.timestampDelta} seconds</li>
-                    <li>Received: {timeToDelta(currentSeconds, garageStatus.firmwareUpgradeState.receivedAt)} ago</li>
-                    <li>Rssi: {garageStatus.firmwareUpgradeState.rssi}dB</li>
-                </ul>
-            </div>
+                <div>
+                    <ul>
+                        <li>Progress: {firmwareUpgradeProgress(garageStatus.firmwareUpgradeState)}%</li>
+                        <li>Clock slew: {garageStatus.firmwareUpgradeState.timestampDelta} seconds</li>
+                        <li>Received: {timeToDelta(currentSeconds, garageStatus.firmwareUpgradeState.receivedAt)} ago</li>
+                        <li>Rssi: {garageStatus.firmwareUpgradeState.rssi}dB</li>
+                    </ul>
+                </div>
             }
             {garageStatus?.garageStatus &&
-            <div>
-                <ul>
-                    <li>Door status: <DoorStatusComponent doorStatus={garageStatus.garageStatus.doorStatus}/></li>
-                    <li>Light status: {garageStatus.garageStatus.lightIsOn ? "on" : "off"}</li>
-                    <li>Clock slew: {garageStatus.garageStatus.timestampDelta} seconds</li>
-                    <li>Firmware: {garageStatus.garageStatus.firmwareVersion}</li>
-                    <li>Auto closing in: {
-                        !garageStatus.garageStatus.autoCloseAfter ? "disabled" : (
-                            timeToDelta(garageStatus.garageStatus.autoCloseAfter, currentSeconds)
-                        )
-                    }</li>
-                </ul>
-                <p>Updated: {timeToDelta(currentSeconds, garageStatus.garageStatus.utcTimestampInMs)} ago</p>
-            </div>
+                <div>
+                    <ul>
+                        <li>Door status: <DoorStatusComponent doorStatus={garageStatus.garageStatus.doorStatus}/></li>
+                        <li>Light status: {garageStatus.garageStatus.lightIsOn ? "on" : "off"}</li>
+                        <li>Clock slew: {garageStatus.garageStatus.timestampDelta} seconds</li>
+                        <li>Firmware: {garageStatus.garageStatus.firmwareVersion}</li>
+                        <li>Auto closing in: {
+                            !garageStatus.garageStatus.autoCloseAfter ? "disabled" : (
+                                timeToDelta(garageStatus.garageStatus.autoCloseAfter, currentSeconds)
+                            )
+                        }</li>
+                    </ul>
+                    <p>Updated: {timeToDelta(currentSeconds, garageStatus.garageStatus.utcTimestampInMs)} ago</p>
+                </div>
             }
             {!garageStatus?.garageStatus && !garageStatus?.firmwareUpgradeState &&
-            <p>Status currently not available</p>}
+                <p>Status currently not available</p>}
 
             <Grid
                 container
@@ -166,14 +128,14 @@ const GarageDoor = () => {
                     <Grid item xs={3}>
                         <Button
                             style={{ margin: "10px" }} variant="contained" color="primary"
-                            onClick={() => sendCmd(GarageRequestType.openGarageDoor)}>
+                            onClick={() => sendCmd("openGarageDoor")}>
                             <ArrowUpward/> Open
                         </Button>
                     </Grid>
                     <Grid item xs={3}>
                         <Button
                             style={{ margin: "10px" }} variant="contained" color="primary"
-                            onClick={() => sendCmd(GarageRequestType.closeGarageDoor)}>
+                            onClick={() => sendCmd("closeGarageDoor")}>
                             <ArrowDownward/> Close
                         </Button>
                     </Grid>
@@ -258,15 +220,15 @@ type DoorStatusComponentProps = {
 }
 const DoorStatusComponent = ({ doorStatus }: DoorStatusComponentProps) => {
     return <>
-        {doorStatus === DoorStatus.doorOpen && <span style={{
+        {doorStatus === "doorOpen" && <span style={{
             color: "#ff0000",
             fontWeight: "bold"
         }}>Open</span>}
-        {doorStatus === DoorStatus.doorClosed && <span style={{
+        {doorStatus === "doorClosed" && <span style={{
             color: "#00ff07",
             fontWeight: "bold"
         }}>Closed</span>}
-        {doorStatus === DoorStatus.doorClosing && <span style={{
+        {doorStatus === "doorClosing" && <span style={{
             color: "#00ff07",
             fontWeight: "bold"
         }}>Closing &#11018;</span>}

@@ -2,6 +2,7 @@
 Smarthome backend and frontend
 
 ### Features:
+- Management of [Victron](https://www.victronenergy.com/) ESS system, [using mode 3](https://www.victronenergy.com/live/ess:ess_mode_2_and_3)
 - Management of my DehneEVSE Charging stations (See [hardware](https://github.com/sebdehne/DehneEVSE-Hardware) and [firmware](https://github.com/sebdehne/DehneEVSE-Firmware)) 
   - Charge only when energy prices are low (overrideable)
   - Intelligent load sharing between multiple stations

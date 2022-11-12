@@ -25,7 +25,6 @@ import kotlin.math.min
 private const val TARGET_TEMP_KEY = "HeatingControllerService.targetTemp"
 private const val HEATER_STATUS_KEY = "HeatingControllerService.heaterTarget"
 private const val OPERATING_MODE = "HeatingControllerService.operatingMode"
-private const val SKIPPERCENTEXPENSIVEHOURS_KEY = "HeatingControllerService.skipPercentExpensiveHours"
 
 class UnderFloorHeaterService(
     private val loRaConnection: LoRaConnection,
@@ -94,7 +93,6 @@ class UnderFloorHeaterService(
         UnderFloorHeaterMode.values().first { it.mode == getCurrentMode() },
         OnOff.off,
         getTargetTemperature(),
-        getSkipPercentExpensiveHours(),
         null,
         0,
         null
@@ -291,7 +289,7 @@ class UnderFloorHeaterService(
                 } else {
                     val targetTemperature = getTargetTemperature()
                     logger.info("Evaluating target temperature now: $targetTemperature")
-                    waitUntilCheapHour = energyPriceService.mustWaitUntilV2(getSkipPercentExpensiveHours())
+                    waitUntilCheapHour = energyPriceService.mustWaitUntilV2("HeaterUnderFloor")
                     if (waitUntilCheapHour == null && sensorData.temperature < targetTemperature * 100) {
                         logger.info("Setting heater to on")
                         persistenceService[HEATER_STATUS_KEY] = "on"
@@ -330,7 +328,6 @@ class UnderFloorHeaterService(
             mode = UnderFloorHeaterMode.values().first { it.mode == currentMode },
             status = if (heaterStatus) OnOff.on else OnOff.off,
             targetTemperature = getTargetTemperature(),
-            skipPercentExpensiveHours = getSkipPercentExpensiveHours(),
             waitUntilCheapHour = waitUntilCheapHour?.toEpochMilli(),
             timestampDelta = sensorData.timestampDelta,
             fromController = UnderFloorHeaterStatusFromController(
@@ -381,18 +378,6 @@ class UnderFloorHeaterService(
         setTargetTemperature(targetTemperature)
         lastStatus = lastStatus.copy(
             targetTemperature = targetTemperature
-        )
-        executorService.submit {
-            tick()
-        }
-        return true
-    }
-
-    fun setEkipPercentExpensiveHours(skipPercentExpensiveHours: Int): Boolean {
-        check(skipPercentExpensiveHours in 0..100)
-        setSkipPercentExpensiveHours(skipPercentExpensiveHours)
-        lastStatus = lastStatus.copy(
-            skipPercentExpensiveHours = skipPercentExpensiveHours
         )
         executorService.submit {
             tick()
@@ -496,21 +481,9 @@ class UnderFloorHeaterService(
         persistenceService[TARGET_TEMP_KEY] = t.toString()
     }
 
-    private fun getSkipPercentExpensiveHours() =
-        Integer.valueOf(persistenceService[SKIPPERCENTEXPENSIVEHOURS_KEY, 40.toString()])
-
-    private fun setSkipPercentExpensiveHours(t: Int) {
-        persistenceService[SKIPPERCENTEXPENSIVEHOURS_KEY] = t.toString()
-    }
-
     private fun getConfiguredHeaterTarget() = persistenceService[HEATER_STATUS_KEY, "off"]!!
 
 }
-
-data class TemperatureAndHeaterStatus(
-    val temp: Int,
-    val heaterIsOn: Boolean
-)
 
 data class UnderFloorSensorData(
     val temperature: Int,

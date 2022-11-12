@@ -1,9 +1,7 @@
 import { Button } from "@material-ui/core";
 import React from "react";
 import WebsocketService from "../../Websocket/websocketClient";
-import { RequestType, RpcRequest } from "../../Websocket/types/Rpc";
 import { arrayBufferToBase64 } from "../Utils/utils";
-import { UnderFloorHeaterRequest, UnderFloorHeaterRequestType } from "../../Websocket/types/UnderFloorHeater";
 
 type FirmwareUploadProps = {
     setSending: (sending: boolean) => void;
@@ -21,23 +19,13 @@ export const FirmwareUpload = ({ setSending, setCmdResult }: FirmwareUploadProps
             const rawData = ev!!.target!!.result as ArrayBuffer;
             const firmwareBased64Encoded = arrayBufferToBase64(rawData);
 
-            WebsocketService.rpc(new RpcRequest(
-                RequestType.underFloorHeaterRequest,
-                null,
-                null,
-                null,
-                new UnderFloorHeaterRequest(
-                    UnderFloorHeaterRequestType.firmwareUpgrade,
-                    null,
-                    null,
-                    null,
+            WebsocketService.rpc({
+                type: "underFloorHeaterRequest",
+                underFloorHeaterRequest: {
+                    type: "firmwareUpgrade",
                     firmwareBased64Encoded
-                ),
-                null,
-                null,
-                null,
-                null,
-            )).then(response => {
+                }
+            }).then(response => {
                 setCmdResult(response.underFloorHeaterResponse!!.firmwareUploadSuccess!!);
                 setTimeout(() => {
                     setCmdResult(null);

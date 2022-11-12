@@ -2,6 +2,7 @@ package com.dehnes.smarthome.energy_pricing
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.utils.AbstractProcess
+import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import java.time.Clock
@@ -12,12 +13,15 @@ interface PriceSource {
     fun getPrices(): List<Price>?
 }
 
+private const val skipPercentExpensiveHoursPrefix = "EnergyPriceService.skipPercentExpensiveHours."
+
 class EnergyPriceService(
     private val clock: Clock,
     private val objectMapper: ObjectMapper,
     private val priceSource: PriceSource,
     private val influxDBClient: InfluxDBClient,
-    executorService: ExecutorService
+    executorService: ExecutorService,
+    private val persistenceService: PersistenceService,
 ) : AbstractProcess(executorService, 60 * 5) {
 
     private val logger = KotlinLogging.logger { }
@@ -48,11 +52,45 @@ class EnergyPriceService(
         return priceCache
     }
 
+    fun getAllSettings(): List<EnergyPriceConfig> = persistenceService.getAllFor(skipPercentExpensiveHoursPrefix).map {
+        val service = it.first.replace(skipPercentExpensiveHoursPrefix, "")
+        EnergyPriceConfig(
+            service,
+            it.second.toInt(),
+            mustWaitUntilV2(service)
+        )
+    }
+
+    fun getSkipPercentExpensiveHours(serviceType: String): Int =
+        persistenceService["$skipPercentExpensiveHoursPrefix$serviceType", "100"]!!.toInt()
+
+    fun setSkipPercentExpensiveHours(serviceType: String, skipPercentExpensiveHours: Int?) {
+        if (skipPercentExpensiveHours == null) {
+            persistenceService["$skipPercentExpensiveHoursPrefix$serviceType"] = null
+        } else {
+            check(skipPercentExpensiveHours in 0..100)
+            persistenceService["$skipPercentExpensiveHoursPrefix$serviceType"] = skipPercentExpensiveHours.toString()
+        }
+    }
+
+    fun getPricingThreshold() = persistenceService["EnergyPriceService.pricingThreshold", "1.0"]!!.toDouble()
+    fun setPricingThreshold(threshold: Double) {
+        persistenceService["EnergyPriceService.pricingThreshold"] = threshold.toString()
+    }
+
     @Synchronized
-    fun mustWaitUntilV2(skipPercentExpensiveHours: Int): Instant? {
+    fun mustWaitUntilV2(serviceType: String): Instant? {
+        val skipPercentExpensiveHours = getSkipPercentExpensiveHours(serviceType)
         check(skipPercentExpensiveHours in 0..100)
         ensureCacheLoaded()
         val now = Instant.now(clock)
+
+        val currentPrice = priceCache.firstOrNull { it.isValidFor(now) }
+        val pricingThreshold = getPricingThreshold()
+        if (currentPrice != null && currentPrice.price < pricingThreshold) {
+            logger.info { "Current price ${currentPrice.price} is lower than threshold $pricingThreshold" }
+            return null
+        }
 
         val futurePrices = priceCache
             .sortedBy { it.from }
@@ -77,12 +115,13 @@ class EnergyPriceService(
                 logger.info { "No cheap enough hour available. Using endOfKnownPrices=$endOfKnownPrices" }
                 endOfKnownPrices
             }
+
             nextCheapHour.isValidFor(now) -> {
                 null
             }
+
             else -> nextCheapHour.from
         }
-
     }
 
     private fun ensureCacheLoaded() {
@@ -103,3 +142,9 @@ class EnergyPriceService(
         }
     }
 }
+
+data class EnergyPriceConfig(
+    val service: String,
+    val skipPercentExpensiveHours: Int,
+    val mustWaitUntil: Instant?
+)

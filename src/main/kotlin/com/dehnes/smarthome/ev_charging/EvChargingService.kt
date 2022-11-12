@@ -2,7 +2,6 @@ package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
-import com.dehnes.smarthome.enery.EnergyService
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.utils.PersistenceService
 import mu.KotlinLogging
@@ -120,17 +119,6 @@ class EvChargingService(
         persistenceService["EvChargingService.client.mode.$clientId", EvChargingMode.ChargeDuringCheapHours.name]!!
             .let { EvChargingMode.valueOf(it) }
 
-    fun getSkipPercentExpensiveHours(clientId: String) = persistenceService.get(
-        "EvChargingService.client.skipPercentExpensiveHours.$clientId",
-        "40"
-    )!!.toInt()
-
-    fun setSkipPercentExpensiveHours(clientId: String, skipPercentExpensiveHours: Int): Boolean {
-        persistenceService["EvChargingService.client.skipPercentExpensiveHours.$clientId"] =
-            skipPercentExpensiveHours.toString()
-        return true
-    }
-
     fun setPriorityFor(clientId: String, loadSharingPriority: LoadSharingPriority) = synchronized(this) {
         persistenceService["EvChargingService.client.priorty.$clientId"] = loadSharingPriority.name
         var result = false
@@ -212,7 +200,7 @@ class EvChargingService(
          */
         val getReasonCannotCharge = {
             val mode = getMode(clientId)
-            val nextCheapHour = energyPriceService.mustWaitUntilV2(getSkipPercentExpensiveHours(clientId))
+            val nextCheapHour = energyPriceService.mustWaitUntilV2("EvCharger$clientId")
             var reasonCannotCharge: String? = null
 
             when {
@@ -526,7 +514,6 @@ class EvChargingService(
         EVChargingStationConfig(
             getMode(internalState.clientId),
             internalState.loadSharingPriority,
-            getSkipPercentExpensiveHours(internalState.clientId),
             getChargeRateLimit(internalState.clientId)
         ),
         internalState.evChargingStationClient

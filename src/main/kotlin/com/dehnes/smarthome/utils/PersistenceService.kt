@@ -34,6 +34,18 @@ class PersistenceService(
         writeAsJson(filenameJson, properties)
     }
 
+    fun getAllFor(prefix: String): List<Pair<String, String>> {
+        val properties = loadJsonProperties(filenameJson)
+        return properties.keys().toList()
+            .map { it as String }
+            .filter { key -> key.startsWith(prefix) }
+            .mapNotNull { key ->
+                properties.getProperty(key)?.let {
+                    key to it
+                }
+            }
+    }
+
     private fun writeAsJson(filename: String, properties: Properties) {
         val json = mutableMapOf<String, Any>()
         properties.forEach { (k, value) ->
