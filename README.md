@@ -1,6 +1,8 @@
 # SmartHomeServer
 Smarthome backend and frontend
 
+![Main Menu](/docs/main_menu.png "Main menu")
+
 ### Features:
 - Management of [Victron](https://www.victronenergy.com/) ESS system, [using mode 3](https://www.victronenergy.com/live/ess:ess_mode_2_and_3)
 - Management of my DehneEVSE Charging stations (See [hardware](https://github.com/sebdehne/DehneEVSE-Hardware) and [firmware](https://github.com/sebdehne/DehneEVSE-Firmware)) 
@@ -22,6 +24,7 @@ Smarthome backend and frontend
 ### Frontend:
 - React frontend
 - material UI styring
+- WebSockets for real time updates
 
 ### Backend:
 - pure Kotlin - no Spring
