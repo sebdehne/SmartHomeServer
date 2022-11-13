@@ -1,11 +1,14 @@
 package com.dehnes.smarthome.api.dtos
 
+import com.dehnes.smarthome.users.UserSettings
 import com.dehnes.smarthome.victron.ESSState
 import com.dehnes.smarthome.victron.ESSWrite
 
 enum class RequestType {
     subscribe,
     unsubscribe,
+
+    userSettings,
 
     garageRequest,
     underFloorHeaterRequest,
@@ -47,4 +50,5 @@ data class RpcResponse(
     val quickStatsResponse: QuickStatsResponse? = null,
     val essState: ESSState? = null,
     val energyPricingSettingsRead: EnergyPricingSettingsRead? = null,
+    val userSettings: UserSettings? = null,
 )

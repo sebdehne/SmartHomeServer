@@ -3,7 +3,7 @@ import { Button, Container, Paper, Table, TableBody, TableCell, TableContainer, 
 import { useNavigate } from "react-router-dom";
 import './App.css';
 import { QuickStatsResponse } from "../../Websocket/types/QuickStats";
-import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import Header from "../Header";
 import { numberNok } from "../Utils/utils";
 import Icon from '@mdi/react'
@@ -23,6 +23,7 @@ const App = () => {
     const navigate = useNavigate();
 
     const [quickStatsResponse, setQuickStatsResponse] = useState<QuickStatsResponse | null>(null);
+    const userSettings = useUserSettings();
 
     useEffect(() => {
         const subId = WebsocketService.subscribe("quickStatsEvents", notify => {
@@ -90,12 +91,15 @@ const App = () => {
             >
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary" onClick={relative("/garage")}>
+                        <Button disabled={!userSettings.userCanRead("garageDoor")} fullWidth variant="contained"
+                                color="primary"
+                                onClick={relative("/garage")}>
                             <Icon path={mdiGarageVariant} size={3}/>
                         </Button>
                     </div>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary" onClick={relative("/evChargingStations")}>
+                        <Button disabled={!userSettings.userCanRead("evCharging")} fullWidth variant="contained"
+                                color="primary" onClick={relative("/evChargingStations")}>
                             <Icon path={mdiEvStation} size={3}/>
                         </Button>
                     </div>
@@ -103,12 +107,14 @@ const App = () => {
 
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary" onClick={relative("/energy")}>
+                        <Button disabled={!userSettings.userCanRead("energyStorageSystem")} fullWidth
+                                variant="contained" color="primary" onClick={relative("/energy")}>
                             <Icon path={mdiHomeBattery} size={3}/>
                         </Button>
                     </div>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary"
+                        <Button disabled={!userSettings.userCanRead("energyPricing")} fullWidth variant="contained"
+                                color="primary"
                                 onClick={relative("/energy_price_settings")}>
                             <Icon path={mdiTransmissionTower} size={3}/>
                         </Button>
@@ -117,12 +123,14 @@ const App = () => {
 
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary" onClick={relative("/heater")}>
+                        <Button disabled={!userSettings.userCanRead("heaterUnderFloor")} fullWidth
+                                variant="contained" color="primary" onClick={relative("/heater")}>
                             <Icon path={mdiHeatingCoil} size={3}/>
                         </Button>
                     </div>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary" onClick={relative("/environmentSensors")}>
+                        <Button disabled={!userSettings.userCanRead("environmentSensors")} fullWidth
+                                variant="contained" color="primary" onClick={relative("/environmentSensors")}>
                             <Icon path={mdiHomeThermometer} size={3}/>
                         </Button>
                     </div>
@@ -130,12 +138,14 @@ const App = () => {
 
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary" onClick={relative("/webcams")}>
+                        <Button disabled={!userSettings.userCanRead("cameras")} fullWidth variant="contained"
+                                color="primary" onClick={relative("/webcams")}>
                             <Icon path={mdiCctv} size={3}/>
                         </Button>
                     </div>
                     <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
-                        <Button fullWidth variant="contained" color="primary" onClick={relative("/recordings")}>
+                        <Button disabled={!userSettings.userCanRead("recordings")} fullWidth variant="contained"
+                                color="primary" onClick={relative("/recordings")}>
                             <Icon path={mdiVhs} size={3}/>
                         </Button>
                     </div>

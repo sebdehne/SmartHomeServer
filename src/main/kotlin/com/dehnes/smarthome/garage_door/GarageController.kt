@@ -12,6 +12,9 @@ import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.lora.LoRaInboundPacketDecrypted
 import com.dehnes.smarthome.lora.LoRaPacketType
 import com.dehnes.smarthome.lora.maxPayload
+import com.dehnes.smarthome.users.SystemUser
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.time.Clock
@@ -25,7 +28,8 @@ class GarageController(
     private val loRaConnection: LoRaConnection,
     private val clock: Clock,
     private val influxDBClient: InfluxDBClient,
-    executorService: ExecutorService
+    executorService: ExecutorService,
+    private val userSettingsService: UserSettingsService,
 ) : AbstractProcess(executorService, 30) {
 
     private val loRaAddr = 17
@@ -45,7 +49,7 @@ class GarageController(
     @Volatile
     private var firmwareHolder: FirmwareHolder? = null
 
-    val listeners = ConcurrentHashMap<String, (GarageResponse) -> Unit>()
+    private val listeners = ConcurrentHashMap<String, (GarageResponse) -> Unit>()
 
     init {
         loRaConnection.listeners.add { packet ->
@@ -65,7 +69,19 @@ class GarageController(
         }
     }
 
-    fun startFirmwareUpgrade(firmwareBased64Encoded: String) = asLocked {
+    fun addListener(user: String?, id: String, listener:(GarageResponse) -> Unit) {
+        if (!userSettingsService.canUserRead(user, UserRole.garageDoor)) return
+        listeners[id] = listener
+    }
+
+    fun removeListener(id: String) {
+        listeners.remove(id)
+    }
+
+    fun startFirmwareUpgrade(user: String?, firmwareBased64Encoded: String) = asLocked {
+
+        if (!userSettingsService.canUserWrite(user, UserRole.firmwareUpgrades)) return@asLocked false
+
         val firmwareHolder = FirmwareHolder(
             "unknown.file.name",
             Base64.getDecoder().decode(firmwareBased64Encoded)
@@ -113,7 +129,9 @@ class GarageController(
         sent
     } ?: false
 
-    fun updateAutoCloseAfter(autoCloseDeltaInSeconds: Long) {
+    fun updateAutoCloseAfter(user: String?, autoCloseDeltaInSeconds: Long) {
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) return
+
         asLocked {
             val garageStatus = lastStatus
             if (garageStatus?.autoCloseAfter != null) {
@@ -124,7 +142,9 @@ class GarageController(
         }
     }
 
-    fun adjustTime() = asLocked {
+    fun adjustTime(user: String?) = asLocked {
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked false
+
         val ct = CountDownLatch(1)
         receiveQueue.clear()
         loRaConnection.send(
@@ -140,7 +160,10 @@ class GarageController(
         receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.ADJUST_TIME_RESPONSE
     } ?: false
 
-    fun getCurrentState() = asLocked {
+    fun getCurrentState(user: String?) = asLocked {
+
+        if (!userSettingsService.canUserRead(user, UserRole.garageDoor)) return@asLocked null
+
         firmwareDataRequest?.let {
             GarageResponse(
                 firmwareUpgradeState = FirmwareUpgradeState(
@@ -152,9 +175,12 @@ class GarageController(
                 )
             )
         } ?: GarageResponse(lastStatus)
-    }!!
 
-    fun sendCommand(doorCommandOpen: Boolean) = asLocked {
+    }
+
+    fun sendCommand(user: String?, doorCommandOpen: Boolean) = asLocked {
+        if (userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked false
+
         val currentStatus = lastStatus
 
         logger.info { "sendCommand doorCommandOpen=$doorCommandOpen current=$currentStatus" }
@@ -259,7 +285,7 @@ class GarageController(
 
         listeners.forEach {
             try {
-                it.value(getCurrentState())
+                it.value(getCurrentState(SystemUser)!!)
             } catch (e: Exception) {
                 logger.error("", e)
             }
@@ -278,7 +304,13 @@ class GarageController(
                 var sent = false
                 val ct = CountDownLatch(1)
                 receiveQueue.clear()
-                loRaConnection.send(keyId, loRaAddr, LoRaPacketType.GARAGE_HEATER_DATA_REQUESTV2, byteArrayOf(0), null) {
+                loRaConnection.send(
+                    keyId,
+                    loRaAddr,
+                    LoRaPacketType.GARAGE_HEATER_DATA_REQUESTV2,
+                    byteArrayOf(0),
+                    null
+                ) {
                     ct.countDown()
                     sent = it
                 }
@@ -330,8 +362,10 @@ class GarageController(
                         }
                         DoorStatus.doorOpen
                     }
+
                     RecevivedDoorStatus.closed -> DoorStatus.doorClosed
                 }
+
                 DoorStatus.doorOpen -> when (receivedDoorStatus) {
                     RecevivedDoorStatus.open, RecevivedDoorStatus.middle -> {
                         if (autoCloseAfter != null && clock.millis() > autoCloseAfter) {
@@ -342,11 +376,13 @@ class GarageController(
                             DoorStatus.doorOpen
                         }
                     }
+
                     RecevivedDoorStatus.closed -> {
                         autoCloseAfter = null
                         DoorStatus.doorClosed
                     }
                 }
+
                 DoorStatus.doorClosing -> when (receivedDoorStatus) {
                     RecevivedDoorStatus.middle, RecevivedDoorStatus.open -> {
                         // retry
@@ -354,6 +390,7 @@ class GarageController(
                         autoCloseAfter = null
                         DoorStatus.doorClosing
                     }
+
                     RecevivedDoorStatus.closed -> DoorStatus.doorClosed
                 }
             }

@@ -7,6 +7,7 @@ import { VideoBrowserRequest, VideoBrowserResponse } from "./Video";
 import { QuickStatsResponse } from "./QuickStats";
 import { EnergyPricingSettingsRead, EnergyPricingSettingsWrite } from "./EnergyPricingSettings";
 import { ESSState, ESSWrite } from "./EnergyStorageSystem";
+import { UserSettings } from "./UserSettings";
 
 export type RequestType =
     "subscribe"
@@ -21,6 +22,7 @@ export type RequestType =
     | "writeEnergyPricingSettings"
     | "essRead"
     | "essWrite"
+    | "userSettings"
     ;
 
 export type RpcRequest = {
@@ -49,4 +51,5 @@ export type RpcResponse = {
     quickStatsResponse?: QuickStatsResponse;
     essState?: ESSState;
     energyPricingSettingsRead?: EnergyPricingSettingsRead;
+    userSettings?: UserSettings;
 }

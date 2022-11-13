@@ -5,11 +5,15 @@ import com.dehnes.smarthome.datalogging.QuickStatsService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
-import com.dehnes.smarthome.ev_charging.*
+import com.dehnes.smarthome.ev_charging.EvChargingService
+import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
+import com.dehnes.smarthome.ev_charging.FirmwareUploadService
+import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.han.HanPortService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.utils.PersistenceService
@@ -37,6 +41,8 @@ class Configuration {
         val executorService = Executors.newCachedThreadPool()
         val objectMapper = objectMapper()
         val persistenceService = PersistenceService(objectMapper)
+
+        val userSettingsService = UserSettingsService(persistenceService)
 
         //val priceSource = TibberPriceClient(objectMapper, persistenceService)
         val priceSource = HvakosterstrommenClient(objectMapper)
@@ -79,7 +85,8 @@ class Configuration {
             "192.168.1.18",
             objectMapper,
             executorService,
-            persistenceService
+            persistenceService,
+            influxDBClient
         )
 
         val evChargingService = EvChargingService(
@@ -108,7 +115,13 @@ class Configuration {
             influxDBClient
         )
 
-        val garageDoorService = GarageController(loRaConnection, clock, influxDBClient, executorService)
+        val garageDoorService = GarageController(
+            loRaConnection,
+            clock,
+            influxDBClient,
+            executorService,
+            userSettingsService
+        )
         garageDoorService.start()
 
         val heaterService = UnderFloorHeaterService(
@@ -147,6 +160,7 @@ class Configuration {
         beans[VictronService::class] = victronService
         beans[VictronEssProcess::class] = victronEssProcess
         beans[EnergyPriceService::class] = energyPriceService
+        beans[UserSettingsService::class] = userSettingsService
     }
 
     fun <T> getBean(klass: KClass<*>): T {

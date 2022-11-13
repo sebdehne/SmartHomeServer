@@ -1,5 +1,7 @@
 package com.dehnes.smarthome.victron
 
+import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -16,6 +18,7 @@ import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5RetainHandling
 import mu.KotlinLogging
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
+import java.time.Instant
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -28,6 +31,7 @@ class VictronService(
     private val objectMapper: ObjectMapper,
     private val executorService: ExecutorService,
     private val persistenceService: PersistenceService,
+    private val influxDBClient: InfluxDBClient,
 ) {
 
     val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
@@ -81,6 +85,12 @@ class VictronService(
                 if (lastNotify < (System.currentTimeMillis() - delayInMs)) {
                     lastNotify = System.currentTimeMillis()
                     logger.info { "sending notify $essValues listeners=${listeners.size}" }
+                    executorService.submit {
+                        val c = essValues
+                        influxDBClient.recordSensorData(
+                            c.toInfluxDBRecord()
+                        )
+                    }
                     executorService.submit {
                         listeners.forEach {
                             it.value(essValues)
@@ -246,6 +256,26 @@ data class ESSValues(
     val batteryAlarms: List<BatteryAlarms> = emptyList(),
 ) {
 
+    fun toInfluxDBRecord() = InfluxDBRecord(
+        Instant.now(),
+        "energyStorageSystem",
+        mapOf(
+            "baterySoC" to soc.toInt().toString(),
+            "batteryCurrent" to batteryCurrent.toString(),
+            "batteryPower" to batteryPower.toString(),
+            "batteryVoltage" to batteryVoltage.toString(),
+            "gridL1Power" to gridL1.power.toString(),
+            "gridL2Power" to gridL2.power.toString(),
+            "gridL3Power" to gridL3.power.toString(),
+            "gridPower" to gridPower.toString(),
+            "outputL1Power" to outputL1.power.toString(),
+            "outputL2Power" to outputL2.power.toString(),
+            "outputL3Power" to outputL3.power.toString(),
+            "outputPower" to outputPower.toString(),
+        ),
+        mapOf()
+    )
+
     fun isGridOk() = listOf(
         gridL1,
         gridL2,
@@ -334,6 +364,7 @@ data class ESSValues(
             this.copy(batteryAlarms = this.batteryAlarms.filterNot { it == alarm })
         }
     }
+
 }
 
 enum class BatteryAlarms {

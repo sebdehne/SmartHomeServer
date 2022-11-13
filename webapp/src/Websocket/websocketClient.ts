@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { RpcRequest, RpcResponse } from "./types/Rpc";
 import { Notify, SubscriptionType } from "./types/Subscription";
 import { WebsocketMessage } from "./types/WebsocketMessage";
+import { UserRole, UserSettings } from "./types/UserSettings";
 
 export enum ConnectionStatus {
     connected = "connected",
@@ -14,6 +15,17 @@ const SubscriptionsById = new Map<string, Subscription>();
 const ConnectionStatusSubscriptionsById = new Map<string, (connectionStatus: ConnectionStatus) => void>();
 let ws: WebSocket | undefined = undefined;
 let connectionStatus: ConnectionStatus = ConnectionStatus.closed;
+let userSettings: UserSettings | undefined = undefined;
+
+const userCanRead = (r: UserRole) => {
+    const l = userSettings?.authorization?.[r]!!;
+    return l === "read" || l === "readWrite";
+}
+
+const userCanWrite = (r: UserRole) => {
+    const l = userSettings?.authorization?.[r]!!;
+    return l === "readWrite";
+}
 
 function subscribe(type: SubscriptionType, onNotify: (notify: Notify) => void, onOpened: () => void) {
     const subscriptionId = uuidv4();
@@ -95,6 +107,7 @@ function reconnect() {
         setConnectionStatusChanged(ConnectionStatus.connected);
         // re-subscribe
         let subscriptions = new Array<string>();
+
         // re-send ongoing RPCs
         OngoingRPCsById.forEach((ongoingRPC) => {
             send(ongoingRPC.msg);
@@ -102,6 +115,11 @@ function reconnect() {
                 subscriptions.push(ongoingRPC.msg.rpcRequest.subscribe!!.subscriptionId)
             }
         });
+
+        // (re-fetch userSettings)
+        rpc({
+            type: "userSettings"
+        }).then(resp => userSettings = resp.userSettings);
 
         SubscriptionsById.forEach((sub, key) => {
             console.log("onopen - re-subscribe: " + key)
@@ -158,6 +176,8 @@ const WebsocketService = {
     rpc,
     subscribe,
     unsubscribe,
+    userCanWrite,
+    userCanRead,
     monitorConnectionStatus: (fn: (connectionStatis: ConnectionStatus) => void) => {
         const id = uuidv4();
         ConnectionStatusSubscriptionsById.set(id, fn);
@@ -167,6 +187,13 @@ const WebsocketService = {
         };
     }
 };
+
+export const useUserSettings = () => {
+    return ({
+        userCanWrite,
+        userCanRead
+    })
+}
 
 export default WebsocketService;
 
