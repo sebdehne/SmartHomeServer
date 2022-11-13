@@ -3,6 +3,7 @@ package com.dehnes.smarthome.victron
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.serviceEnergyStorage
 import com.dehnes.smarthome.utils.AbstractProcess
+import com.dehnes.smarthome.utils.DateTimeUtils.zoneId
 import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.victron.VictronEssCalculation.VictronEssCalculationInput
 import com.dehnes.smarthome.victron.VictronEssCalculation.calculateAcPowerSetPoints
@@ -75,7 +76,7 @@ class VictronEssProcess(
                 ProfileType.manual
             }
             OperationMode.automatic -> {
-                val energyPricesAreCheap = energyPricesAreCheap()
+                val energyPricesAreCheap = energyPricesAreCheap()?.atZone(zoneId)?.toLocalTime()
                 if (isSoCTooLow()) {
                     if (energyPricesAreCheap == null) {
                         essState = "SoC low, charging"
