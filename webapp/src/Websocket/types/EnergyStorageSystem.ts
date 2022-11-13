@@ -12,6 +12,7 @@ export type ESSState = {
     currentProfile: ProfileType;
     soCLimit: SoCLimit;
     profileSettings: ProfileSettings[];
+    essState: string;
 }
 
 export type ESSWrite = {

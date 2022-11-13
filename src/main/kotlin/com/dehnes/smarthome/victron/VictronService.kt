@@ -74,6 +74,7 @@ class VictronService(
 
             synchronized(this) {
                 essValues = essValues.update(
+                    getPortalId(),
                     it.topic.toString(),
                     jsonRaw
                 )
@@ -100,6 +101,8 @@ class VictronService(
             }
         }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
     }
+
+    private fun getPortalId() = persistenceService["VictronService.portalId"] ?: error("VictronService.portalId not configured")
 
     fun current() = essValues
 
@@ -155,22 +158,22 @@ class VictronService(
             )
         ).get()
     }
+
+    fun topic(type: TopicType, path: String) = when (type) {
+        TopicType.notify -> "N"
+        TopicType.read -> "R"
+        TopicType.write -> "W"
+    } + "/${getPortalId()}$path"
+
+
 }
 
 // https://github.com/victronenergy/venus-html5-app/blob/master/TOPICS.md
-const val portalId = "48e7da87e605"
-
 enum class TopicType {
     notify,
     read,
     write
 }
-
-fun topic(type: TopicType, path: String) = when (type) {
-    TopicType.notify -> "N"
-    TopicType.read -> "R"
-    TopicType.write -> "W"
-} + "/$portalId$path"
 
 fun doubleValue(any: Any?) = when {
     any == null -> 0.0
@@ -249,7 +252,7 @@ data class ESSValues(
         gridL3,
     ).all { it.voltage > 200 } && (InverterAlarms.GridLost !in inverterAlarms)
 
-    fun update(topicIn: String, json: Map<String, Any>): ESSValues {
+    fun update(portalId: String, topicIn: String, json: Map<String, Any>): ESSValues {
         val topic = topicIn.replace("N/$portalId", "")
 
         val any = json["value"]
@@ -277,14 +280,14 @@ data class ESSValues(
 
             else -> {
                 when {
-                    topicIn.contains("/vebus/276/Ac/ActiveIn/L1") -> this.copy(gridL1 = gridL1.update(topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/ActiveIn/L2") -> this.copy(gridL2 = gridL2.update(topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/ActiveIn/L3") -> this.copy(gridL3 = gridL3.update(topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/Out/L1") -> this.copy(outputL1 = outputL1.update(topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/Out/L2") -> this.copy(outputL2 = outputL2.update(topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/Out/L3") -> this.copy(outputL3 = outputL3.update(topicIn, json))
-                    topicIn.contains("/vebus/276/Alarms") -> this.updateInverterAlarms(topicIn, json)
-                    topicIn.contains("/battery/0/Alarms") -> this.updateBatteryAlarms(topicIn, json)
+                    topicIn.contains("/vebus/276/Ac/ActiveIn/L1") -> this.copy(gridL1 = gridL1.update(portalId, topicIn, json))
+                    topicIn.contains("/vebus/276/Ac/ActiveIn/L2") -> this.copy(gridL2 = gridL2.update(portalId, topicIn, json))
+                    topicIn.contains("/vebus/276/Ac/ActiveIn/L3") -> this.copy(gridL3 = gridL3.update(portalId, topicIn, json))
+                    topicIn.contains("/vebus/276/Ac/Out/L1") -> this.copy(outputL1 = outputL1.update(portalId, topicIn, json))
+                    topicIn.contains("/vebus/276/Ac/Out/L2") -> this.copy(outputL2 = outputL2.update(portalId, topicIn, json))
+                    topicIn.contains("/vebus/276/Ac/Out/L3") -> this.copy(outputL3 = outputL3.update(portalId, topicIn, json))
+                    topicIn.contains("/vebus/276/Alarms") -> this.updateInverterAlarms(portalId, topicIn, json)
+                    topicIn.contains("/battery/0/Alarms") -> this.updateBatteryAlarms(portalId, topicIn, json)
                     else -> {
                         this
                     }
@@ -293,7 +296,7 @@ data class ESSValues(
         }
     }
 
-    private fun updateInverterAlarms(topicIn: String, json: Map<String, Any>): ESSValues {
+    private fun updateInverterAlarms(portalId: String, topicIn: String, json: Map<String, Any>): ESSValues {
         val topic = topicIn.replace("N/$portalId", "")
         val any = json["value"]
         val (alarm, triggered) = when (topic) {
@@ -312,7 +315,7 @@ data class ESSValues(
         }
     }
 
-    private fun updateBatteryAlarms(topicIn: String, json: Map<String, Any>): ESSValues {
+    private fun updateBatteryAlarms(portalId: String, topicIn: String, json: Map<String, Any>): ESSValues {
         val topic = topicIn.replace("N/$portalId", "")
         val any = json["value"]
         val (alarm, triggered) = when (topic) {
@@ -385,7 +388,7 @@ data class GridData(
     val freq: Double = 0.0, // N/48e7da87e605/vebus/276/Ac/ActiveIn/L1/F
     val voltage: Double = 0.0, // N/48e7da87e605/vebus/276/Ac/ActiveIn/L1/V
 ) {
-    fun update(topicIn: String, json: Map<String, Any>): GridData {
+    fun update(portalId: String, topicIn: String, json: Map<String, Any>): GridData {
         var topic = topicIn.replace("N/$portalId/vebus/276/Ac/ActiveIn/L1", "")
         topic = topic.replace("N/$portalId/vebus/276/Ac/ActiveIn/L2", "")
         topic = topic.replace("N/$portalId/vebus/276/Ac/ActiveIn/L3", "")

@@ -5,9 +5,10 @@ import { eesAlarms, numberTo2Decimal } from "../Utils/utils";
 
 
 export type VisualizationProps = {
-    essValues: ESSValues
+    essValues: ESSValues,
+    essState: string,
 }
-export const Visualization = ({ essValues }: VisualizationProps) => {
+export const Visualization = ({ essValues, essState }: VisualizationProps) => {
     return <TableContainer component={Paper} style={{
         marginTop: "20px"
     }}>
@@ -15,6 +16,10 @@ export const Visualization = ({ essValues }: VisualizationProps) => {
             <TableBody>
                 <TableRow>
                     <TableCell component="th" scope="row">Status</TableCell>
+                    <TableCell align="right">{essState}</TableCell>
+                </TableRow>
+                <TableRow>
+                    <TableCell component="th" scope="row">Inverter status</TableCell>
                     <TableCell align="right">{essValues.systemState}</TableCell>
                 </TableRow>
                 {essValues.inverterAlarms.length > 0 &&

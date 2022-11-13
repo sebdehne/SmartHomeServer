@@ -5,7 +5,6 @@ import {
     Button,
     ButtonGroup,
     Container,
-    Grid,
     TextField
 } from "@material-ui/core";
 import Header from "../Header";
@@ -48,7 +47,7 @@ export const EnergyStorageSystem = () => {
                     soCLimit={essState.soCLimit}
                 />
 
-                <Visualization essValues={essState.measurements}/>
+                <Visualization essValues={essState.measurements} essState={essState.essState}/>
 
                 <ProfileSettingsComponent
                     profileSettings={essState.profileSettings}
@@ -130,7 +129,7 @@ const SoCLimitComponent = ({ soCLimit, setSending, onNewData }: SoCLimitProps) =
             .finally(() => setSending(false))
     }
 
-    return <Accordion style={{width: "100%"}}>
+    return <Accordion style={{ width: "100%" }}>
         <AccordionSummary
             expandIcon={<ExpandMoreIcon/>}
             aria-controls="panel1a-content"
@@ -148,8 +147,8 @@ const SoCLimitComponent = ({ soCLimit, setSending, onNewData }: SoCLimitProps) =
             </div>
         </AccordionSummary>
         <AccordionDetails>
-            <div style={{display: "flex", flexDirection: "column", width: "100%"}}>
-                <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between"}}>
+            <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+                <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
                     <div>From:</div>
                     <div>
                         <TextField value={from} onChange={e => setFrom(e.target.value.trim())}/>
@@ -162,7 +161,7 @@ const SoCLimitComponent = ({ soCLimit, setSending, onNewData }: SoCLimitProps) =
                         }}>Update</Button>
                     </div>
                 </div>
-                <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between"}}>
+                <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
                     <div>To:</div>
                     <div>
                         <TextField value={to} onChange={e => setTo(e.target.value.trim())}/>

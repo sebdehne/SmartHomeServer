@@ -1,8 +1,6 @@
 package com.dehnes.smarthome.victron
 
-import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
-import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
 import com.dehnes.smarthome.energy_pricing.serviceEnergyStorage
 import com.dehnes.smarthome.utils.AbstractProcess
 import com.dehnes.smarthome.utils.PersistenceService
@@ -11,8 +9,6 @@ import com.dehnes.smarthome.victron.VictronEssCalculation.calculateAcPowerSetPoi
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import mu.KotlinLogging
-import java.time.Clock
-import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -28,6 +24,7 @@ class VictronEssProcess(
 
     private var currentOperationMode = OperationMode.passthrough
     private var currentProfile: ProfileSettings? = null
+    private var essState: String = ""
 
     val listeners = ConcurrentHashMap<String, (data: ESSState) -> Unit>()
 
@@ -69,25 +66,38 @@ class VictronEssProcess(
 
     private fun calculateProfile(): ProfileType {
         val targetProfile = when (currentOperationMode) {
-            OperationMode.passthrough -> ProfileType.passthrough
-            OperationMode.manual -> ProfileType.manual
+            OperationMode.passthrough -> {
+                essState = "Passthrough mode"
+                ProfileType.passthrough
+            }
+            OperationMode.manual -> {
+                essState = "Manual mode"
+                ProfileType.manual
+            }
             OperationMode.automatic -> {
+                val energyPricesAreCheap = energyPricesAreCheap()
                 if (isSoCTooLow()) {
-                    if (energyPricesAreCheap()) {
+                    if (energyPricesAreCheap == null) {
+                        essState = "SoC low, charging"
                         ProfileType.autoCharging
                     } else {
+                        essState = "SoC low, waiting: $energyPricesAreCheap"
                         ProfileType.passthrough
                     }
                 } else if (isSoCTooHigh()) {
-                    if (!energyPricesAreCheap()) {
+                    if (energyPricesAreCheap != null) {
+                        essState = "SoC high, waiting until $energyPricesAreCheap"
                         ProfileType.autoDischarging
                     } else {
+                        essState = "SoC high, energy price low"
                         ProfileType.passthrough
                     }
                 } else {
-                    if (energyPricesAreCheap()) {
+                    if (energyPricesAreCheap == null) {
+                        essState = "Energy price low, charging"
                         ProfileType.autoCharging
                     } else {
+                        essState = "Discharging until $energyPricesAreCheap"
                         ProfileType.autoDischarging
                     }
                 }
@@ -97,7 +107,7 @@ class VictronEssProcess(
         return targetProfile
     }
 
-    private fun energyPricesAreCheap() = energyPriceService.mustWaitUntilV2(serviceEnergyStorage) == null
+    private fun energyPricesAreCheap() = energyPriceService.mustWaitUntilV2(serviceEnergyStorage)
 
     private fun isSoCTooLow(): Boolean {
         val soc = victronService.current().soc.toInt()
@@ -123,11 +133,6 @@ class VictronEssProcess(
 
     override fun logger() = logger
 
-    fun currentOperationMode() =
-        persistenceService["VictronEssProcess.operationMode", OperationMode.passthrough.name]!!.let { mode ->
-            OperationMode.values().first { it.name == mode }
-        }
-
     fun current() = ESSState(
         victronService.essValues,
         currentOperationMode,
@@ -135,7 +140,8 @@ class VictronEssProcess(
         getSoCLimit(),
         ProfileType.values().map { t ->
             getProfile(t)
-        }
+        },
+        essState
     )
 
     fun handleWrite(essWrite: ESSWrite) {
@@ -194,7 +200,8 @@ data class ESSState(
     val operationMode: VictronEssProcess.OperationMode,
     val currentProfile: VictronEssProcess.ProfileType,
     val soCLimit: SoCLimit,
-    val profileSettings: List<VictronEssProcess.ProfileSettings>
+    val profileSettings: List<VictronEssProcess.ProfileSettings>,
+    val essState: String,
 )
 
 data class ESSWrite(
@@ -213,26 +220,22 @@ fun main() {
     val objectMapper = jacksonObjectMapper().registerModule(kotlinModule())
     val persistenceService = PersistenceService(objectMapper)
     val victronService = VictronService("192.168.1.18", objectMapper, executorService, persistenceService)
-    val energyPriceService = EnergyPriceService(
-        Clock.system(ZoneId.of("Europe/Oslo")),
-        objectMapper,
-        HvakosterstrommenClient(objectMapper),
-        InfluxDBClient(persistenceService, objectMapper),
-        executorService,
-        persistenceService
-    )
-    val victronEssProcess = VictronEssProcess(executorService, victronService, persistenceService, energyPriceService)
-    victronEssProcess.start()
 
     while (true) {
         Thread.sleep(5000)
         val current = victronService.current()
         println("State: " + current.systemState)
-        println("gridPower: " + current.gridPower)
-        println("batteryPower: " + current.batteryPower)
-        println("outputPower: " + current.outputPower)
-        val current1 = victronEssProcess.current()
-        println("currentProfile: " + current1.currentProfile)
-        println("operationMode: " + current1.operationMode)
+        println("L1: IN=" + current.gridL1.power.toLong() + " OUT=" + current.outputL1.power.toLong())
+        println("L2: IN=" + current.gridL2.power.toLong() + " OUT=" + current.outputL2.power.toLong())
+        println("L3: IN=" + current.gridL3.power.toLong() + " OUT=" + current.outputL3.power.toLong())
+
+        victronService.essMode3_setAcPowerSetPointMode(
+            VictronEssCalculation.VictronEssCalculationResult(
+                current.outputL1.power.toLong(),
+                //current.outputL2.power.toLong(),
+                20000,
+                current.outputL3.power.toLong(),
+            )
+        )
     }
 }
