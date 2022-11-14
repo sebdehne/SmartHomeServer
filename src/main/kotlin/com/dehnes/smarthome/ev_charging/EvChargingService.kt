@@ -3,6 +3,9 @@ package com.dehnes.smarthome.ev_charging
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.ev_charging.ChargingState.*
+import com.dehnes.smarthome.users.SystemUser
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
@@ -64,9 +67,10 @@ class EvChargingService(
     private val persistenceService: PersistenceService,
     private val clock: Clock,
     private val loadSharingAlgorithms: Map<String, LoadSharing>,
-    private val victronService: VictronService
+    private val victronService: VictronService,
+    private val userSettingsService: UserSettingsService,
 ) {
-    val listeners = ConcurrentHashMap<String, (EvChargingEvent) -> Unit>()
+    private val listeners = ConcurrentHashMap<String, (EvChargingEvent) -> Unit>()
     private val currentData = ConcurrentHashMap<String, InternalState>()
 
     // config
@@ -94,7 +98,7 @@ class EvChargingService(
                                 fn(
                                     EvChargingEvent(
                                         EvChargingEventType.chargingStationDataAndConfig,
-                                        getChargingStationsDataAndConfig()
+                                        getChargingStationsDataAndConfig(SystemUser)
                                     )
                                 )
                             }
@@ -107,11 +111,24 @@ class EvChargingService(
         }
     }
 
-    fun getChargingStationsDataAndConfig() = currentData.map { entry ->
-        toEvChargingStationDataAndConfig(entry.value)
+    fun addListener(user: String?, id: String, listener: (EvChargingEvent) -> Unit) {
+        if (!userSettingsService.canUserRead(user, UserRole.evCharging)) return
+        listeners[id] = listener
     }
 
-    fun updateMode(clientId: String, evChargingMode: EvChargingMode): Boolean {
+    fun removeListener(id: String) {
+        listeners.remove(id)
+    }
+
+    fun getChargingStationsDataAndConfig(user: String?): List<EvChargingStationDataAndConfig> {
+        if (!userSettingsService.canUserRead(user, UserRole.evCharging)) return emptyList()
+        return currentData.map { entry ->
+            toEvChargingStationDataAndConfig(entry.value)
+        }
+    }
+
+    fun updateMode(user: String?, clientId: String, evChargingMode: EvChargingMode): Boolean {
+        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return false
         persistenceService["EvChargingService.client.mode.$clientId"] = evChargingMode.name
         eVChargingStationConnection.collectDataAndDistribute(clientId)
         return true
@@ -121,7 +138,9 @@ class EvChargingService(
         persistenceService["EvChargingService.client.mode.$clientId", EvChargingMode.ChargeDuringCheapHours.name]!!
             .let { EvChargingMode.valueOf(it) }
 
-    fun setPriorityFor(clientId: String, loadSharingPriority: LoadSharingPriority) = synchronized(this) {
+    fun setPriorityFor(user: String?, clientId: String, loadSharingPriority: LoadSharingPriority) = synchronized(this) {
+        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return@synchronized false
+
         persistenceService["EvChargingService.client.priorty.$clientId"] = loadSharingPriority.name
         var result = false
         currentData.computeIfPresent(clientId) { _, internalState ->
@@ -136,7 +155,9 @@ class EvChargingService(
             LoadSharingPriority.valueOf(it)
         }
 
-    fun setChargeRateLimitFor(clientId: String, chargeRateLimit: Int) = synchronized(this) {
+    fun setChargeRateLimitFor(user: String?, clientId: String, chargeRateLimit: Int) = synchronized(this) {
+        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return@synchronized false
+
         check(chargeRateLimit in 6..32)
         persistenceService["EvChargingService.client.chargeRateLimit.$clientId"] = chargeRateLimit.toString()
         var result = false
@@ -214,6 +235,7 @@ class EvChargingService(
                 mode == EvChargingMode.ChargeDuringCheapHours && !gridOk -> {
                     reasonCannotCharge = "Grid is offline"
                 }
+
                 mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour != null -> {
                     reasonCannotCharge = "starting @ " + nextCheapHour.atZone(clock.zone).toLocalTime()
                 }

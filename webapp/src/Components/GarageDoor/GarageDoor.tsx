@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Container, Grid } from "@material-ui/core";
-import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import Header from "../Header";
 import { ArrowDownward, ArrowUpward } from "@material-ui/icons";
 import { DoorStatus, GarageRequestType, GarageResponse } from "../../Websocket/types/Garage";
@@ -14,6 +14,7 @@ const GarageDoor = () => {
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
     const [currentSeconds, setCurrentSeconds] = useState(Date.now());
+    const userSettings = useUserSettings();
 
     useEffect(() => {
         setTimeout(() => setCurrentSeconds(Date.now()), 1000)
@@ -127,6 +128,7 @@ const GarageDoor = () => {
                     <Grid item xs={4}/>
                     <Grid item xs={3}>
                         <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
                             style={{ margin: "10px" }} variant="contained" color="primary"
                             onClick={() => sendCmd("openGarageDoor")}>
                             <ArrowUpward/> Open
@@ -134,6 +136,7 @@ const GarageDoor = () => {
                     </Grid>
                     <Grid item xs={3}>
                         <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
                             style={{ margin: "10px" }} variant="contained" color="primary"
                             onClick={() => sendCmd("closeGarageDoor")}>
                             <ArrowDownward/> Close
@@ -149,6 +152,7 @@ const GarageDoor = () => {
                     </Grid>
                     <Grid item xs={2}>
                         <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
                             style={{ margin: "10px" }} variant="contained" color="primary"
                             onClick={() => adjustAutoClose(-60)}>
                             -1 hour
@@ -156,20 +160,25 @@ const GarageDoor = () => {
                     </Grid>
                     <Grid item xs={2}>
                         <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
                             style={{ margin: "10px" }} variant="contained" color="primary"
                             onClick={() => adjustAutoClose(-10)}>
                             -10 min
                         </Button>
                     </Grid>
                     <Grid item xs={2}>
-                        <Button style={{ margin: "10px" }} variant="contained" color="primary"
-                                onClick={() => adjustAutoClose(10)}>
+                        <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
+                            style={{ margin: "10px" }} variant="contained" color="primary"
+                            onClick={() => adjustAutoClose(10)}>
                             +10 min
                         </Button>
                     </Grid>
                     <Grid item xs={2}>
-                        <Button style={{ margin: "10px" }} variant="contained" color="primary"
-                                onClick={() => adjustAutoClose(60)}>
+                        <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
+                            style={{ margin: "10px" }} variant="contained" color="primary"
+                            onClick={() => adjustAutoClose(60)}>
                             +1 hour
                         </Button>
                     </Grid>
@@ -183,13 +192,16 @@ const GarageDoor = () => {
                     </Grid>
                     <Grid item xs={4}>
                         <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
                             style={{ margin: "10px" }} variant="contained" color="primary"
                             onClick={() => adjustTime()}>
                             Adjust time
                         </Button>
                     </Grid>
                     <Grid item xs={4}>
-                        <FirmwareUpload setCmdResult={setCmdResult} setSending={setSending}/>
+                        {userSettings.userCanWrite("firmwareUpgrades") &&
+                            <FirmwareUpload setCmdResult={setCmdResult} setSending={setSending}/>
+                        }
                     </Grid>
                 </Grid>
             </Grid>

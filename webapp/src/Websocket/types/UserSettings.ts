@@ -6,7 +6,9 @@ export type UserRole =
     | "heaterUnderFloor"
     | "environmentSensors"
     | "cameras"
-    | "recordings";
+    | "recordings"
+    | "firmwareUpgrades"
+    ;
 
 export type Level = "none" | "read" | "readWrite";
 

@@ -42,6 +42,11 @@ class VictronEssProcess(
     override fun tickLocked(): Boolean {
         val targetProfile = calculateProfile()
 
+        if (targetProfile == ProfileType.passthrough) {
+            logger.info { "Not writing to inverter - passthrough" }
+            return true
+        }
+
         val profileSettings = getProfile(targetProfile)
 
         val result = if (profileSettings.passthrough()) {
@@ -148,6 +153,9 @@ class VictronEssProcess(
 
     fun handleWrite(essWrite: ESSWrite) {
         if (essWrite.operationMode != null) {
+            if (essWrite.operationMode == OperationMode.passthrough && currentOperationMode != OperationMode.passthrough) {
+                victronService.essMode3_setAcPowerSetPointMode(null)
+            }
             currentOperationMode = essWrite.operationMode
         }
         if (essWrite.soCLimit != null) {
@@ -230,20 +238,21 @@ fun main() {
     )
 
     while (true) {
-        Thread.sleep(5000)
         val current = victronService.current()
         println("State: " + current.systemState)
         println("L1: IN=" + current.gridL1.power.toLong() + " OUT=" + current.outputL1.power.toLong())
         println("L2: IN=" + current.gridL2.power.toLong() + " OUT=" + current.outputL2.power.toLong())
         println("L3: IN=" + current.gridL3.power.toLong() + " OUT=" + current.outputL3.power.toLong())
+        println("Battery: " + current.batteryPower)
 
         victronService.essMode3_setAcPowerSetPointMode(
             VictronEssCalculation.VictronEssCalculationResult(
-                current.outputL1.power.toLong(),
-                //current.outputL2.power.toLong(),
-                20000,
-                current.outputL3.power.toLong(),
+                //current.outputL1.power.toLong(),
+                0,
+                0,
+                0,
             )
         )
+        Thread.sleep(5000)
     }
 }

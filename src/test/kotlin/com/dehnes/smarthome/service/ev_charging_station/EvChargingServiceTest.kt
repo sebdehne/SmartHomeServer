@@ -5,6 +5,7 @@ import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.ev_charging.*
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.victron.VictronService
 import io.mockk.every
@@ -29,6 +30,7 @@ internal class EvChargingServiceTest {
     val eVChargingStationConnection = mockk<EvChargingStationConnection>()
     val currentModes = mutableMapOf<String, EvChargingMode>()
     val clockMock = mockk<Clock>()
+    val userSettingsService = mockk<UserSettingsService>()
 
     val allChargingsStations = mutableMapOf<String, TestChargingStation>()
     val onlineChargingStations = mutableSetOf<String>()
@@ -66,8 +68,7 @@ internal class EvChargingServiceTest {
                 } else {
                     defaultSlot.captured
                 }
-            }
-            else if (key.startsWith("PowerConnection.availableCapacity.")) {
+            } else if (key.startsWith("PowerConnection.availableCapacity.")) {
                 currentPowerConnectionCapacity.toString()
             } else {
                 defaultSlot.captured
@@ -114,6 +115,13 @@ internal class EvChargingServiceTest {
         every {
             victronService.isGridOk()
         } returns true
+
+        every {
+            userSettingsService.canUserRead(any(), any())
+        } returns true
+        every {
+            userSettingsService.canUserWrite(any(), any())
+        } returns true
     }
 
     val evChargingService = EvChargingService(
@@ -125,7 +133,8 @@ internal class EvChargingServiceTest {
         mapOf(
             PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clockMock)
         ),
-        victronService
+        victronService,
+        userSettingsService,
     )
 
     @Test

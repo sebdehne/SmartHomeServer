@@ -179,7 +179,7 @@ class GarageController(
     }
 
     fun sendCommand(user: String?, doorCommandOpen: Boolean) = asLocked {
-        if (userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked false
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked false
 
         val currentStatus = lastStatus
 

@@ -98,11 +98,12 @@ class Configuration {
             mapOf(
                 PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clock)
             ),
-            victronService
+            victronService,
+            userSettingsService
         )
         evChargingService.start()
 
-        val firmwareUploadService = FirmwareUploadService(evChargingStationConnection)
+        val firmwareUploadService = FirmwareUploadService(evChargingStationConnection, userSettingsService)
 
         val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
         loRaConnection.start()

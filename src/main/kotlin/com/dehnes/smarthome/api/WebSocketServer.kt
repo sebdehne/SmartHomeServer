@@ -112,7 +112,7 @@ class WebSocketServer : Endpoint() {
                             subscriptionId,
                             argSession,
                         ).apply {
-                            evChargingService.listeners[subscriptionId] = this::onEvent
+                            evChargingService.addListener(userEmail, subscriptionId, this::onEvent)
                         }
 
                         SubscriptionType.environmentSensorEvents -> EnvironmentSensorSubscription(
@@ -141,7 +141,7 @@ class WebSocketServer : Endpoint() {
 
             garageRequest -> RpcResponse(garageResponse = garageRequest(rpcRequest.garageRequest!!, userEmail))
             underFloorHeaterRequest -> RpcResponse(underFloorHeaterResponse = underFloorHeaterRequest(rpcRequest.underFloorHeaterRequest!!))
-            evChargingStationRequest -> RpcResponse(evChargingStationResponse = evChargingStationRequest(rpcRequest.evChargingStationRequest!!))
+            evChargingStationRequest -> RpcResponse(evChargingStationResponse = evChargingStationRequest(userEmail, rpcRequest.evChargingStationRequest!!))
             environmentSensorRequest -> RpcResponse(environmentSensorResponse = environmentSensorRequest(rpcRequest.environmentSensorRequest!!))
             RequestType.videoBrowser -> RpcResponse(videoBrowserResponse = videoBrowser.rpc(rpcRequest.videoBrowserRequest!!))
             readEnergyPricingSettings -> RpcResponse(
@@ -224,35 +224,37 @@ class WebSocketServer : Endpoint() {
         }
     }
 
-    private fun evChargingStationRequest(request: EvChargingStationRequest) = when (request.type) {
+    private fun evChargingStationRequest(user: String?, request: EvChargingStationRequest) = when (request.type) {
         EvChargingStationRequestType.uploadFirmwareToClient -> EvChargingStationResponse(
             uploadFirmwareToClientResult = firmwareUploadService.uploadVersion(
-                request.clientId!!,
-                request.firmwareBased64Encoded!!
+                user = user,
+                clientId = request.clientId!!,
+                firmwareBased64Encoded = request.firmwareBased64Encoded!!
             ),
-            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig(user)
         )
 
         EvChargingStationRequestType.getChargingStationsDataAndConfig -> EvChargingStationResponse(
-            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig(user)
         )
 
         EvChargingStationRequestType.setLoadSharingPriority -> EvChargingStationResponse(
-            configUpdated = evChargingService.setPriorityFor(request.clientId!!, request.newLoadSharingPriority!!),
-            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+            configUpdated = evChargingService.setPriorityFor(user, request.clientId!!, request.newLoadSharingPriority!!),
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig(user)
         )
 
         EvChargingStationRequestType.setMode -> EvChargingStationResponse(
-            configUpdated = evChargingService.updateMode(request.clientId!!, request.newMode!!),
-            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+            configUpdated = evChargingService.updateMode(user, request.clientId!!, request.newMode!!),
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig(user)
         )
 
         EvChargingStationRequestType.setChargeRateLimit -> EvChargingStationResponse(
             configUpdated = evChargingService.setChargeRateLimitFor(
+                user,
                 request.clientId!!,
                 request.chargeRateLimit!!
             ),
-            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig()
+            chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig(user)
         )
     }
 
@@ -471,7 +473,7 @@ class WebSocketServer : Endpoint() {
         }
 
         override fun close() {
-            evChargingService.listeners.remove(subscriptionId)
+            evChargingService.removeListener(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }

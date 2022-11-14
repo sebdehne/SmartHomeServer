@@ -26,7 +26,7 @@ import {
     TableRow
 } from "@material-ui/core";
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
-import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 import { FirmwareUpload } from "./FirmwareUpload";
 
@@ -60,6 +60,7 @@ export const EvChargingStation = ({
                                   }: EvChargingStationProps) => {
 
     const [showData, setShowData] = useState<boolean>(false);
+    const userSettings = useUserSettings();
 
     const sendUpdate = (req: EvChargingStationRequest) => {
         setSending(true);
@@ -118,12 +119,15 @@ export const EvChargingStation = ({
                             margin: "10px"
                         }}>
                             <Button
+                                disabled={!userSettings.userCanWrite("evCharging")}
                                 color={station.config.mode === "ON" ? 'secondary' : 'primary'}
                                 onClick={() => updateModeTo("ON")}>On</Button>
-                            <Button color={station.config.mode === "OFF" ? 'secondary' : 'primary'}
+                            <Button
+                                disabled={!userSettings.userCanWrite("evCharging")}
+                                color={station.config.mode === "OFF" ? 'secondary' : 'primary'}
                                     onClick={() => updateModeTo("OFF")}>Off</Button>
                             <Button
-
+                                disabled={!userSettings.userCanWrite("evCharging")}
                                 color={station.config.mode === "ChargeDuringCheapHours" ? 'secondary' : 'primary'}
                                 onClick={() => updateModeTo("ChargeDuringCheapHours")}
                             >Low-cost</Button>
@@ -143,12 +147,15 @@ export const EvChargingStation = ({
                             margin: "10px"
                         }}>
                             <Button
+                                disabled={!userSettings.userCanWrite("evCharging")}
                                 color={station.config.loadSharingPriority === "HIGH" ? 'secondary' : 'primary'}
                                 onClick={() => updatePriorityTo("HIGH")}>High priority</Button>
                             <Button
+                                disabled={!userSettings.userCanWrite("evCharging")}
                                 color={station.config.loadSharingPriority === "NORMAL" ? 'secondary' : 'primary'}
                                 onClick={() => updatePriorityTo("NORMAL")}>Normal priority</Button>
                             <Button
+                                disabled={!userSettings.userCanWrite("evCharging")}
                                 color={station.config.loadSharingPriority === "LOW" ? 'secondary' : 'primary'}
                                 onClick={() => updatePriorityTo("LOW")}>Low priority</Button>
                         </ButtonGroup>
@@ -168,10 +175,10 @@ export const EvChargingStation = ({
                                 margin: "10px"
                             }}>
                                 <Button
-                                    disabled={station.config.chargeRateLimit <= 6}
+                                    disabled={!userSettings.userCanWrite("evCharging") || station.config.chargeRateLimit <= 6}
                                     onClick={() => setChargeRateLimit(-1)}>-</Button>
                                 <Button
-                                    disabled={station.config.chargeRateLimit >= 32}
+                                    disabled={!userSettings.userCanWrite("evCharging") || station.config.chargeRateLimit >= 32}
                                     onClick={() => setChargeRateLimit(1)}>+</Button>
                             </ButtonGroup>
                         </Grid>
