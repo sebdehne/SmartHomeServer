@@ -42,8 +42,14 @@ class VictronEssProcess(
     override fun tickLocked(): Boolean {
         val targetProfile = calculateProfile()
 
-        if (targetProfile == ProfileType.passthrough) {
-            logger.info { "Not writing to inverter - passthrough" }
+        if (targetProfile == null) {
+            if (currentProfile != null) {
+                victronService.essMode3_setAcPowerSetPointMode(null)
+                currentProfile = null
+                logger.info { "Switching to passthrough" }
+            } else {
+                logger.info { "Not writing to victron - passthrough" }
+            }
             return true
         }
 
@@ -71,47 +77,45 @@ class VictronEssProcess(
         return true
     }
 
-    private fun calculateProfile(): ProfileType {
-        val targetProfile = when (currentOperationMode) {
-            OperationMode.passthrough -> {
-                essState = "Passthrough mode"
-                ProfileType.passthrough
-            }
-            OperationMode.manual -> {
-                essState = "Manual mode"
-                ProfileType.manual
-            }
-            OperationMode.automatic -> {
-                val energyPricesAreCheap = energyPricesAreCheap()?.atZone(zoneId)?.toLocalTime()
-                if (isSoCTooLow()) {
-                    if (energyPricesAreCheap == null) {
-                        essState = "SoC low, charging"
-                        ProfileType.autoCharging
-                    } else {
-                        essState = "SoC low, waiting: $energyPricesAreCheap"
-                        ProfileType.passthrough
-                    }
-                } else if (isSoCTooHigh()) {
-                    if (energyPricesAreCheap != null) {
-                        essState = "SoC high, waiting until $energyPricesAreCheap"
-                        ProfileType.autoDischarging
-                    } else {
-                        essState = "SoC high, energy price low"
-                        ProfileType.passthrough
-                    }
+    private fun calculateProfile() = when (currentOperationMode) {
+        OperationMode.passthrough -> {
+            essState = "Passthrough mode"
+            null
+        }
+
+        OperationMode.manual -> {
+            essState = "Manual mode"
+            ProfileType.manual
+        }
+
+        OperationMode.automatic -> {
+            val energyPricesAreCheap = energyPricesAreCheap()?.atZone(zoneId)?.toLocalTime()
+            if (isSoCTooLow()) {
+                if (energyPricesAreCheap == null) {
+                    essState = "SoC low, charging"
+                    ProfileType.autoCharging
                 } else {
-                    if (energyPricesAreCheap == null) {
-                        essState = "Energy price low, charging"
-                        ProfileType.autoCharging
-                    } else {
-                        essState = "Discharging until $energyPricesAreCheap"
-                        ProfileType.autoDischarging
-                    }
+                    essState = "SoC low, waiting: $energyPricesAreCheap"
+                    null
+                }
+            } else if (isSoCTooHigh()) {
+                if (energyPricesAreCheap != null) {
+                    essState = "SoC high, waiting until $energyPricesAreCheap"
+                    ProfileType.autoDischarging
+                } else {
+                    essState = "SoC high, energy price low"
+                    null
+                }
+            } else {
+                if (energyPricesAreCheap == null) {
+                    essState = "Energy price low, charging"
+                    ProfileType.autoCharging
+                } else {
+                    essState = "Discharging until $energyPricesAreCheap"
+                    ProfileType.autoDischarging
                 }
             }
         }
-
-        return targetProfile
     }
 
     private fun energyPricesAreCheap() = energyPriceService.mustWaitUntilV2(serviceEnergyStorage)
@@ -143,19 +147,14 @@ class VictronEssProcess(
     fun current() = ESSState(
         victronService.essValues,
         currentOperationMode,
-        currentProfile?.profileType ?: calculateProfile(),
+        currentProfile?.profileType,
         getSoCLimit(),
-        ProfileType.values().map { t ->
-            getProfile(t)
-        },
+        ProfileType.values().map { t -> getProfile(t) },
         essState
     )
 
     fun handleWrite(essWrite: ESSWrite) {
         if (essWrite.operationMode != null) {
-            if (essWrite.operationMode == OperationMode.passthrough && currentOperationMode != OperationMode.passthrough) {
-                victronService.essMode3_setAcPowerSetPointMode(null)
-            }
             currentOperationMode = essWrite.operationMode
         }
         if (essWrite.soCLimit != null) {
@@ -191,7 +190,6 @@ class VictronEssProcess(
     enum class ProfileType {
         autoCharging,
         autoDischarging,
-        passthrough,
         manual
     }
 
@@ -208,7 +206,7 @@ class VictronEssProcess(
 data class ESSState(
     val measurements: ESSValues,
     val operationMode: VictronEssProcess.OperationMode,
-    val currentProfile: VictronEssProcess.ProfileType,
+    val currentProfile: VictronEssProcess.ProfileType?,
     val soCLimit: SoCLimit,
     val profileSettings: List<VictronEssProcess.ProfileSettings>,
     val essState: String,

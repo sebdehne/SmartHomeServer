@@ -1,5 +1,5 @@
 export type OperationMode = "automatic" | "passthrough" | "manual";
-export type ProfileType = "autoCharging" | "autoDischarging" | "passthrough" | "manual"
+export type ProfileType = "autoCharging" | "autoDischarging" | "manual"
 export type ProfileSettings = {
     profileType: ProfileType;
     acPowerSetPoint: number;
@@ -9,7 +9,7 @@ export type ProfileSettings = {
 export type ESSState = {
     measurements: ESSValues;
     operationMode: OperationMode;
-    currentProfile: ProfileType;
+    currentProfile?: ProfileType;
     soCLimit: SoCLimit;
     profileSettings: ProfileSettings[];
     essState: string;
