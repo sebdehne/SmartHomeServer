@@ -4,6 +4,8 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
+import com.dehnes.smarthome.energy_pricing.PriceCategory
+import com.dehnes.smarthome.energy_pricing.priceDecision
 import com.dehnes.smarthome.environment_sensors.FirmwareDataRequest
 import com.dehnes.smarthome.environment_sensors.FirmwareHolder
 import com.dehnes.smarthome.lora.LoRaConnection
@@ -16,6 +18,7 @@ import mu.KotlinLogging
 import java.nio.ByteBuffer
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.util.*
 import java.util.concurrent.*
 import java.util.zip.CRC32
@@ -287,14 +290,19 @@ class UnderFloorHeaterService(
                 } else {
                     val targetTemperature = getTargetTemperature()
                     logger.info("Evaluating target temperature now: $targetTemperature")
-                    waitUntilCheapHour = energyPriceService.mustWaitUntilV2("HeaterUnderFloor")
+
+                    val suitablePrices =
+                        energyPriceService.findSuitablePrices("HeaterUnderFloor", LocalDate.now(DateTimeUtils.zoneId))
+                    val priceDecision = suitablePrices.priceDecision()
+
                     if (!victronService.isGridOk()) {
                         waitUntilCheapHour = Instant.MAX
                     }
-                    if (waitUntilCheapHour == null && sensorData.temperature < targetTemperature * 100) {
-                        logger.info("Setting heater to on")
+                    if (priceDecision?.current == PriceCategory.cheap && sensorData.temperature < targetTemperature * 100) {
+                        logger.info("Setting heater to on. priceDecision=$priceDecision")
                         persistenceService[HEATER_STATUS_KEY] = "on"
                     } else {
+                        waitUntilCheapHour = priceDecision?.changesAt
                         logger.info {
                             "Setting heater to off. waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
                         }

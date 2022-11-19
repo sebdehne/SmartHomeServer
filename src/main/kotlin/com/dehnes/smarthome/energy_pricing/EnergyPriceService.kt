@@ -2,23 +2,21 @@ package com.dehnes.smarthome.energy_pricing
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.utils.AbstractProcess
+import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
-import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.util.concurrent.ExecutorService
 
 interface PriceSource {
     fun getPrices(): List<Price>?
 }
 
-private const val skipPercentExpensiveHoursPrefix = "EnergyPriceService.skipPercentExpensiveHours."
-
 const val serviceEnergyStorage = "EnergyStorage"
 
 class EnergyPriceService(
-    private val clock: Clock,
     private val objectMapper: ObjectMapper,
     private val priceSource: PriceSource,
     private val influxDBClient: InfluxDBClient,
@@ -56,75 +54,69 @@ class EnergyPriceService(
         return priceCache
     }
 
-    fun getAllSettings(): List<EnergyPriceConfig> = persistenceService.getAllFor(skipPercentExpensiveHoursPrefix).map {
-        val service = it.first.replace(skipPercentExpensiveHoursPrefix, "")
+    fun getAllSettings(): List<EnergyPriceConfig> = persistenceService.getAllFor("EnergyPriceService.neutralSpan.").map {
+        val service = it.first.replace("EnergyPriceService.neutralSpan.", "")
+        val today = Instant.now().atZone(DateTimeUtils.zoneId).toLocalDate()
+        val categorizedPrices = listOf(
+            today.minusDays(1),
+            today,
+            today.plusDays(1),
+        )
+            .map { findSuitablePrices(service, it) }
+            .flatten()
         EnergyPriceConfig(
             service,
-            it.second.toInt(),
-            mustWaitUntilV2(service)
+            getNeutralSpan(service),
+            getAvgMultiplier(service),
+            categorizedPrices,
+            categorizedPrices.priceDecision()
         )
     }
 
-    fun getSkipPercentExpensiveHours(serviceType: String): Int =
-        persistenceService["$skipPercentExpensiveHoursPrefix$serviceType", "100"]!!.toInt()
+    fun getNeutralSpan(serviceType: String) =
+        persistenceService["EnergyPriceService.neutralSpan.$serviceType", "0.4"]!!.toDouble()
 
-    fun setSkipPercentExpensiveHours(serviceType: String, skipPercentExpensiveHours: Int?) {
-        if (skipPercentExpensiveHours == null) {
-            persistenceService["$skipPercentExpensiveHoursPrefix$serviceType"] = null
-        } else {
-            check(skipPercentExpensiveHours in 0..100)
-            persistenceService["$skipPercentExpensiveHoursPrefix$serviceType"] = skipPercentExpensiveHours.toString()
-        }
+    fun setNeutralSpan(serviceType: String, neutralSpan: Double) {
+        persistenceService["EnergyPriceService.neutralSpan.$serviceType"] = neutralSpan.toString()
     }
 
-    fun getPricingThreshold() = persistenceService["EnergyPriceService.pricingThreshold", "1.0"]!!.toDouble()
-    fun setPricingThreshold(threshold: Double) {
-        persistenceService["EnergyPriceService.pricingThreshold"] = threshold.toString()
+    fun getAvgMultiplier(serviceType: String) =
+        persistenceService["EnergyPriceService.avgMultiplier.$serviceType", "0"]!!.toDouble()
+
+    fun setAvgMultiplier(serviceType: String, avgMultiplier: Double) {
+        persistenceService["EnergyPriceService.avgMultiplier.$serviceType"] = avgMultiplier.toString()
     }
 
     @Synchronized
-    fun mustWaitUntilV2(serviceType: String): Instant? {
-        val skipPercentExpensiveHours = getSkipPercentExpensiveHours(serviceType)
-        check(skipPercentExpensiveHours in 0..100)
+    fun findSuitablePrices(serviceType: String, day: LocalDate): List<CategorizedPrice> {
         ensureCacheLoaded()
-        val now = Instant.now(clock)
 
-        val currentPrice = priceCache.firstOrNull { it.isValidFor(now) }
-        val pricingThreshold = getPricingThreshold()
-        if (currentPrice != null && currentPrice.price < pricingThreshold) {
-            logger.info { "Current price ${currentPrice.price} is lower than threshold $pricingThreshold" }
-            return null
-        }
+        val periodFrom = day.atStartOfDay(DateTimeUtils.zoneId).toInstant()
+        val periodUntil = (day.plusDays(1)).atStartOfDay(DateTimeUtils.zoneId).toInstant()
 
-        val futurePrices = priceCache
+        val priceRange = priceCache
             .sortedBy { it.from }
-            .filter { it.to.isAfter(now) }
+            .filter { it.from >= periodFrom }
+            .filter { it.to <= periodUntil }
 
-        val allowedHours = futurePrices
-            .sortedBy { it.price }
-            .let { sortedHours ->
-                val keep = (100 - skipPercentExpensiveHours) * sortedHours.size / 100
-                if (keep < sortedHours.size) {
-                    sortedHours.subList(0, keep)
-                } else {
-                    sortedHours
-                }
-            }
-            .sortedBy { it.from }
+        if (priceRange.isEmpty()) return emptyList()
 
-        val nextCheapHour = allowedHours.firstOrNull()
-        return when {
-            nextCheapHour == null -> {
-                val endOfKnownPrices = priceCache.maxByOrNull { it.from }?.to
-                logger.info { "No cheap enough hour available. Using endOfKnownPrices=$endOfKnownPrices" }
-                endOfKnownPrices
-            }
+        val avgRaw = priceRange.map { it.price }.average()
+        val avg = avgRaw + avgRaw * getAvgMultiplier(serviceType)
 
-            nextCheapHour.isValidFor(now) -> {
-                null
-            }
+        val neutralSpan = getNeutralSpan(serviceType)
+        val upperBound = avg + (neutralSpan / 2)
+        val lowerBound = avg - (neutralSpan / 2)
 
-            else -> nextCheapHour.from
+        return priceRange.map {
+            CategorizedPrice(
+                when {
+                    it.price > upperBound -> PriceCategory.expensive
+                    it.price <= lowerBound -> PriceCategory.cheap
+                    else -> PriceCategory.neutral
+                },
+                it
+            )
         }
     }
 
@@ -149,6 +141,53 @@ class EnergyPriceService(
 
 data class EnergyPriceConfig(
     val service: String,
-    val skipPercentExpensiveHours: Int,
-    val mustWaitUntil: Instant?
+    val neutralSpan: Double,
+    val avgMultiplier: Double,
+    val categorizedPrices: List<CategorizedPrice>,
+    val priceDecision: PriceDecision?,
 )
+
+enum class PriceCategory {
+    cheap,
+    neutral,
+    expensive
+}
+
+data class CategorizedPrice(
+    val category: PriceCategory,
+    val price: Price,
+)
+
+fun List<CategorizedPrice>.priceDecision(): PriceDecision? {
+    val now = Instant.now()
+    if (isEmpty()) return null
+    val i = this.indexOfFirst {
+        it.price.isValidFor(now)
+    }
+    if (i < 0) return null
+    val categorizedPrice = this[i]
+    val future = this.subList(i, this.size)
+    val changesAtIndex = future.indexOfFirst { it.category != categorizedPrice.category }
+    val changesAt = if (changesAtIndex < 0) {
+        this.last().price.to
+    } else {
+        future[changesAtIndex].price.from
+    }
+    val changesInto = if (changesAtIndex < 0) {
+        PriceCategory.neutral
+    } else {
+        future[changesAtIndex].category
+    }
+    return PriceDecision(
+        categorizedPrice.category,
+        changesAt,
+        changesInto
+    )
+}
+
+data class PriceDecision(
+    val current: PriceCategory,
+    val changesAt: Instant,
+    val changesInto: PriceCategory
+)
+

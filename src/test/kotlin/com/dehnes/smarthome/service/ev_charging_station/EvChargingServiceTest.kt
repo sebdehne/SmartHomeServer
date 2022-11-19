@@ -3,7 +3,10 @@ package com.dehnes.smarthome.service.ev_charging_station
 import com.dehnes.smarthome.api.dtos.EvChargingMode
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
+import com.dehnes.smarthome.energy_pricing.CategorizedPrice
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
+import com.dehnes.smarthome.energy_pricing.Price
+import com.dehnes.smarthome.energy_pricing.PriceCategory
 import com.dehnes.smarthome.ev_charging.*
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.PersistenceService
@@ -23,7 +26,6 @@ import kotlin.test.assertFalse
 internal class EvChargingServiceTest {
 
     var time = Instant.now()
-    var mustWaitUntil: Instant? = null
     val energyPriceService = mockk<EnergyPriceService>()
     val executorService = mockk<ExecutorService>()
     val persistenceService = mockk<PersistenceService>()
@@ -39,9 +41,16 @@ internal class EvChargingServiceTest {
 
     init {
         every {
-            energyPriceService.mustWaitUntilV2(any<String>())
+            energyPriceService.findSuitablePrices(any(), any())
         } answers {
-            mustWaitUntil
+            listOf(CategorizedPrice(
+                PriceCategory.cheap,
+                Price(
+                    Instant.parse("2010-01-01T00:00:00Z"),
+                    Instant.parse("2050-01-01T00:00:00Z"),
+                    0.0
+                )
+            ))
         }
 
         val slot = slot<Runnable>()
@@ -55,10 +64,7 @@ internal class EvChargingServiceTest {
         val keySlot = slot<String>()
         val defaultSlot = slot<String>()
         every {
-            persistenceService.get(
-                capture(keySlot),
-                capture(defaultSlot)
-            )
+            persistenceService[capture(keySlot), capture(defaultSlot)]
         } answers {
             val key = keySlot.captured
             if (key.startsWith("EvChargingService.client.mode.")) {
@@ -381,7 +387,10 @@ internal class EvChargingServiceTest {
         repeat(times) {
             time = time.plusSeconds(secondsToAdd)
             allChargingsStations.forEach { (_, u) ->
-                evChargingService.onIncomingDataUpdate(u.evChargingStationClient, u.toData(clockMock.millis()))
+                val timestamp = clockMock.millis()
+                val dataResponse = u.toData(timestamp)
+                val evChargingStationClient = u.evChargingStationClient
+                evChargingService.onIncomingDataUpdate(evChargingStationClient, dataResponse)
             }
         }
     }

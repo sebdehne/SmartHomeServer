@@ -33,6 +33,15 @@ fun readInt32Bits(buf: ByteArray, offset: Int): Int {
     return byteBuffer.getInt(0)
 }
 
+fun readInt16Bits(buf: ByteArray, offset: Int): Int {
+    val byteBuffer = ByteBuffer.allocate(4)
+    byteBuffer.put(0)
+    byteBuffer.put(0)
+    byteBuffer.put(buf, offset, 2)
+    byteBuffer.flip()
+    return byteBuffer.getInt(0)
+}
+
 fun readLong32Bits(buf: ByteArray, offset: Int): Long {
     val byteBuffer = ByteBuffer.allocate(8)
     byteBuffer.put(buf, offset, 4)

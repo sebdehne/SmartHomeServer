@@ -2,16 +2,20 @@ package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
+import com.dehnes.smarthome.energy_pricing.PriceCategory
+import com.dehnes.smarthome.energy_pricing.priceDecision
 import com.dehnes.smarthome.ev_charging.ChargingState.*
 import com.dehnes.smarthome.users.SystemUser
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
+import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
 import java.lang.Integer.min
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import kotlin.math.ceil
@@ -224,7 +228,9 @@ class EvChargingService(
         val getReasonCannotCharge = {
             val mode = getMode(clientId)
             val gridOk = victronService.isGridOk()
-            val nextCheapHour = energyPriceService.mustWaitUntilV2("EvCharger$clientId")
+            val suitablePrices =
+                energyPriceService.findSuitablePrices("EvCharger$clientId", LocalDate.now(DateTimeUtils.zoneId))
+            val priceDecision = suitablePrices.priceDecision()
             var reasonCannotCharge: String? = null
 
             when {
@@ -236,8 +242,8 @@ class EvChargingService(
                     reasonCannotCharge = "Grid is offline"
                 }
 
-                mode == EvChargingMode.ChargeDuringCheapHours && nextCheapHour != null -> {
-                    reasonCannotCharge = "starting @ " + nextCheapHour.atZone(clock.zone).toLocalTime()
+                mode == EvChargingMode.ChargeDuringCheapHours && (priceDecision?.current != PriceCategory.cheap) -> {
+                    reasonCannotCharge = "starting @ " + priceDecision?.changesAt?.atZone(clock.zone)?.toLocalTime()
                 }
             }
 

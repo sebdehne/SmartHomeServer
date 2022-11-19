@@ -141,28 +141,32 @@ class WebSocketServer : Endpoint() {
 
             garageRequest -> RpcResponse(garageResponse = garageRequest(rpcRequest.garageRequest!!, userEmail))
             underFloorHeaterRequest -> RpcResponse(underFloorHeaterResponse = underFloorHeaterRequest(rpcRequest.underFloorHeaterRequest!!))
-            evChargingStationRequest -> RpcResponse(evChargingStationResponse = evChargingStationRequest(userEmail, rpcRequest.evChargingStationRequest!!))
+            evChargingStationRequest -> RpcResponse(
+                evChargingStationResponse = evChargingStationRequest(
+                    userEmail,
+                    rpcRequest.evChargingStationRequest!!
+                )
+            )
+
             environmentSensorRequest -> RpcResponse(environmentSensorResponse = environmentSensorRequest(rpcRequest.environmentSensorRequest!!))
             RequestType.videoBrowser -> RpcResponse(videoBrowserResponse = videoBrowser.rpc(rpcRequest.videoBrowserRequest!!))
             readEnergyPricingSettings -> RpcResponse(
                 energyPricingSettingsRead = EnergyPricingSettingsRead(
                     energyPriceService.getAllSettings(),
-                    energyPriceService.getPricingThreshold()
                 )
             )
 
             writeEnergyPricingSettings -> {
-                val energyPricingSettingsWrite = rpcRequest.energyPricingSettingsWrite!!
-                if (energyPricingSettingsWrite.pricingThreshold != null) {
-                    energyPriceService.setPricingThreshold(energyPricingSettingsWrite.pricingThreshold)
+                val req = rpcRequest.energyPricingSettingsWrite!!
+                if (req.neutralSpan != null) {
+                    energyPriceService.setNeutralSpan(req.service, req.neutralSpan)
                 }
-                energyPricingSettingsWrite.serviceToSkipPercentExpensiveHours.entries.forEach { (service, percentage) ->
-                    energyPriceService.setSkipPercentExpensiveHours(service, percentage)
+                if (req.avgMultiplier != null) {
+                    energyPriceService.setAvgMultiplier(req.service, req.avgMultiplier)
                 }
                 RpcResponse(
                     energyPricingSettingsRead = EnergyPricingSettingsRead(
                         energyPriceService.getAllSettings(),
-                        energyPriceService.getPricingThreshold()
                     )
                 )
             }
@@ -239,7 +243,11 @@ class WebSocketServer : Endpoint() {
         )
 
         EvChargingStationRequestType.setLoadSharingPriority -> EvChargingStationResponse(
-            configUpdated = evChargingService.setPriorityFor(user, request.clientId!!, request.newLoadSharingPriority!!),
+            configUpdated = evChargingService.setPriorityFor(
+                user,
+                request.clientId!!,
+                request.newLoadSharingPriority!!
+            ),
             chargingStationsDataAndConfig = evChargingService.getChargingStationsDataAndConfig(user)
         )
 

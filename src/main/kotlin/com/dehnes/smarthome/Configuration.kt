@@ -52,7 +52,6 @@ class Configuration {
         val clock = Clock.system(DateTimeUtils.zoneId)
 
         val energyPriceService = EnergyPriceService(
-            clock,
             objectMapper,
             priceSource,
             influxDBClient,

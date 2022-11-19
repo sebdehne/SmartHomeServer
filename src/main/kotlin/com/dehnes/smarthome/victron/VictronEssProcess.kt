@@ -2,6 +2,8 @@ package com.dehnes.smarthome.victron
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
+import com.dehnes.smarthome.energy_pricing.PriceCategory
+import com.dehnes.smarthome.energy_pricing.priceDecision
 import com.dehnes.smarthome.energy_pricing.serviceEnergyStorage
 import com.dehnes.smarthome.utils.AbstractProcess
 import com.dehnes.smarthome.utils.DateTimeUtils.zoneId
@@ -11,6 +13,7 @@ import com.dehnes.smarthome.victron.VictronEssCalculation.calculateAcPowerSetPoi
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import mu.KotlinLogging
+import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -89,36 +92,33 @@ class VictronEssProcess(
         }
 
         OperationMode.automatic -> {
-            val energyPricesAreCheap = energyPricesAreCheap()?.atZone(zoneId)?.toLocalTime()
-            if (isSoCTooLow()) {
-                if (energyPricesAreCheap == null) {
-                    essState = "SoC low, charging"
-                    ProfileType.autoCharging
-                } else {
-                    essState = "SoC low, waiting: $energyPricesAreCheap"
-                    null
-                }
-            } else if (isSoCTooHigh()) {
-                if (energyPricesAreCheap != null) {
-                    essState = "SoC high, waiting until $energyPricesAreCheap"
-                    ProfileType.autoDischarging
-                } else {
-                    essState = "SoC high, energy price low"
-                    null
-                }
+
+            val suitablePrices = energyPriceService.findSuitablePrices(serviceEnergyStorage, LocalDate.now(zoneId))
+            val priceDecision = suitablePrices.priceDecision()
+
+            if (priceDecision == null) {
+                essState = "No prices"
+                null
             } else {
-                if (energyPricesAreCheap == null) {
-                    essState = "Energy price low, charging"
-                    ProfileType.autoCharging
-                } else {
-                    essState = "Discharging until $energyPricesAreCheap"
-                    ProfileType.autoDischarging
+                essState = "${priceDecision.current} until ${priceDecision.changesAt.atZone(zoneId).toLocalTime()}"
+                when (priceDecision.current) {
+                    PriceCategory.expensive -> if (isSoCTooLow()) {
+                        null
+                    } else {
+                        ProfileType.autoDischarging
+                    }
+
+                    PriceCategory.neutral -> null
+
+                    PriceCategory.cheap -> if (isSoCTooHigh()) {
+                        null
+                    } else {
+                        ProfileType.autoCharging
+                    }
                 }
             }
         }
     }
-
-    private fun energyPricesAreCheap() = energyPriceService.mustWaitUntilV2(serviceEnergyStorage)
 
     private fun isSoCTooLow(): Boolean {
         val soc = victronService.current().soc.toInt()
