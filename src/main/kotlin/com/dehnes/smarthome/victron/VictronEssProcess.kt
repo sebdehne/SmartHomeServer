@@ -242,6 +242,7 @@ fun main() {
         println("L2: IN=" + current.gridL2.power.toLong() + " OUT=" + current.outputL2.power.toLong())
         println("L3: IN=" + current.gridL3.power.toLong() + " OUT=" + current.outputL3.power.toLong())
         println("Battery: " + current.batteryPower)
+        println("oldestUpdatedField: " + current.getOldestUpdatedField())
 
         victronService.essMode3_setAcPowerSetPointMode(
             VictronEssCalculation.VictronEssCalculationResult(

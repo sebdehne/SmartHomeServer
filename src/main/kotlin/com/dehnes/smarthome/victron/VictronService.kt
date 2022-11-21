@@ -14,6 +14,7 @@ import com.hivemq.client.internal.mqtt.message.subscribe.MqttSubscription
 import com.hivemq.client.internal.util.collections.ImmutableList
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.datatypes.MqttQos
+import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5RetainHandling
 import mu.KotlinLogging
 import java.net.InetSocketAddress
@@ -24,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 
 
 class VictronService(
@@ -44,6 +46,7 @@ class VictronService(
         .initialDelay(1, TimeUnit.SECONDS)
         .maxDelay(5, TimeUnit.SECONDS)
         .applyAutomaticReconnect()
+        .addConnectedListener { resubscribe() }
         .buildAsync()
 
     val listeners = ConcurrentHashMap<String, (data: ESSValues) -> Unit>()
@@ -58,8 +61,42 @@ class VictronService(
         val logger = KotlinLogging.logger { }
     }
 
+    val lock = ReentrantLock()
+
     init {
+        scheduledExecutorService.scheduleAtFixedRate({
+            executorService.submit {
+
+                lock.tryLock()
+                try {
+                    val oldestUpdatedField = essValues.getOldestUpdatedField()
+                    if (oldestUpdatedField == null || oldestUpdatedField.second.isBefore(
+                            Instant.now().minusSeconds(60 * 5)
+                        )
+                    ) {
+                        logger.warn { "Need to re-connect. oldestUpdatedField=$oldestUpdatedField" }
+                        reconnect()
+                    }
+
+                    send(topic(TopicType.read, "/system/0/Serial"))
+                    send(topic(TopicType.read, "/system/0/SystemState/State"))
+
+                    send(topic(TopicType.read, "/vebus/276/Hub4/L1/AcPowerSetpoint"))
+                    send(topic(TopicType.read, "/vebus/276/Hub4/L2/AcPowerSetpoint"))
+                    send(topic(TopicType.read, "/vebus/276/Hub4/L3/AcPowerSetpoint"))
+                } finally {
+                    lock.unlock()
+                }
+            }
+        }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
+    }
+
+    fun reconnect() {
+        asyncClient.disconnect()
         asyncClient.connect().get(20, TimeUnit.SECONDS)
+    }
+
+    fun resubscribe() {
         asyncClient.subscribe(
             MqttSubscribe(
                 ImmutableList.of(
@@ -72,50 +109,42 @@ class VictronService(
                     )
                 ),
                 MqttUserPropertiesImpl.NO_USER_PROPERTIES
-            )
-        ) {
-            val body = it.payload.orElse(null)?.let {
-                Charsets.UTF_8.decode(it)
-            }?.toString() ?: "{}"
-            val jsonRaw = objectMapper.readValue<Map<String, Any>>(body)
+            ), this::onMqttMessage
+        )
+    }
 
-            synchronized(this) {
-                essValues = essValues.update(
-                    getPortalId(),
-                    it.topic.toString(),
-                    jsonRaw
-                )
-                if (lastNotify < (System.currentTimeMillis() - delayInMs)) {
-                    lastNotify = System.currentTimeMillis()
-                    logger.info { "sending notify $essValues listeners=${listeners.size}" }
-                    executorService.submit {
-                        val c = essValues
-                        influxDBClient.recordSensorData(
-                            c.toInfluxDBRecord()
-                        )
-                    }
-                    executorService.submit {
-                        listeners.forEach {
-                            it.value(essValues)
-                        }
+    fun onMqttMessage(msg: Mqtt5Publish) {
+        val body = msg.payload.orElse(null)?.let {
+            Charsets.UTF_8.decode(it)
+        }?.toString() ?: "{}"
+        val jsonRaw = objectMapper.readValue<Map<String, Any>>(body)
+
+        synchronized(this) {
+            essValues = essValues.update(
+                getPortalId(),
+                msg.topic.toString(),
+                jsonRaw
+            )
+            if (lastNotify < (System.currentTimeMillis() - delayInMs)) {
+                lastNotify = System.currentTimeMillis()
+                logger.info { "sending notify $essValues listeners=${listeners.size}" }
+                executorService.submit {
+                    val c = essValues
+                    influxDBClient.recordSensorData(
+                        c.toInfluxDBRecord()
+                    )
+                }
+                executorService.submit {
+                    listeners.forEach {
+                        it.value(essValues)
                     }
                 }
             }
-        }.get()
-
-        scheduledExecutorService.scheduleAtFixedRate({
-            executorService.submit {
-                send(topic(TopicType.read, "/system/0/Serial"))
-                send(topic(TopicType.read, "/system/0/SystemState/State"))
-
-                send(topic(TopicType.read, "/vebus/276/Hub4/L1/AcPowerSetpoint"))
-                send(topic(TopicType.read, "/vebus/276/Hub4/L2/AcPowerSetpoint"))
-                send(topic(TopicType.read, "/vebus/276/Hub4/L3/AcPowerSetpoint"))
-            }
-        }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
+        }
     }
 
-    private fun getPortalId() = persistenceService["VictronService.portalId"] ?: error("VictronService.portalId not configured")
+    private fun getPortalId() =
+        persistenceService["VictronService.portalId"] ?: error("VictronService.portalId not configured")
 
     fun current() = essValues
 
@@ -257,6 +286,8 @@ data class ESSValues(
     val inverterAlarms: List<InverterAlarms> = emptyList(),
     val batteryAlarm: Int = 0,
     val batteryAlarms: List<BatteryAlarms> = emptyList(),
+
+    val lastUpdateReceived: Map<String, Instant> = emptyMap()
 ) {
 
     fun toInfluxDBRecord() = InfluxDBRecord(
@@ -279,6 +310,8 @@ data class ESSValues(
         mapOf()
     )
 
+    fun getOldestUpdatedField() = lastUpdateReceived.entries.maxByOrNull { it.value }?.let { it.key to it.value }
+
     fun isGridOk() = listOf(
         gridL1,
         gridL2,
@@ -290,37 +323,83 @@ data class ESSValues(
 
         val any = json["value"]
 
-        return when (topic) {
-            "/system/0/Dc/Battery/Soc" -> this.copy(soc = doubleValue(any))
+        val updated = this.copy(
+            lastUpdateReceived = this.lastUpdateReceived + (topic to Instant.now())
+        )
 
-            "/system/0/Dc/Battery/Current" -> this.copy(batteryCurrent = doubleValue(any))
-            "/system/0/Dc/Battery/Power" -> this.copy(batteryPower = doubleValue(any))
-            "/system/0/Dc/Battery/Voltage" -> this.copy(batteryVoltage = doubleValue(any))
-            "/vebus/276/Ac/ActiveIn/P" -> this.copy(gridPower = doubleValue(any))
-            "/vebus/276/Ac/Out/P" -> this.copy(outputPower = doubleValue(any))
+        return when (topic) {
+            "/system/0/Dc/Battery/Soc" -> updated.copy(soc = doubleValue(any))
+
+            "/system/0/Dc/Battery/Current" -> updated.copy(batteryCurrent = doubleValue(any))
+            "/system/0/Dc/Battery/Power" -> updated.copy(batteryPower = doubleValue(any))
+            "/system/0/Dc/Battery/Voltage" -> updated.copy(batteryVoltage = doubleValue(any))
+            "/vebus/276/Ac/ActiveIn/P" -> updated.copy(gridPower = doubleValue(any))
+            "/vebus/276/Ac/Out/P" -> updated.copy(outputPower = doubleValue(any))
             "/system/0/SystemState/State" -> {
                 val v = intValue(any)
                 val systemState1 = SystemState.values().firstOrNull { it.value == v } ?: SystemState.Unknown
-                this.copy(systemState = systemState1)
+                updated.copy(systemState = systemState1)
             }
 
             "/vebus/276/Mode" -> {
                 val v = intValue(any)
-                this.copy(mode = Mode.values().firstOrNull { it.value == v } ?: Mode.Unknown)
+                updated.copy(mode = Mode.values().firstOrNull { it.value == v } ?: Mode.Unknown)
             }
 
-            "/battery/0/Alarms/Alarm" -> this.copy(batteryAlarm = intValue(any))
+            "/battery/0/Alarms/Alarm" -> updated.copy(batteryAlarm = intValue(any))
 
             else -> {
                 when {
-                    topicIn.contains("/vebus/276/Ac/ActiveIn/L1") -> this.copy(gridL1 = gridL1.update(portalId, topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/ActiveIn/L2") -> this.copy(gridL2 = gridL2.update(portalId, topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/ActiveIn/L3") -> this.copy(gridL3 = gridL3.update(portalId, topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/Out/L1") -> this.copy(outputL1 = outputL1.update(portalId, topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/Out/L2") -> this.copy(outputL2 = outputL2.update(portalId, topicIn, json))
-                    topicIn.contains("/vebus/276/Ac/Out/L3") -> this.copy(outputL3 = outputL3.update(portalId, topicIn, json))
-                    topicIn.contains("/vebus/276/Alarms") -> this.updateInverterAlarms(portalId, topicIn, json)
-                    topicIn.contains("/battery/0/Alarms") -> this.updateBatteryAlarms(portalId, topicIn, json)
+                    topicIn.contains("/vebus/276/Ac/ActiveIn/L1") -> updated.copy(
+                        gridL1 = gridL1.update(
+                            portalId,
+                            topicIn,
+                            json
+                        )
+                    )
+
+                    topicIn.contains("/vebus/276/Ac/ActiveIn/L2") -> updated.copy(
+                        gridL2 = gridL2.update(
+                            portalId,
+                            topicIn,
+                            json
+                        )
+                    )
+
+                    topicIn.contains("/vebus/276/Ac/ActiveIn/L3") -> updated.copy(
+                        gridL3 = gridL3.update(
+                            portalId,
+                            topicIn,
+                            json
+                        )
+                    )
+
+                    topicIn.contains("/vebus/276/Ac/Out/L1") -> updated.copy(
+                        outputL1 = outputL1.update(
+                            portalId,
+                            topicIn,
+                            json
+                        )
+                    )
+
+                    topicIn.contains("/vebus/276/Ac/Out/L2") -> updated.copy(
+                        outputL2 = outputL2.update(
+                            portalId,
+                            topicIn,
+                            json
+                        )
+                    )
+
+                    topicIn.contains("/vebus/276/Ac/Out/L3") -> updated.copy(
+                        outputL3 = outputL3.update(
+                            portalId,
+                            topicIn,
+                            json
+                        )
+                    )
+
+                    topicIn.contains("/vebus/276/Alarms") -> updated.updateInverterAlarms(portalId, topicIn, json)
+                    topicIn.contains("/battery/0/Alarms") -> updated.updateBatteryAlarms(portalId, topicIn, json)
                     else -> {
                         this
                     }
