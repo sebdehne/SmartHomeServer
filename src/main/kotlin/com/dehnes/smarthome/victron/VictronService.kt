@@ -40,7 +40,10 @@ class VictronService(
         .identifier(UUID.randomUUID().toString())
         .serverAddress(InetSocketAddress(victronHost, 1883))
         .useMqttVersion5()
-        .automaticReconnectWithDefaultConfig()
+        .automaticReconnect()
+        .initialDelay(1, TimeUnit.SECONDS)
+        .maxDelay(5, TimeUnit.SECONDS)
+        .applyAutomaticReconnect()
         .buildAsync()
 
     val listeners = ConcurrentHashMap<String, (data: ESSValues) -> Unit>()
@@ -156,7 +159,7 @@ class VictronService(
             MqttWillPublish(
                 MqttTopicImpl.of(topic),
                 msg?.let { ByteBuffer.wrap(it) },
-                MqttQos.AT_MOST_ONCE,
+                MqttQos.AT_LEAST_ONCE,
                 false,
                 1000,
                 null,
