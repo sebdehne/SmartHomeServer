@@ -1,6 +1,7 @@
 package com.dehnes.smarthome.victron
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.PriceCategory
 import com.dehnes.smarthome.energy_pricing.priceDecision
@@ -227,12 +228,14 @@ fun main() {
     val executorService = Executors.newCachedThreadPool()
     val objectMapper = jacksonObjectMapper().registerModule(kotlinModule())
     val persistenceService = PersistenceService(objectMapper)
+    val influxDBClient = InfluxDBClient(persistenceService, objectMapper)
     val victronService = VictronService(
         "192.168.1.18",
         objectMapper,
         executorService,
         persistenceService,
-        InfluxDBClient(persistenceService, objectMapper)
+        influxDBClient,
+        EnergyConsumptionService(influxDBClient)
     )
 
     while (true) {

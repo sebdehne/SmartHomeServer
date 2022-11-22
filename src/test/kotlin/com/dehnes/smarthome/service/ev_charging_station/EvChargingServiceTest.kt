@@ -141,6 +141,7 @@ internal class EvChargingServiceTest {
         ),
         victronService,
         userSettingsService,
+        mockk(relaxed = true)
     )
 
     @Test

@@ -2,6 +2,7 @@ package com.dehnes.smarthome.victron
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
+import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -34,7 +35,8 @@ class VictronService(
     private val executorService: ExecutorService,
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
-) {
+    private val energyConsumptionService: EnergyConsumptionService,
+    ) {
 
     val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
@@ -135,6 +137,11 @@ class VictronService(
                     )
                 }
                 executorService.submit {
+                    energyConsumptionService.reportPower(
+                        "HomeBattery",
+                        essValues.batteryPower
+                    )
+
                     listeners.forEach {
                         it.value(essValues)
                     }

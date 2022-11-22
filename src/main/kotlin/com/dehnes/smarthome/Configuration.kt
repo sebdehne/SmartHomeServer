@@ -2,6 +2,7 @@ package com.dehnes.smarthome
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
+import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
@@ -48,6 +49,7 @@ class Configuration {
         val priceSource = HvakosterstrommenClient(objectMapper)
 
         val influxDBClient = InfluxDBClient(persistenceService, objectMapper)
+        val energyConsumptionService = EnergyConsumptionService(influxDBClient)
 
         val clock = Clock.system(DateTimeUtils.zoneId)
 
@@ -85,7 +87,8 @@ class Configuration {
             objectMapper,
             executorService,
             persistenceService,
-            influxDBClient
+            influxDBClient,
+            energyConsumptionService
         )
 
         val evChargingService = EvChargingService(
@@ -98,7 +101,8 @@ class Configuration {
                 PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clock)
             ),
             victronService,
-            userSettingsService
+            userSettingsService,
+            energyConsumptionService
         )
         evChargingService.start()
 
@@ -132,6 +136,7 @@ class Configuration {
             energyPriceService,
             clock,
             victronService,
+            energyConsumptionService
         )
         heaterService.start()
 

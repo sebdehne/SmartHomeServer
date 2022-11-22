@@ -3,6 +3,7 @@ package com.dehnes.smarthome.heating
 import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
+import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.PriceCategory
 import com.dehnes.smarthome.energy_pricing.priceDecision
@@ -36,9 +37,11 @@ class UnderFloorHeaterService(
     private val energyPriceService: EnergyPriceService,
     private val clock: Clock,
     private val victronService: VictronService,
+    private val energyConsumptionService: EnergyConsumptionService,
 ) : AbstractProcess(executorService, 42) {
 
     private val loRaAddr = 18
+    private val serviceType = "HeaterUnderFloor"
 
     @Volatile
     private var keyId: Int = 1
@@ -292,7 +295,7 @@ class UnderFloorHeaterService(
                     logger.info("Evaluating target temperature now: $targetTemperature")
 
                     val suitablePrices =
-                        energyPriceService.findSuitablePrices("HeaterUnderFloor", LocalDate.now(DateTimeUtils.zoneId))
+                        energyPriceService.findSuitablePrices(serviceType, LocalDate.now(DateTimeUtils.zoneId))
                     val priceDecision = suitablePrices.priceDecision()
 
                     if (!victronService.isGridOk()) {
@@ -316,22 +319,30 @@ class UnderFloorHeaterService(
 
         // bring the heater to the desired state
         val executionResult = if (sensorData.heaterIsOn && "off" == getConfiguredHeaterTarget()) {
-            if (sendOffCommand()) {
+            if (sendCommand(LoRaPacketType.HEATER_OFF_REQUEST)) {
                 heaterStatus = false
                 true
             } else {
+                logger.warn { "No response" }
                 false
             }
         } else if (!sensorData.heaterIsOn && "on" == getConfiguredHeaterTarget()) {
-            if (sendOnCommand()) {
+            if (sendCommand(LoRaPacketType.HEATER_ON_REQUEST)) {
                 heaterStatus = true
                 true
             } else {
+                logger.warn { "No response" }
                 false
             }
         } else {
+            logger.info { "Nothing to do, heater already in desired state" }
             true
         }
+
+        energyConsumptionService.reportPower(
+            serviceType,
+            (if (heaterStatus) 5000 else 0).toDouble()
+        )
 
         lastStatus = UnderFloorHeaterStatus(
             mode = UnderFloorHeaterMode.values().first { it.mode == currentMode },
@@ -439,40 +450,20 @@ class UnderFloorHeaterService(
         )
     }
 
-    private fun sendOnCommand(): Boolean {
-        var sent = false
+    private fun sendCommand(cmd: LoRaPacketType): Boolean {
         receiveQueue.clear()
         val ct = CountDownLatch(1)
         loRaConnection.send(
             keyId,
             loRaAddr,
-            LoRaPacketType.HEATER_ON_REQUEST,
+            cmd,
             byteArrayOf(),
             null
         ) {
-            sent = it
             ct.countDown()
         }
 
-        return sent && receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.HEATER_RESPONSE
-    }
-
-    private fun sendOffCommand(): Boolean {
-        var sent = false
-        receiveQueue.clear()
-        val ct = CountDownLatch(1)
-        loRaConnection.send(
-            keyId,
-            loRaAddr,
-            LoRaPacketType.HEATER_OFF_REQUEST,
-            byteArrayOf(),
-            null
-        ) {
-            sent = it
-            ct.countDown()
-        }
-
-        return sent && receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.HEATER_RESPONSE
+        return ct.await(10, TimeUnit.SECONDS) && receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.HEATER_RESPONSE
     }
 
     private fun getCurrentMode() = Mode.valueOf(

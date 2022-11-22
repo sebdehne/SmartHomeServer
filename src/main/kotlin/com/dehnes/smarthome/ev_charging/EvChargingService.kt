@@ -1,6 +1,7 @@
 package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.*
+import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.PriceCategory
 import com.dehnes.smarthome.energy_pricing.priceDecision
@@ -73,6 +74,7 @@ class EvChargingService(
     private val loadSharingAlgorithms: Map<String, LoadSharing>,
     private val victronService: VictronService,
     private val userSettingsService: UserSettingsService,
+    private val energyConsumptionService: EnergyConsumptionService,
 ) {
     private val listeners = ConcurrentHashMap<String, (EvChargingEvent) -> Unit>()
     private val currentData = ConcurrentHashMap<String, InternalState>()
@@ -98,6 +100,9 @@ class EvChargingService(
                 EventType.clientData -> {
                     onIncomingDataUpdate(event.evChargingStationClient, event.clientData!!)?.let { updatedState ->
                         executorService.submit {
+
+                            recordPower(updatedState)
+
                             listeners.forEach { (_, fn) ->
                                 fn(
                                     EvChargingEvent(
@@ -112,6 +117,30 @@ class EvChargingService(
 
                 else -> logger.debug { "Ignored ${event.eventType}" }
             }
+        }
+    }
+
+    private fun recordPower(updatedState: InternalState) {
+        if (updatedState.isCharging()) {
+            val ampsL1 = updatedState.dataResponse.phase1Milliamps.toDouble() / 1000
+            val ampsL2 = updatedState.dataResponse.phase2Milliamps.toDouble() / 1000
+            val ampsL3 = updatedState.dataResponse.phase3Milliamps.toDouble() / 1000
+            val totalAmps = listOfNotNull(
+                if (ampsL1 > 2) ampsL1 else 0.0,
+                if (ampsL2 > 2) ampsL2 else 0.0,
+                if (ampsL3 > 2) ampsL3 else 0.0,
+            ).sum()
+
+            energyConsumptionService.reportPower(
+                "EvCharger${updatedState.clientId}",
+                totalAmps * 230
+            )
+
+        } else {
+            energyConsumptionService.reportPower(
+                "EvCharger${updatedState.clientId}",
+                0.0
+            )
         }
     }
 
