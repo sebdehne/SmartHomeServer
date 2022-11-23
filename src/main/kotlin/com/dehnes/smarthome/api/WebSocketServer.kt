@@ -5,6 +5,7 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
 import com.dehnes.smarthome.datalogging.QuickStatsService
+import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
@@ -50,6 +51,8 @@ class WebSocketServer : Endpoint() {
         configuration.getBean<EnergyPriceService>(EnergyPriceService::class)
     private val userSettingsService =
         configuration.getBean<UserSettingsService>(UserSettingsService::class)
+    private val energyConsumptionService =
+        configuration.getBean<EnergyConsumptionService>(EnergyConsumptionService::class)
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info("$instanceId Socket connected: $sess")
@@ -83,6 +86,7 @@ class WebSocketServer : Endpoint() {
             }
 
             quickStats -> RpcResponse(quickStatsResponse = quickStatsService.getStats())
+            energyConsumptionQuery -> RpcResponse(energyConsumptionData = energyConsumptionService.report(rpcRequest.energyConsumptionQuery!!))
             subscribe -> {
                 val subscribe = rpcRequest.subscribe!!
                 val subscriptionId = subscribe.subscriptionId

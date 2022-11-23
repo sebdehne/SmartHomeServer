@@ -11,6 +11,8 @@ class PersistenceService(
 ) {
     private val filenameJson = System.getProperty("STORAGE_FILE_NAME", "properties.json")
 
+    fun inDevMode() = this["devMode", "false"].toBoolean()
+
     @Synchronized
     operator fun get(key: String?, persistDefaultValue: String? = null): String? {
         val properties = loadJsonProperties(filenameJson)

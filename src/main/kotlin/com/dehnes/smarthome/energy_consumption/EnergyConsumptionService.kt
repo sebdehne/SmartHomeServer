@@ -1,7 +1,9 @@
 package com.dehnes.smarthome.energy_consumption
 
+import com.dehnes.smarthome.Configuration
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
+import com.dehnes.smarthome.utils.PersistenceService
 import java.time.Instant
 
 data class PowerPeriodeStart(
@@ -53,5 +55,63 @@ class EnergyConsumptionService(
         }
     }
 
+    fun report(query: EnergyConsumptionQuery): EnergyConsumptionData {
+
+        val data = influxDBClient.query(
+            """
+            from(bucket: "sensor_data")
+                |> range(start: ${query.start}, stop: ${query.stop})
+                |> filter(fn: (r) => r["_measurement"] == "energyConsumptions")
+                |> filter(fn: (r) => r["_field"] == "consumedInWattHours")
+                |> sum()
+        """.trimIndent()
+        )
+
+        fun getValueFor(consumerId: String): Double {
+            return data.firstOrNull { it.tags["consumerId"] == consumerId }?.value ?: 0.0
+        }
+
+        val houseKnownConsumers = data
+            .filterNot { it.tags["consumerId"]!! in listOf("Grid", "HomeBattery", "HouseTotal") }
+            .associate { it.tags["consumerId"]!! to it.value }
+
+        val houseTotal = getValueFor("HouseTotal")
+        val rest = houseTotal - houseKnownConsumers.values.sum()
+
+        return EnergyConsumptionData(
+            getValueFor("Grid"),
+            getValueFor("HomeBattery"),
+            houseTotal,
+            houseKnownConsumers + ("Other" to rest),
+        )
+    }
+
 }
 
+data class EnergyConsumptionQuery(
+    val start: Instant,
+    val stop: Instant,
+)
+
+data class EnergyConsumptionData(
+    val grid: Double,
+    val battery: Double,
+    val houseTotal: Double,
+    val houseKnownConsumers: Map<String, Double>
+)
+
+
+fun main() {
+    val objectMapper = Configuration().objectMapper()
+    val persistenceService = PersistenceService(objectMapper)
+    val influxDBClient = InfluxDBClient(persistenceService)
+    val energyConsumptionService = EnergyConsumptionService(influxDBClient)
+    val report = energyConsumptionService.report(
+        EnergyConsumptionQuery(
+            Instant.parse("2019-08-28T22:00:00Z"),
+            Instant.parse("2023-08-28T22:00:00Z"),
+        )
+    )
+
+    println(report)
+}

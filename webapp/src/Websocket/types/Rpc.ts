@@ -5,7 +5,12 @@ import { EvChargingStationRequest, EvChargingStationResponse } from "./EVChargin
 import { EnvironmentSensorRequest, EnvironmentSensorResponse } from "./EnvironmentSensors";
 import { VideoBrowserRequest, VideoBrowserResponse } from "./Video";
 import { QuickStatsResponse } from "./QuickStats";
-import { EnergyPricingSettingsRead, EnergyPricingSettingsWrite } from "./EnergyPricingSettings";
+import {
+    EnergyConsumptionData,
+    EnergyConsumptionQuery,
+    EnergyPricingSettingsRead,
+    EnergyPricingSettingsWrite
+} from "./EnergyPricingSettings";
 import { ESSState, ESSWrite } from "./EnergyStorageSystem";
 import { UserSettings } from "./UserSettings";
 
@@ -18,6 +23,7 @@ export type RequestType =
     | "environmentSensorRequest"
     | "videoBrowser"
     | "quickStats"
+    | "energyConsumptionQuery"
     | "readEnergyPricingSettings"
     | "writeEnergyPricingSettings"
     | "essRead"
@@ -37,6 +43,7 @@ export type RpcRequest = {
     videoBrowserRequest?: VideoBrowserRequest;
     essWrite?: ESSWrite;
     energyPricingSettingsWrite?: EnergyPricingSettingsWrite;
+    energyConsumptionQuery?: EnergyConsumptionQuery;
 }
 
 export type RpcResponse = {
@@ -52,4 +59,5 @@ export type RpcResponse = {
     essState?: ESSState;
     energyPricingSettingsRead?: EnergyPricingSettingsRead;
     userSettings?: UserSettings;
+    energyConsumptionData?: EnergyConsumptionData;
 }

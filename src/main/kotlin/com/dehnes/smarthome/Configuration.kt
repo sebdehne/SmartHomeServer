@@ -48,7 +48,7 @@ class Configuration {
         //val priceSource = TibberPriceClient(objectMapper, persistenceService)
         val priceSource = HvakosterstrommenClient(objectMapper)
 
-        val influxDBClient = InfluxDBClient(persistenceService, objectMapper)
+        val influxDBClient = InfluxDBClient(persistenceService)
         val energyConsumptionService = EnergyConsumptionService(influxDBClient)
 
         val clock = Clock.system(DateTimeUtils.zoneId)
@@ -166,6 +166,7 @@ class Configuration {
         beans[VictronEssProcess::class] = victronEssProcess
         beans[EnergyPriceService::class] = energyPriceService
         beans[UserSettingsService::class] = userSettingsService
+        beans[EnergyConsumptionService::class] = energyConsumptionService
     }
 
     fun <T> getBean(klass: KClass<*>): T {

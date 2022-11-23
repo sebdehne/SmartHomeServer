@@ -228,7 +228,7 @@ fun main() {
     val executorService = Executors.newCachedThreadPool()
     val objectMapper = jacksonObjectMapper().registerModule(kotlinModule())
     val persistenceService = PersistenceService(objectMapper)
-    val influxDBClient = InfluxDBClient(persistenceService, objectMapper)
+    val influxDBClient = InfluxDBClient(persistenceService)
     val victronService = VictronService(
         "192.168.1.18",
         objectMapper,

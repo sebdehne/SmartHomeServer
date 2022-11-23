@@ -1,5 +1,4 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
 import './index.css';
 import App from './Components/App/App';
 import reportWebVitals from './reportWebVitals';
@@ -14,8 +13,12 @@ import { EnvironmentSensors } from "./Components/EnvironmentSensors/EnvironmentS
 import { VideoRecordings } from "./Components/VideoRecordings/VideoRecordings";
 import { EnergyPricingSettings } from "./Components/EnergyPricingSettings/EnergyPricingSettings";
 import { EnergyStorageSystem } from "./Components/EnergyStorageSystem/EnergyStorageSystem";
+import { createRoot } from 'react-dom/client';
+const container = document.getElementById('root');
 
-ReactDOM.render(
+const root = createRoot(container!);
+
+root.render(
     <React.StrictMode>
         <MuiThemeProvider theme={theme}>
             <CssBaseline/>
@@ -33,8 +36,7 @@ ReactDOM.render(
                 </Routes>
             </BrowserRouter>
         </MuiThemeProvider>
-    </React.StrictMode>,
-    document.getElementById('root')
+    </React.StrictMode>
 );
 
 // If you want to start measuring performance in your app, pass a function

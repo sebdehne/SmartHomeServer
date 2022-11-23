@@ -11,7 +11,7 @@ export const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
 };
 
 export const numberTo2Decimal = (n: number | null | undefined) => {
-    if (n) {
+    if (n || n === 0) {
         return new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(n)
     } else {
         return undefined;
@@ -35,4 +35,8 @@ export const eesAlarms = (alarms: string[]) => {
     } else {
         return alarms.join(",")
     }
+}
+
+export const isNumber = (str: string): boolean => {
+    return !isNaN(parseInt(str.trim()));
 }

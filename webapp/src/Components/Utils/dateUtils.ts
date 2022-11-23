@@ -24,3 +24,7 @@ export function formatTime(isoTimeString: string) {
     }
     return hStr + ":" + mStr;
 }
+
+export function currentDay() {
+    return new Date().getDate();
+}

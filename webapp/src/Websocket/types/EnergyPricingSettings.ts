@@ -34,3 +34,16 @@ export type PriceDecision = {
     changesAt: string;
     changesInto: PriceCategory;
 }
+
+
+export type EnergyConsumptionQuery = {
+    start: string;
+    stop: string;
+}
+
+export type EnergyConsumptionData = {
+    grid: number;
+    battery: number;
+    houseTotal: number;
+    houseKnownConsumers: { [key: string]: number; }
+}

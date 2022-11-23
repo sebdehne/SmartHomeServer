@@ -1,18 +1,41 @@
-import { Accordion, AccordionDetails, AccordionSummary, Button, Container, Grid, TextField } from "@material-ui/core";
-import React, { useEffect, useState } from "react";
+import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
+    Button,
+    Container,
+    Grid,
+    MenuItem,
+    Paper,
+    Select,
+    TextField
+} from "@material-ui/core";
+import React, { Dispatch, SetStateAction, useEffect, useMemo, useState } from "react";
 import Header from "../Header";
 import {
     CategorizedPrice,
+    EnergyConsumptionData,
     EnergyPriceConfig,
     EnergyPricingSettingsWrite,
     PriceCategory
 } from "../../Websocket/types/EnergyPricingSettings";
 import WebsocketService from "../../Websocket/websocketClient";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
-import { formatTime } from "../Utils/dateUtils";
-import { Bar } from 'react-chartjs-2';
-import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Title, Tooltip, } from 'chart.js';
+import { currentDay, formatTime } from "../Utils/dateUtils";
+import { Bar, Doughnut } from 'react-chartjs-2';
+import {
+    ArcElement,
+    BarElement,
+    CategoryScale,
+    Chart as ChartJS,
+    ChartOptions,
+    Legend,
+    LinearScale,
+    Title,
+    Tooltip,
+} from 'chart.js';
 import { ArrowLeft, ArrowRight } from "@material-ui/icons";
+import { isNumber, numberTo2Decimal } from "../Utils/utils";
 
 ChartJS.register(
     CategoryScale,
@@ -20,7 +43,8 @@ ChartJS.register(
     BarElement,
     Title,
     Tooltip,
-    Legend
+    Legend,
+    ArcElement
 );
 
 
@@ -190,6 +214,9 @@ export const EnergyPricingSettings = () => {
             </Accordion>
         </>)}
 
+        <div style={{ margin: "10px" }}/>
+
+        <EnergyConsumption setSending={setSending}/>
     </Container>
 };
 
@@ -216,3 +243,144 @@ const toPrice = (c: PriceCategory) => (p: CategorizedPrice): number | null => {
     }
     return null;
 }
+
+
+type EnergyConsumptionProps = {
+    setSending: Dispatch<SetStateAction<boolean>>;
+
+}
+
+const EnergyConsumption = ({ setSending }: EnergyConsumptionProps) => {
+    const [selectedPeriode, setSelectedPeriode] = useState<string>("day");
+    const [extraParam, setExtraParam] = useState<string>(currentDay().toString());
+    const [data, setData] = useState<EnergyConsumptionData>();
+
+    const handleChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+        setSelectedPeriode(event.target.value as string);
+    };
+
+    useEffect(() => {
+        let start = ""
+        let stop = "";
+        if (selectedPeriode === "month" && isNumber(extraParam)) {
+            let d = new Date();
+            d.setHours(0);
+            d.setMinutes(0);
+            d.setSeconds(0);
+            d.setMilliseconds(0);
+            d.setDate(1);
+            d.setMonth(parseInt(extraParam.trim()) - 1);
+            start = d.toISOString();
+            d.setMonth(d.getMonth() + 1);
+            stop = d.toISOString();
+        } else {
+            let d = new Date();
+            d.setHours(0);
+            d.setMinutes(0);
+            d.setSeconds(0);
+            d.setMilliseconds(0);
+            if (isNumber(extraParam)) {
+                d.setDate(parseInt(extraParam.trim()));
+            } else {
+            }
+            start = d.toISOString();
+            d.setDate(d.getDate() + 1);
+            stop = d.toISOString();
+        }
+
+        setSending(true);
+        WebsocketService.rpc({
+            type: "energyConsumptionQuery",
+            energyConsumptionQuery: {
+                start,
+                stop
+            }
+        })
+            .then(resp => setData(resp.energyConsumptionData))
+            .finally(() => setSending(false));
+
+    }, [extraParam, selectedPeriode, setSending]);
+
+    function mapData(data: EnergyConsumptionData) {
+        return ({
+            labels: Object.keys(data.houseKnownConsumers),
+            datasets: [{
+                label: "Energy consumption",
+                data: Object.keys(data.houseKnownConsumers).map(key => data.houseKnownConsumers[key] / 1000),
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                    'rgba(255, 159, 64, 0.2)',
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)',
+                ],
+                borderWidth: 1,
+            }],
+        })
+    }
+
+
+    let options: ChartOptions<"doughnut"> = {
+        plugins: {
+            legend: {
+                labels: {
+                    generateLabels: chart => {
+                        const datasets = chart.data.datasets;
+                        const labels = chart.data.labels as string[];
+                        let dataset = datasets[0];
+                        return dataset.data.map((data, i) => {
+                            // @ts-ignore
+                            let backgroundColorElement = dataset.backgroundColor[i];
+                            return ({
+                                text: `${labels[i]} - ${numberTo2Decimal(data as number)} kWh`,
+                                fillStyle: backgroundColorElement,
+                                fontColor: 'rgb(255,255,255)'
+                            });
+                        })
+                    }
+                }
+            }
+        }
+    };
+    return <Paper>
+        <h4>Energy Consumption</h4>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", flexDirection: "row" }}>
+                <Select
+                    value={selectedPeriode}
+                    onChange={handleChange}
+                >
+                    <MenuItem value={"day"}>Day</MenuItem>
+                    <MenuItem value={"month"}>Month</MenuItem>
+                </Select>
+                <TextField value={extraParam} onChange={event => setExtraParam(event.target.value)}></TextField>
+            </div>
+            {data && <div style={{ display: "flex", flexDirection: "row" }}>
+                <div>Grid: {numberTo2Decimal(data.grid / 1000)} kWh</div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                    <div>Victron</div>
+                    <div>|</div>
+                    <div>Battery: {numberTo2Decimal(data.battery / 1000)} kWh</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                    <div>House: {numberTo2Decimal(data.houseTotal / 1000)} kWh</div>
+                    <div>
+                        <Doughnut data={mapData(data)} options={options}/>
+                    </div>
+                </div>
+
+            </div>}
+        </div>
+    </Paper>
+}
+
+

@@ -138,7 +138,7 @@ class HanDataService(
         )
 
         return data.lastOrNull()?.let {
-            it.time to it.value.toLong()
+            it.time!! to it.value.toLong()
         }
     }
 }

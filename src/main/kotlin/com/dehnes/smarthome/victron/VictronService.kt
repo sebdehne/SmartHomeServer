@@ -147,6 +147,11 @@ class VictronService(
                         essValues.outputPower
                     )
 
+                    energyConsumptionService.reportPower(
+                        "Grid",
+                        essValues.gridPower
+                    )
+
                     listeners.forEach {
                         it.value(essValues)
                     }

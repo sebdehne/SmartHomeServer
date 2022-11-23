@@ -37,7 +37,6 @@ data class InfluxDBRecord(
 
 class InfluxDBClient(
     private val persistenceService: PersistenceService,
-    private val objectMapper: ObjectMapper,
     host: String = "192.168.1.1",
     port: Int = 8086
 ) {
@@ -51,6 +50,10 @@ class InfluxDBClient(
     }
 
     fun recordSensorData(records: List<InfluxDBRecord>) {
+        if (persistenceService.inDevMode()) {
+            logger.warn { "Not writing to influxDb because of devMode=true" }
+            return
+        }
         try {
             val body = records.joinToString(separator = "\n") { it.toLine() }
             logger.debug("About to send {}", body)
@@ -105,11 +108,11 @@ class InfluxDBClient(
                 headerFields[index] to s
             }.toMap().let { d ->
                 InfluxDbQueryRecord(
-                    Instant.parse(d["_time"]),
-                    d["_value"]!!.toDouble(),
-                    d["_field"]!!,
-                    d["_measurement"]!!,
-                    d.entries
+                    time = d["_time"]?.let { Instant.parse(it) },
+                    value = d["_value"]!!.toDouble(),
+                    field = d["_field"]!!,
+                    measurement = d["_measurement"]!!,
+                    tags = d.entries
                         .filterNot { it.key.startsWith("_") }
                         .filterNot { it.key == "" }
                         .filterNot { it.key == "result" }
@@ -124,7 +127,7 @@ class InfluxDBClient(
 }
 
 data class InfluxDbQueryRecord(
-    val time: Instant,
+    val time: Instant?,
     val value: Double,
     val field: String,
     val measurement: String,
