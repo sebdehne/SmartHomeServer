@@ -142,6 +142,11 @@ class VictronService(
                         essValues.batteryPower
                     )
 
+                    energyConsumptionService.reportPower(
+                        "HouseTotal",
+                        essValues.outputPower
+                    )
+
                     listeners.forEach {
                         it.value(essValues)
                     }
