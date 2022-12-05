@@ -341,7 +341,7 @@ const EnergyConsumption = ({ setSending }: EnergyConsumptionProps) => {
                             // @ts-ignore
                             let backgroundColorElement = dataset.backgroundColor[i];
                             return ({
-                                text: `${labels[i]} - ${numberTo2Decimal(data as number)} kWh`,
+                                text: `${labels[i]}: ${numberTo2Decimal(data as number)} kWh`,
                                 fillStyle: backgroundColorElement,
                                 fontColor: 'rgb(255,255,255)'
                             });

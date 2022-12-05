@@ -28,7 +28,6 @@ class VictronEssProcess(
 
     private val logger = KotlinLogging.logger { }
 
-    private var currentOperationMode = OperationMode.passthrough
     private var currentProfile: ProfileSettings? = null
     private var essState: String = ""
 
@@ -41,6 +40,13 @@ class VictronEssProcess(
                 l(current())
             }
         }
+    }
+
+    fun getCurrentOperationMode() = OperationMode.valueOf(
+        persistenceService["VictronEssProcess.currentOperationMode", "passthrough"]!!
+    )
+    fun setCurrentOperationMode(operationMode: OperationMode) {
+        persistenceService["VictronEssProcess.currentOperationMode"] = operationMode.name
     }
 
     override fun tickLocked(): Boolean {
@@ -81,7 +87,7 @@ class VictronEssProcess(
         return true
     }
 
-    private fun calculateProfile() = when (currentOperationMode) {
+    private fun calculateProfile() = when (getCurrentOperationMode()) {
         OperationMode.passthrough -> {
             essState = "Passthrough mode"
             null
@@ -147,7 +153,7 @@ class VictronEssProcess(
 
     fun current() = ESSState(
         victronService.essValues,
-        currentOperationMode,
+        getCurrentOperationMode(),
         currentProfile?.profileType,
         getSoCLimit(),
         ProfileType.values().map { t -> getProfile(t) },
@@ -156,7 +162,7 @@ class VictronEssProcess(
 
     fun handleWrite(essWrite: ESSWrite) {
         if (essWrite.operationMode != null) {
-            currentOperationMode = essWrite.operationMode
+            setCurrentOperationMode(essWrite.operationMode)
         }
         if (essWrite.soCLimit != null) {
             setSoCLimit(essWrite.soCLimit)
@@ -247,14 +253,19 @@ fun main() {
         println("Battery: " + current.batteryPower)
         println("oldestUpdatedField: " + current.getOldestUpdatedField())
 
-        victronService.essMode3_setAcPowerSetPointMode(
-            VictronEssCalculation.VictronEssCalculationResult(
-                //current.outputL1.power.toLong(),
-                0,
-                0,
-                0,
+        try {
+            victronService.essMode3_setAcPowerSetPointMode(
+                VictronEssCalculation.VictronEssCalculationResult(
+                    //current.outputL1.power.toLong(),
+                    20000,
+                    current.outputL2.power.toLong(),
+                    current.outputL3.power.toLong(),
+                )
             )
-        )
+        } catch (e: Exception) {
+            KotlinLogging.logger {}.warn(e) {  }
+        }
+
         Thread.sleep(5000)
     }
 }
