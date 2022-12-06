@@ -508,6 +508,7 @@ enum class SystemState(
     Passthru(8, "Passthru"),
     Inverting(9, "Inverting"),
     Assisting(10, "Assisting"),
+    Ext_Control(252, "Ext. control"),
     Discharging(256, "Discharging"),
     Sustain(257, "Sustain"),
 }
