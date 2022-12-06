@@ -18,9 +18,11 @@ import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.VictronEssProcess
 import com.dehnes.smarthome.victron.VictronService
 import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -36,6 +38,7 @@ class Configuration {
         .registerModule(JavaTimeModule())
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
         .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     fun init() {
 
@@ -82,8 +85,9 @@ class Configuration {
         )
         evChargingStationConnection.start()
 
+        val victronHost = "192.168.1.18"
         val victronService = VictronService(
-            "192.168.1.18",
+            victronHost,
             objectMapper,
             executorService,
             persistenceService,
@@ -152,6 +156,11 @@ class Configuration {
         victronEssProcess.start()
 
         val quickStatsService = QuickStatsService(influxDBClient, hanPortService, executorService, victronService)
+
+        DalyBmsDataLogger(influxDBClient, objectMapper, victronHost, executorService).apply {
+            reconnect()
+            resubscribe()
+        }
 
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageController::class] = garageDoorService
