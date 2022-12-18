@@ -146,21 +146,24 @@ class Configuration {
 
         val videoBrowser = VideoBrowser()
 
+        val dalyBmsDataLogger = DalyBmsDataLogger(influxDBClient, objectMapper, victronHost, executorService)
+        dalyBmsDataLogger.apply {
+            reconnect()
+            resubscribe()
+        }
+
 
         val victronEssProcess = VictronEssProcess(
             executorService,
             victronService,
             persistenceService,
-            energyPriceService
+            energyPriceService,
+            dalyBmsDataLogger
         )
         victronEssProcess.start()
 
         val quickStatsService = QuickStatsService(influxDBClient, hanPortService, executorService, victronService)
 
-        DalyBmsDataLogger(influxDBClient, objectMapper, victronHost, executorService).apply {
-            reconnect()
-            resubscribe()
-        }
 
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageController::class] = garageDoorService

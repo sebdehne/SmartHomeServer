@@ -36,7 +36,7 @@ class VictronService(
     private val persistenceService: PersistenceService,
     private val influxDBClient: InfluxDBClient,
     private val energyConsumptionService: EnergyConsumptionService,
-    ) {
+) {
 
     val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
@@ -63,7 +63,7 @@ class VictronService(
         val logger = KotlinLogging.logger { }
     }
 
-    val lock = ReentrantLock()
+    private val lock = ReentrantLock()
 
     init {
         scheduledExecutorService.scheduleAtFixedRate({
@@ -234,51 +234,49 @@ enum class TopicType {
     write
 }
 
-fun doubleValue(any: Any?) = when {
-    any == null -> 0.0
-    any is Int -> any.toDouble()
-    any is Long -> any.toDouble()
-    any is Double -> any
+fun doubleValue(any: Any?) = when (any) {
+    null -> 0.0
+    is Int -> any.toDouble()
+    is Long -> any.toDouble()
+    is Double -> any
     else -> {
         VictronService.logger.error { "doubleValue - Unsupported type $any" }
         0.0
     }
 }
 
-fun booleanValue(any: Any?) = when {
-    any == null -> false
-    any is Int -> any != 0
-    any is Long -> any != 0L
-    any is Double -> any.toLong() != 0L
+fun booleanValue(any: Any?) = when (any) {
+    null -> false
+    is Int -> any != 0
+    is Long -> any != 0L
+    is Double -> any.toLong() != 0L
     else -> {
         VictronService.logger.error { "booleanValue - Unsupported type $any" }
         false
     }
 }
 
-fun intValue(any: Any?) =
-    when {
-        any == null -> 0
-        any is Int -> any
-        any is Long -> any.toInt()
-        any is Double -> any.toInt()
-        else -> {
-            VictronService.logger.error { "intValue - Unsupported type $any" }
-            0
-        }
+fun intValue(any: Any?) = when (any) {
+    null -> 0
+    is Int -> any
+    is Long -> any.toInt()
+    is Double -> any.toInt()
+    else -> {
+        VictronService.logger.error { "intValue - Unsupported type $any" }
+        0
     }
+}
 
-fun longValue(any: Any?) =
-    when {
-        any == null -> 0L
-        any is Int -> any.toLong()
-        any is Long -> any
-        any is Double -> any.toLong()
-        else -> {
-            VictronService.logger.error { "longValue - Unsupported type $any" }
-            0L
-        }
+fun longValue(any: Any?) = when (any) {
+    null -> 0L
+    is Int -> any.toLong()
+    is Long -> any
+    is Double -> any.toLong()
+    else -> {
+        VictronService.logger.error { "longValue - Unsupported type $any" }
+        0L
     }
+}
 
 
 data class ESSValues(
@@ -345,11 +343,11 @@ data class ESSValues(
         )
 
         return when (topic) {
-            "/system/0/Dc/Battery/Soc" -> updated.copy(soc = doubleValue(any))
+            "/battery/0/Soc" -> updated.copy(soc = doubleValue(any)) // from BMS
 
-            "/system/0/Dc/Battery/Current" -> updated.copy(batteryCurrent = doubleValue(any))
-            "/system/0/Dc/Battery/Power" -> updated.copy(batteryPower = doubleValue(any))
-            "/system/0/Dc/Battery/Voltage" -> updated.copy(batteryVoltage = doubleValue(any))
+            "/battery/1/Dc/0/Current" -> updated.copy(batteryCurrent = doubleValue(any)) // From Lynx Shunt
+            "/battery/1/Dc/0/Power" -> updated.copy(batteryPower = doubleValue(any)) // From Lynx Shunt
+            "/battery/1/Dc/0/Voltage" -> updated.copy(batteryVoltage = doubleValue(any)) // From Lynx Shunt
             "/vebus/276/Ac/ActiveIn/P" -> updated.copy(gridPower = doubleValue(any))
             "/vebus/276/Ac/Out/P" -> updated.copy(outputPower = doubleValue(any))
             "/system/0/SystemState/State" -> {

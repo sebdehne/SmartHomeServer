@@ -14,6 +14,7 @@ import com.dehnes.smarthome.victron.VictronEssCalculation.calculateAcPowerSetPoi
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import mu.KotlinLogging
+import java.time.Instant
 import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -24,12 +25,16 @@ class VictronEssProcess(
     private val victronService: VictronService,
     private val persistenceService: PersistenceService,
     private val energyPriceService: EnergyPriceService,
+    private val dalyBmsDataLogger: DalyBmsDataLogger
 ) : AbstractProcess(executorService, 5) {
 
     private val logger = KotlinLogging.logger { }
 
     private var currentProfile: ProfileSettings? = null
     private var essState: String = ""
+
+    @Volatile
+    private var bmsData = listOf<BmsData>()
 
     val listeners = ConcurrentHashMap<String, (data: ESSState) -> Unit>()
 
@@ -40,11 +45,19 @@ class VictronEssProcess(
                 l(current())
             }
         }
+        dalyBmsDataLogger.listeners["VictronEssProcess"] = {
+            onBmsData(it)
+        }
+    }
+
+    private fun onBmsData(bmsData: List<BmsData>) {
+        this.bmsData = bmsData
     }
 
     fun getCurrentOperationMode() = OperationMode.valueOf(
         persistenceService["VictronEssProcess.currentOperationMode", "passthrough"]!!
     )
+
     fun setCurrentOperationMode(operationMode: OperationMode) {
         persistenceService["VictronEssProcess.currentOperationMode"] = operationMode.name
     }
@@ -99,31 +112,40 @@ class VictronEssProcess(
         }
 
         OperationMode.automatic -> {
+            val now = Instant.now()
+            val onlineBmses = bmsData
+                .filter { it.timestamp.plusSeconds(bmsAssumeDeadAfterSeconds()).isAfter(now) }
 
-            val suitablePrices = energyPriceService.findSuitablePrices(serviceEnergyStorage, LocalDate.now(zoneId))
-            val priceDecision = suitablePrices.priceDecision()
-
-            if (priceDecision == null) {
-                essState = "No prices"
+            if (onlineBmses.size < minNumberOfOnlineBmses()) {
+                essState = "Not enough BMSes online: ${onlineBmses.map { it.bmsId.displayName }}"
                 null
             } else {
-                essState = "${priceDecision.current} until ${priceDecision.changesAt.atZone(zoneId).toLocalTime()}"
-                when (priceDecision.current) {
-                    PriceCategory.expensive -> if (isSoCTooLow()) {
-                        null
-                    } else {
-                        ProfileType.autoDischarging
-                    }
+                val suitablePrices = energyPriceService.findSuitablePrices(serviceEnergyStorage, LocalDate.now(zoneId))
+                val priceDecision = suitablePrices.priceDecision()
 
-                    PriceCategory.neutral -> null
+                if (priceDecision == null) {
+                    essState = "No prices"
+                    null
+                } else {
+                    essState = "${priceDecision.current} until ${priceDecision.changesAt.atZone(zoneId).toLocalTime()}"
+                    when (priceDecision.current) {
+                        PriceCategory.expensive -> if (isSoCTooLow()) {
+                            null
+                        } else {
+                            ProfileType.autoDischarging
+                        }
 
-                    PriceCategory.cheap -> if (isSoCTooHigh()) {
-                        null
-                    } else {
-                        ProfileType.autoCharging
+                        PriceCategory.neutral -> null
+
+                        PriceCategory.cheap -> if (isSoCTooHigh()) {
+                            null
+                        } else {
+                            ProfileType.autoCharging
+                        }
                     }
                 }
             }
+
         }
     }
 
@@ -134,7 +156,7 @@ class VictronEssProcess(
 
     private fun isSoCTooHigh(): Boolean {
         val soc = victronService.current().soc.toInt()
-        return soc >= getSoCLimit().to
+        return soc > getSoCLimit().to
     }
 
     fun setSoCLimit(soCLimit: SoCLimit) {
@@ -148,6 +170,9 @@ class VictronEssProcess(
             persistenceService["VictronEssProcess.socLimit.to", "80"]!!.toInt(),
         )
     }
+
+    fun bmsAssumeDeadAfterSeconds() = persistenceService["VictronEssProcess.bmsAssumeDeadAfterSeconds", "30"]!!.toLong()
+    fun minNumberOfOnlineBmses() = persistenceService["VictronEssProcess.minNumberOfOnlineBmses", "3"]!!.toInt()
 
     override fun logger() = logger
 
@@ -263,7 +288,7 @@ fun main() {
                 )
             )
         } catch (e: Exception) {
-            KotlinLogging.logger {}.warn(e) {  }
+            KotlinLogging.logger {}.warn(e) { }
         }
 
         Thread.sleep(5000)

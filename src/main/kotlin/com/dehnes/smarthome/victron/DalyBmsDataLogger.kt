@@ -18,6 +18,7 @@ import mu.KotlinLogging
 import java.net.InetSocketAddress
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
@@ -42,6 +43,7 @@ class DalyBmsDataLogger(
 
     private val logger = KotlinLogging.logger { }
     private val lock = ReentrantLock()
+    val listeners = ConcurrentHashMap<String, (List<BmsData>) -> Unit>()
 
     fun reconnect() {
         asyncClient.disconnect()
@@ -72,16 +74,23 @@ class DalyBmsDataLogger(
         }?.toString() ?: "{}"
         logger.debug { "Msg received" }
 
+        val dbusService = objectMapper.readValue<DbusService>(body)
+
+        executorService.submit {
+            try {
+                listeners.forEach { l -> l.value(dbusService.bmsData) }
+            } catch (e: Exception) {
+                logger.error(e) { "" }
+            }
+        }
+
         executorService.submit {
             try {
                 if (lock.tryLock()) {
-                    logger.debug { "Got lock" }
                     try {
-                        val dbusService = objectMapper.readValue<DbusService>(body)
                         onMqttMessageLocked(dbusService)
                     } finally {
                         lock.unlock()
-                        logger.debug { "lock released" }
                     }
                 }
             } catch (e: Throwable) {
