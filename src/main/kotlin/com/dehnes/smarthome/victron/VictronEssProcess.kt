@@ -117,7 +117,7 @@ class VictronEssProcess(
                 .filter { it.timestamp.plusSeconds(bmsAssumeDeadAfterSeconds()).isAfter(now) }
 
             if (onlineBmses.size < minNumberOfOnlineBmses()) {
-                essState = "Not enough BMSes online: ${onlineBmses.map { it.bmsId.displayName }}"
+                essState = "Not enough BMSes online: ${onlineBmses.map { it.bmsId.displayName }.joinToString(", ")}"
                 null
             } else {
                 val suitablePrices = energyPriceService.findSuitablePrices(serviceEnergyStorage, LocalDate.now(zoneId))
@@ -171,7 +171,7 @@ class VictronEssProcess(
         )
     }
 
-    fun bmsAssumeDeadAfterSeconds() = persistenceService["VictronEssProcess.bmsAssumeDeadAfterSeconds", "30"]!!.toLong()
+    fun bmsAssumeDeadAfterSeconds() = persistenceService["VictronEssProcess.bmsAssumeDeadAfterSeconds", "60"]!!.toLong()
     fun minNumberOfOnlineBmses() = persistenceService["VictronEssProcess.minNumberOfOnlineBmses", "3"]!!.toInt()
 
     override fun logger() = logger
