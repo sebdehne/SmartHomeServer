@@ -3,13 +3,16 @@ package com.dehnes.smarthome.service.ev_charging_station
 import com.dehnes.smarthome.api.dtos.EvChargingMode
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
+import com.dehnes.smarthome.config.ConfigService
+import com.dehnes.smarthome.config.EvCharger
+import com.dehnes.smarthome.config.EvChargerSettings
+import com.dehnes.smarthome.config.PowerConnectionSettings
 import com.dehnes.smarthome.energy_pricing.CategorizedPrice
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.Price
 import com.dehnes.smarthome.energy_pricing.PriceCategory
 import com.dehnes.smarthome.ev_charging.*
 import com.dehnes.smarthome.users.UserSettingsService
-import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.victron.VictronService
 import io.mockk.every
 import io.mockk.mockk
@@ -28,15 +31,19 @@ internal class EvChargingServiceTest {
     var time = Instant.now()
     val energyPriceService = mockk<EnergyPriceService>()
     val executorService = mockk<ExecutorService>()
-    val persistenceService = mockk<PersistenceService>()
+    val configService = mockk<ConfigService>()
     val eVChargingStationConnection = mockk<EvChargingStationConnection>()
-    val currentModes = mutableMapOf<String, EvChargingMode>()
     val clockMock = mockk<Clock>()
     val userSettingsService = mockk<UserSettingsService>()
 
+    var evSettings = EvChargerSettings(
+        powerConnections = mapOf(
+            "unknown" to PowerConnectionSettings()
+        ),
+    )
+
     val allChargingsStations = mutableMapOf<String, TestChargingStation>()
     val onlineChargingStations = mutableSetOf<String>()
-    var currentPowerConnectionCapacity = 32
     val victronService = mockk<VictronService>()
 
     init {
@@ -61,24 +68,10 @@ internal class EvChargingServiceTest {
             null
         }
 
-        val keySlot = slot<String>()
-        val defaultSlot = slot<String>()
         every {
-            persistenceService[capture(keySlot), capture(defaultSlot)]
+            configService.getEvSettings()
         } answers {
-            val key = keySlot.captured
-            if (key.startsWith("EvChargingService.client.mode.")) {
-                val clientId = key.split(".")[3]
-                if (clientId in currentModes) {
-                    currentModes[clientId]!!.name
-                } else {
-                    defaultSlot.captured
-                }
-            } else if (key.startsWith("PowerConnection.availableCapacity.")) {
-                currentPowerConnectionCapacity.toString()
-            } else {
-                defaultSlot.captured
-            }
+            evSettings
         }
 
         val clientIdSlot = slot<String>()
@@ -134,7 +127,7 @@ internal class EvChargingServiceTest {
         eVChargingStationConnection,
         executorService,
         energyPriceService,
-        persistenceService,
+        configService,
         clockMock,
         mapOf(
             PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clockMock)
@@ -158,12 +151,29 @@ internal class EvChargingServiceTest {
         assertEquals(100, s2.pwmPercent)
     }
 
+    private fun setModeFor(c: String, m: EvChargingMode) {
+        val ev = evSettings.chargers[c]!!
+        evSettings = evSettings.copy(
+            chargers = evSettings.chargers + (ev.serialNumber to ev.copy(
+                evChargingMode = m
+            ))
+        )
+    }
+    private fun setCurrentPowerConnectionCapacity(value: Int) {
+        val powerConnections = evSettings.powerConnections["unknown"]!!
+        evSettings = evSettings.copy(
+            powerConnections = evSettings.powerConnections + (powerConnections.name to powerConnections.copy(
+                availableCapacity = value
+            ))
+        )
+    }
+
     @Test
     @Disabled
     fun testPlayground() {
 
         val s1 = newTestStation("s1")
-        currentModes["s1"] = EvChargingMode.OFF
+        setModeFor("s1",EvChargingMode.OFF)
         s1.phase1Milliamps = -387
         s1.phase2Milliamps = -265
         s1.phase3Milliamps = -666
@@ -181,7 +191,7 @@ internal class EvChargingServiceTest {
         collectDataCycle()
         collectDataCycle()
 
-        currentModes["s1"] = EvChargingMode.ON
+        setModeFor("s1",EvChargingMode.ON)
 
         collectDataCycle() // -> ConnectedChargingAvailable
 
@@ -267,7 +277,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
 
         // Test power connection capacity drops
-        currentPowerConnectionCapacity = 16
+        setCurrentPowerConnectionCapacity(16)
         collectDataCycle(secondsToAdd = 10)
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(8), s1.pwmPercent)
@@ -275,7 +285,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(8), s2.pwmPercent)
 
         // Test power connection capacity drops to minimum
-        currentPowerConnectionCapacity = 6
+        setCurrentPowerConnectionCapacity(6)
         collectDataCycle(10, secondsToAdd = 10)
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(6), s1.pwmPercent)
@@ -283,7 +293,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(0), s2.pwmPercent)
 
         // Test power connection capacity drops below minimum
-        currentPowerConnectionCapacity = 2
+        setCurrentPowerConnectionCapacity(2)
         collectDataCycle(10, secondsToAdd = 10)
         assertFalse(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(0), s1.pwmPercent)
@@ -291,7 +301,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(0), s2.pwmPercent)
 
         // Test power connection capacity back to normal
-        currentPowerConnectionCapacity = 32
+        setCurrentPowerConnectionCapacity(32)
         collectDataCycle(10, secondsToAdd = 10)
         assertTrue(s1.contactorOn)
         assertEquals(chargeRateToPwmPercent(16), s1.pwmPercent)
@@ -360,7 +370,7 @@ internal class EvChargingServiceTest {
         assertEquals(chargeRateToPwmPercent(16), s2.pwmPercent)
 
         // Car 1 - stopped from app
-        currentModes[s1.clientId] = EvChargingMode.OFF
+        setModeFor(s1.clientId, EvChargingMode.OFF)
         collectDataCycle()
         assertTrue(s1.contactorOn)
         assertEquals(PWM_NO_CHARGING, s1.pwmPercent)
@@ -396,7 +406,7 @@ internal class EvChargingServiceTest {
         }
     }
 
-    private fun newTestStation(clientId: String, powerConnectionId: String = "conn1") = TestChargingStation(
+    private fun newTestStation(clientId: String, powerConnectionId: String = "unknown") = TestChargingStation(
         clientId,
         powerConnectionId,
         false,
@@ -412,6 +422,18 @@ internal class EvChargingServiceTest {
     ).apply {
         allChargingsStations[clientId] = this
         onlineChargingStations.add(clientId)
+        evSettings = evSettings.copy(
+            chargers = evSettings.chargers + (clientId to EvCharger(
+                clientId,
+                clientId,
+                clientId,
+                powerConnectionId,
+                CalibrationData(),
+                EvChargingMode.ChargeDuringCheapHours,
+                LoadSharingPriority.NORMAL,
+                32
+            ))
+        )
     }
 
 

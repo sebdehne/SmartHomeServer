@@ -3,6 +3,7 @@ package com.dehnes.smarthome.victron
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.utils.toInt
+import com.dehnes.smarthome.utils.withLogging
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.hivemq.client.internal.mqtt.datatypes.MqttTopicFilterImpl
@@ -76,27 +77,19 @@ class DalyBmsDataLogger(
 
         val dbusService = objectMapper.readValue<DbusService>(body)
 
-        executorService.submit {
-            try {
-                listeners.forEach { l -> l.value(dbusService.bmsData) }
-            } catch (e: Exception) {
-                logger.error(e) { "" }
-            }
-        }
+        executorService.submit(withLogging {
+            listeners.forEach { l -> l.value(dbusService.bmsData) }
+        })
 
-        executorService.submit {
-            try {
-                if (lock.tryLock()) {
-                    try {
-                        onMqttMessageLocked(dbusService)
-                    } finally {
-                        lock.unlock()
-                    }
+        executorService.submit(withLogging {
+            if (lock.tryLock()) {
+                try {
+                    onMqttMessageLocked(dbusService)
+                } finally {
+                    lock.unlock()
                 }
-            } catch (e: Throwable) {
-                logger.error(e) { "Error" }
             }
-        }
+        })
     }
 
     private fun onMqttMessageLocked(msg: DbusService) {

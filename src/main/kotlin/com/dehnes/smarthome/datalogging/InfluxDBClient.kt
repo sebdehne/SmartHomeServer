@@ -1,7 +1,6 @@
 package com.dehnes.smarthome.datalogging
 
-import com.dehnes.smarthome.utils.PersistenceService
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.dehnes.smarthome.config.ConfigService
 import mu.KotlinLogging
 import org.apache.http.HttpResponse
 import org.apache.http.client.fluent.Request
@@ -36,7 +35,7 @@ data class InfluxDBRecord(
 }
 
 class InfluxDBClient(
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
     host: String = "192.168.1.1",
     port: Int = 8086
 ) {
@@ -50,7 +49,7 @@ class InfluxDBClient(
     }
 
     fun recordSensorData(records: List<InfluxDBRecord>) {
-        if (persistenceService.inDevMode()) {
+        if (configService.isDevMode()) {
             logger.warn { "Not writing to influxDb because of devMode=true" }
             return
         }
@@ -58,7 +57,7 @@ class InfluxDBClient(
             val body = records.joinToString(separator = "\n") { it.toLine() }
             logger.debug("About to send {}", body)
             val result: Response = Request.Post("$baseUrl/api/v2/write?bucket=$bucketName&org=dehnes.com")
-                .addHeader("Authorization", "Token " + persistenceService["influxDbAuthToken", null]!!)
+                .addHeader("Authorization", "Token " + configService.getInfluxDbAuthToken())
                 .bodyString(body, ContentType.TEXT_PLAIN)
                 .execute()
             val httpResponse: HttpResponse? = result.returnResponse()
@@ -86,7 +85,7 @@ class InfluxDBClient(
                     .addParameter("orgID", "b351a5d22d7de2aa")
                     .build()
             )
-            .addHeader("Authorization", "Token " + persistenceService["influxDbAuthToken", null]!!)
+            .addHeader("Authorization", "Token " + configService.getInfluxDbAuthToken())
             .body(StringEntity(query, ContentType.create("application/vnd.flux", StandardCharsets.UTF_8)))
             .execute()
 

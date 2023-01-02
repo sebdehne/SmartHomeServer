@@ -1,6 +1,7 @@
 package com.dehnes.smarthome.heating
 
 import com.dehnes.smarthome.api.dtos.*
+import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
@@ -25,14 +26,10 @@ import java.util.concurrent.*
 import java.util.zip.CRC32
 import kotlin.math.min
 
-private const val TARGET_TEMP_KEY = "HeatingControllerService.targetTemp"
-private const val HEATER_STATUS_KEY = "HeatingControllerService.heaterTarget"
-private const val OPERATING_MODE = "HeatingControllerService.operatingMode"
-
 class UnderFloorHeaterService(
     private val loRaConnection: LoRaConnection,
     private val executorService: ExecutorService,
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
     private val influxDBClient: InfluxDBClient,
     private val energyPriceService: EnergyPriceService,
     private val clock: Clock,
@@ -86,14 +83,17 @@ class UnderFloorHeaterService(
     }
 
     @Volatile
-    private var lastStatus = UnderFloorHeaterStatus(
-        UnderFloorHeaterMode.values().first { it.mode == getCurrentMode() },
-        OnOff.off,
-        getTargetTemperature(),
-        null,
-        0,
-        null
-    )
+    private var lastStatus = run {
+        val settings = getSettings()
+        UnderFloorHeaterStatus(
+            UnderFloorHeaterMode.values().first { it.mode == settings.operatingMode },
+            OnOff.off,
+            settings.targetTemp,
+            null,
+            0,
+            null
+        )
+    }
 
     override fun logger() = logger
 
@@ -266,8 +266,18 @@ class UnderFloorHeaterService(
         onStatusChanged()
     }
 
+    private fun getSettings() = configService.getHeaterSettings()
+    private fun setHeaterTarget(target: OnOff) {
+        configService.setHeaterSettings(
+            getSettings().copy(
+                heaterTarget = target
+            )
+        )
+    }
+
     private fun handleNewData(packet: LoRaInboundPacketDecrypted): Boolean {
-        val currentMode: Mode = getCurrentMode()
+        val settings = getSettings()
+        val currentMode = settings.operatingMode
         logger.info("Current mode: $currentMode")
 
         recordLocalValues(currentMode)
@@ -277,21 +287,21 @@ class UnderFloorHeaterService(
 
         // evaluate state
         when (currentMode) {
-            Mode.OFF -> persistenceService[HEATER_STATUS_KEY] = "off"
+            Mode.OFF -> setHeaterTarget(OnOff.off)
             Mode.ON -> {
                 if (victronService.isGridOk()) {
-                    persistenceService[HEATER_STATUS_KEY] = "on"
+                    setHeaterTarget(OnOff.on)
                 } else {
-                    persistenceService[HEATER_STATUS_KEY] = "off"
+                    setHeaterTarget(OnOff.off)
                 }
             }
 
             Mode.MANUAL -> {
                 if (sensorData.temperatureError > 0) {
                     logger.info("Forcing heater off due to temperature error=${sensorData.temperatureError}")
-                    persistenceService[HEATER_STATUS_KEY] = "off"
+                    setHeaterTarget(OnOff.off)
                 } else {
-                    val targetTemperature = getTargetTemperature()
+                    val targetTemperature = settings.targetTemp
                     logger.info("Evaluating target temperature now: $targetTemperature")
 
                     val suitablePrices =
@@ -303,13 +313,13 @@ class UnderFloorHeaterService(
                     }
                     if (priceDecision?.current == PriceCategory.cheap && sensorData.temperature < targetTemperature * 100) {
                         logger.info("Setting heater to on. priceDecision=$priceDecision")
-                        persistenceService[HEATER_STATUS_KEY] = "on"
+                        setHeaterTarget(OnOff.on)
                     } else {
                         waitUntilCheapHour = priceDecision?.changesAt
                         logger.info {
                             "Setting heater to off. waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
                         }
-                        persistenceService[HEATER_STATUS_KEY] = "off"
+                        setHeaterTarget(OnOff.off)
                     }
                 }
             }
@@ -318,7 +328,7 @@ class UnderFloorHeaterService(
         var heaterStatus = sensorData.heaterIsOn
 
         // bring the heater to the desired state
-        val executionResult = if (sensorData.heaterIsOn && "off" == getConfiguredHeaterTarget()) {
+        val executionResult = if (sensorData.heaterIsOn && settings.heaterTarget == OnOff.off) {
             if (sendCommand(LoRaPacketType.HEATER_OFF_REQUEST)) {
                 heaterStatus = false
                 true
@@ -326,7 +336,7 @@ class UnderFloorHeaterService(
                 logger.warn { "No response" }
                 false
             }
-        } else if (!sensorData.heaterIsOn && "on" == getConfiguredHeaterTarget()) {
+        } else if (!sensorData.heaterIsOn && settings.heaterTarget == OnOff.on) {
             if (sendCommand(LoRaPacketType.HEATER_ON_REQUEST)) {
                 heaterStatus = true
                 true
@@ -347,7 +357,7 @@ class UnderFloorHeaterService(
         lastStatus = UnderFloorHeaterStatus(
             mode = UnderFloorHeaterMode.values().first { it.mode == currentMode },
             status = if (heaterStatus) OnOff.on else OnOff.off,
-            targetTemperature = getTargetTemperature(),
+            targetTemperature = settings.targetTemp,
             waitUntilCheapHour = waitUntilCheapHour?.toEpochMilli(),
             timestampDelta = sensorData.timestampDelta,
             fromController = UnderFloorHeaterStatusFromController(
@@ -363,15 +373,11 @@ class UnderFloorHeaterService(
     }
 
     private fun onStatusChanged() {
-        executorService.submit {
+        executorService.submit(withLogging {
             listeners.forEach {
-                try {
-                    it.value(getCurrentState())
-                } catch (e: Exception) {
-                    logger.error("", e)
-                }
+                it.value(getCurrentState())
             }
-        }
+        })
     }
 
     fun getCurrentState() = asLocked {
@@ -399,9 +405,9 @@ class UnderFloorHeaterService(
         lastStatus = lastStatus.copy(
             targetTemperature = targetTemperature
         )
-        executorService.submit {
+        executorService.submit(withLogging {
             tick()
-        }
+        })
         return true
     }
 
@@ -434,14 +440,15 @@ class UnderFloorHeaterService(
     private fun recordLocalValues(
         currentMode: Mode
     ) {
+        val settings = getSettings()
         influxDBClient.recordSensorData(
             InfluxDBRecord(
                 clock.instant(),
                 "sensor",
                 mapOf(
                     "manual_mode" to (if (currentMode == Mode.MANUAL) 1 else 0).toString(),
-                    "target_temperature" to getTargetTemperature().toString(),
-                    "configured_heater_target" to (if (getConfiguredHeaterTarget() == "on") 1 else 0).toString()
+                    "target_temperature" to settings.targetTemp.toString(),
+                    "configured_heater_target" to (if (settings.heaterTarget == OnOff.on) 1 else 0).toString()
                 ),
                 mapOf(
                     "room" to "heating_controller"
@@ -466,22 +473,21 @@ class UnderFloorHeaterService(
         return ct.await(10, TimeUnit.SECONDS) && receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.HEATER_RESPONSE
     }
 
-    private fun getCurrentMode() = Mode.valueOf(
-        persistenceService[OPERATING_MODE, Mode.OFF.name]!!
-    )
-
     private fun setCurrentMode(m: Mode) {
-        persistenceService[OPERATING_MODE] = m.name
+        configService.setHeaterSettings(
+            getSettings().copy(
+                operatingMode = m
+            )
+        )
     }
-
-    private fun getTargetTemperature() =
-        Integer.valueOf(persistenceService[TARGET_TEMP_KEY, (25).toString()])
 
     private fun setTargetTemperature(t: Int) {
-        persistenceService[TARGET_TEMP_KEY] = t.toString()
+        configService.setHeaterSettings(
+            getSettings().copy(
+                targetTemp = t
+            )
+        )
     }
-
-    private fun getConfiguredHeaterTarget() = persistenceService[HEATER_STATUS_KEY, "off"]!!
 
 }
 

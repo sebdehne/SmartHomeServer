@@ -1,9 +1,9 @@
 package com.dehnes.smarthome.users
 
-import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.config.ConfigService
 import mu.KotlinLogging
 
-class UserSettingsService(private val persistenceService: PersistenceService) {
+class UserSettingsService(private val configService: ConfigService) {
 
     private val logger = KotlinLogging.logger { }
 
@@ -22,8 +22,10 @@ class UserSettingsService(private val persistenceService: PersistenceService) {
     private fun getUserAccessLevel(user: String?, userRole: UserRole) = if (user == SystemUser) {
         Level.readWrite
     } else {
-        Level.valueOf(persistenceService["UserSettingsService.auth.${userKey(user)}.$userRole", userRole.defaultLevel.name]!!)
+        getUserAuthorization(userKey(user)).authorization[userRole] ?: userRole.defaultLevel
     }
+
+    private fun getUserAuthorization(username: String) = configService.getUserAuthorization(username) ?: error("Unknown user$username")
 
     fun getUserSettings(user: String?) = UserSettings(
         authorization = UserRole.values().associateWith { getUserAccessLevel(user, it) }

@@ -1,9 +1,10 @@
 package com.dehnes.smarthome.victron
 
+import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
-import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.utils.withLogging
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.hivemq.client.internal.mqtt.datatypes.MqttTopicFilterImpl
@@ -33,7 +34,7 @@ class VictronService(
     victronHost: String,
     private val objectMapper: ObjectMapper,
     private val executorService: ExecutorService,
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
     private val influxDBClient: InfluxDBClient,
     private val energyConsumptionService: EnergyConsumptionService,
 ) {
@@ -67,7 +68,7 @@ class VictronService(
 
     init {
         scheduledExecutorService.scheduleAtFixedRate({
-            executorService.submit {
+            executorService.submit(withLogging {
 
                 lock.tryLock()
                 try {
@@ -89,7 +90,7 @@ class VictronService(
                 } finally {
                     lock.unlock()
                 }
-            }
+            })
         }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
     }
 
@@ -130,13 +131,13 @@ class VictronService(
             if (lastNotify < (System.currentTimeMillis() - delayInMs)) {
                 lastNotify = System.currentTimeMillis()
                 logger.info { "sending notify $essValues listeners=${listeners.size}" }
-                executorService.submit {
+                executorService.submit(withLogging {
                     val c = essValues
                     influxDBClient.recordSensorData(
                         c.toInfluxDBRecord()
                     )
-                }
-                executorService.submit {
+                })
+                executorService.submit(withLogging {
                     energyConsumptionService.reportPower(
                         "HomeBattery",
                         essValues.batteryPower
@@ -155,17 +156,18 @@ class VictronService(
                     listeners.forEach {
                         it.value(essValues)
                     }
-                }
+                })
             }
         }
     }
 
-    private fun getPortalId() =
-        persistenceService["VictronService.portalId"] ?: error("VictronService.portalId not configured")
+    private fun getPortalId() = configService.getVictronServiceSettings().portalId.ifBlank {
+        error("no portalId configured")
+    }
 
     fun current() = essValues
 
-    fun writeEnabled() = persistenceService["VictronService.writeEnabled", "false"]!! == "true"
+    fun writeEnabled() = configService.getVictronServiceSettings().writeEnabled
 
     fun essMode3_setAcPowerSetPointMode(acSetPoints: VictronEssCalculation.VictronEssCalculationResult?) {
         if (acSetPoints == null) {

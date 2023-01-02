@@ -1,5 +1,7 @@
 package com.dehnes.smarthome.victron
 
+import com.dehnes.smarthome.config.ConfigService
+import com.dehnes.smarthome.config.VictronEssProcessProfile
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
@@ -8,7 +10,6 @@ import com.dehnes.smarthome.energy_pricing.priceDecision
 import com.dehnes.smarthome.energy_pricing.serviceEnergyStorage
 import com.dehnes.smarthome.utils.AbstractProcess
 import com.dehnes.smarthome.utils.DateTimeUtils.zoneId
-import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.victron.VictronEssCalculation.VictronEssCalculationInput
 import com.dehnes.smarthome.victron.VictronEssCalculation.calculateAcPowerSetPoints
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -23,7 +24,7 @@ import java.util.concurrent.Executors
 class VictronEssProcess(
     executorService: ExecutorService,
     private val victronService: VictronService,
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
     private val energyPriceService: EnergyPriceService,
     private val dalyBmsDataLogger: DalyBmsDataLogger
 ) : AbstractProcess(executorService, 5) {
@@ -54,12 +55,14 @@ class VictronEssProcess(
         this.bmsData = bmsData
     }
 
-    fun getCurrentOperationMode() = OperationMode.valueOf(
-        persistenceService["VictronEssProcess.currentOperationMode", "passthrough"]!!
-    )
+    fun getCurrentOperationMode() = configService.getVictronEssProcessSettings().currentOperationMode
 
     fun setCurrentOperationMode(operationMode: OperationMode) {
-        persistenceService["VictronEssProcess.currentOperationMode"] = operationMode.name
+        configService.setVictronEssProcessSettings(
+            configService.getVictronEssProcessSettings().copy(
+                currentOperationMode = operationMode
+            )
+        )
     }
 
     override fun tickLocked(): Boolean {
@@ -117,7 +120,7 @@ class VictronEssProcess(
                 .filter { it.timestamp.plusSeconds(bmsAssumeDeadAfterSeconds()).isAfter(now) }
 
             if (onlineBmses.size < minNumberOfOnlineBmses()) {
-                essState = "Not enough BMSes online: ${onlineBmses.map { it.bmsId.displayName }.joinToString(", ")}"
+                essState = "Not enough BMSes online: ${onlineBmses.joinToString(", ") { it.bmsId.displayName }}"
                 null
             } else {
                 val suitablePrices = energyPriceService.findSuitablePrices(serviceEnergyStorage, LocalDate.now(zoneId))
@@ -160,19 +163,24 @@ class VictronEssProcess(
     }
 
     fun setSoCLimit(soCLimit: SoCLimit) {
-        persistenceService["VictronEssProcess.socLimit.from"] = soCLimit.from.toString()
-        persistenceService["VictronEssProcess.socLimit.to"] = soCLimit.to.toString()
-    }
-
-    fun getSoCLimit(): SoCLimit {
-        return SoCLimit(
-            persistenceService["VictronEssProcess.socLimit.from", "20"]!!.toInt(),
-            persistenceService["VictronEssProcess.socLimit.to", "80"]!!.toInt(),
+        configService.setVictronEssProcessSettings(
+            configService.getVictronEssProcessSettings().copy(
+                socLimitFrom = soCLimit.from,
+                socLimitTo = soCLimit.to
+            )
         )
     }
 
-    fun bmsAssumeDeadAfterSeconds() = persistenceService["VictronEssProcess.bmsAssumeDeadAfterSeconds", "60"]!!.toLong()
-    fun minNumberOfOnlineBmses() = persistenceService["VictronEssProcess.minNumberOfOnlineBmses", "3"]!!.toInt()
+    fun getSoCLimit(): SoCLimit {
+        val settings = configService.getVictronEssProcessSettings()
+        return SoCLimit(
+            settings.socLimitFrom,
+            settings.socLimitTo,
+        )
+    }
+
+    fun bmsAssumeDeadAfterSeconds() = configService.getVictronEssProcessSettings().bmsAssumeDeadAfterSeconds.toLong()
+    fun minNumberOfOnlineBmses() = configService.getVictronEssProcessSettings().minNumberOfOnlineBmses
 
     override fun logger() = logger
 
@@ -197,20 +205,25 @@ class VictronEssProcess(
         }
     }
 
-    fun getProfile(profileType: ProfileType): ProfileSettings = ProfileSettings(
-        profileType,
-        persistenceService["VictronEssProcess.profiles.$profileType.acPowerSetPoint", "30000"]!!.toLong(),
-        persistenceService["VictronEssProcess.profiles.$profileType.maxChargePower", "0"]!!.toLong(),
-        persistenceService["VictronEssProcess.profiles.$profileType.maxDischargePower", "0"]!!.toLong(),
-    )
+    fun getProfile(profileType: ProfileType): ProfileSettings {
+        val profile = configService.getVictronEssProcessSettings().profiles[profileType.name]!!
+        return ProfileSettings(
+            profileType,
+            profile.acPowerSetPoint,
+            profile.maxChargePower,
+            profile.maxDischargePower
+        )
+    }
 
     fun setProfile(profileSettings: ProfileSettings) {
-        persistenceService["VictronEssProcess.profiles.${profileSettings.profileType}.acPowerSetPoint"] =
-            profileSettings.acPowerSetPoint.toString()
-        persistenceService["VictronEssProcess.profiles.${profileSettings.profileType}.maxChargePower"] =
-            profileSettings.maxChargePower.toString()
-        persistenceService["VictronEssProcess.profiles.${profileSettings.profileType}.maxDischargePower"] =
-            profileSettings.maxDischargePower.toString()
+        val settings = configService.getVictronEssProcessSettings()
+        configService.setVictronEssProcessSettings(
+            settings.copy(profiles = settings.profiles + (profileSettings.profileType.name to VictronEssProcessProfile(
+                profileSettings.acPowerSetPoint,
+                profileSettings.maxChargePower,
+                profileSettings.maxDischargePower
+            )))
+        )
     }
 
     enum class OperationMode {
@@ -258,13 +271,12 @@ data class SoCLimit(
 fun main() {
     val executorService = Executors.newCachedThreadPool()
     val objectMapper = jacksonObjectMapper().registerModule(kotlinModule())
-    val persistenceService = PersistenceService(objectMapper)
-    val influxDBClient = InfluxDBClient(persistenceService)
+    val influxDBClient = InfluxDBClient(ConfigService(objectMapper))
     val victronService = VictronService(
         "192.168.1.18",
         objectMapper,
         executorService,
-        persistenceService,
+        ConfigService(objectMapper),
         influxDBClient,
         EnergyConsumptionService(influxDBClient)
     )

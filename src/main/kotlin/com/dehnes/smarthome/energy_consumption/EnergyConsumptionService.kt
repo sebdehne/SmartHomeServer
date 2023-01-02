@@ -1,9 +1,9 @@
 package com.dehnes.smarthome.energy_consumption
 
-import com.dehnes.smarthome.Configuration
+import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
-import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.objectMapper
 import java.time.Instant
 
 data class PowerPeriodeStart(
@@ -102,9 +102,8 @@ data class EnergyConsumptionData(
 
 
 fun main() {
-    val objectMapper = Configuration().objectMapper()
-    val persistenceService = PersistenceService(objectMapper)
-    val influxDBClient = InfluxDBClient(persistenceService)
+    val objectMapper = objectMapper()
+    val influxDBClient = InfluxDBClient(ConfigService(objectMapper))
     val energyConsumptionService = EnergyConsumptionService(influxDBClient)
     val report = energyConsumptionService.report(
         EnergyConsumptionQuery(

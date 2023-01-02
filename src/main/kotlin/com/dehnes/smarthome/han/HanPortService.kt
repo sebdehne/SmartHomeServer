@@ -1,8 +1,9 @@
 package com.dehnes.smarthome.han
 
+import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
-import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.utils.withLogging
 import mu.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
@@ -33,7 +34,7 @@ class HanPortService(
     private val executorService: ExecutorService,
     influxDBClient: InfluxDBClient,
     energyPriceService: EnergyPriceService,
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
 ) {
 
     private val hanDataService = HanDataService(
@@ -79,7 +80,7 @@ class HanPortService(
     private fun readLoop() {
         val buffer = ByteArray(1024 * 10)
         var writePos = 0
-        val hanDecoder = HanDecoder(persistenceService)
+        val hanDecoder = HanDecoder(configService)
 
         while (true) {
             if (hanPortConnection == null) {
@@ -100,16 +101,10 @@ class HanPortService(
                     val dlmsMessage = DLMSDecoder.decode(hdlcFrame)
                     val hanData = mapToHanData(dlmsMessage)
                     logger.info { "Got new msg=${hdlcFrame} hanData=$hanData" }
-                    executorService.submit {
+                    executorService.submit(withLogging {
                         val listeners = listOf(hanDataService::onNewData) + this.listeners
-                        listeners.forEach { l ->
-                            try {
-                                l(hanData)
-                            } catch (e: Exception) {
-                                logger.error(e) { "Error from hanListener" }
-                            }
-                        }
-                    }
+                        listeners.forEach { l -> l(hanData) }
+                    })
                 }
 
                 if (consumed > 0) {

@@ -1,5 +1,6 @@
 package com.dehnes.smarthome
 
+import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
@@ -17,7 +18,6 @@ import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.AES265GCM
 import com.dehnes.smarthome.utils.DateTimeUtils
-import com.dehnes.smarthome.utils.PersistenceService
 import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.VictronEssProcess
 import com.dehnes.smarthome.victron.VictronService
@@ -31,27 +31,26 @@ import java.time.Clock
 import java.util.concurrent.Executors
 import kotlin.reflect.KClass
 
+fun objectMapper() = jacksonObjectMapper()
+    .registerModule(JavaTimeModule())
+    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+    .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+
 class Configuration {
     private var beans = mutableMapOf<KClass<*>, Any>()
-
-    fun objectMapper() = jacksonObjectMapper()
-        .registerModule(JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     fun init() {
 
         val executorService = Executors.newCachedThreadPool()
         val objectMapper = objectMapper()
-        val persistenceService = PersistenceService(objectMapper)
+        val configService = ConfigService(objectMapper)
 
-        val userSettingsService = UserSettingsService(persistenceService)
+        val userSettingsService = UserSettingsService(configService)
 
-        //val priceSource = TibberPriceClient(objectMapper, persistenceService)
         val priceSource = HvakosterstrommenClient(objectMapper)
 
-        val influxDBClient = InfluxDBClient(persistenceService)
+        val influxDBClient = InfluxDBClient(configService)
         val energyConsumptionService = EnergyConsumptionService(influxDBClient)
 
         val clock = Clock.system(DateTimeUtils.zoneId)
@@ -61,7 +60,7 @@ class Configuration {
             priceSource,
             influxDBClient,
             executorService,
-            persistenceService
+            configService
         )
         energyPriceService.start()
 
@@ -71,16 +70,15 @@ class Configuration {
             executorService,
             influxDBClient,
             energyPriceService,
-            persistenceService
+            configService
         )
         hanPortService.start()
 
         val evChargingStationConnection = EvChargingStationConnection(
             9091,
             executorService,
-            persistenceService,
+            configService,
             influxDBClient,
-            objectMapper,
             clock
         )
         evChargingStationConnection.start()
@@ -90,7 +88,7 @@ class Configuration {
             victronHost,
             objectMapper,
             executorService,
-            persistenceService,
+            configService,
             influxDBClient,
             energyConsumptionService
         )
@@ -99,7 +97,7 @@ class Configuration {
             evChargingStationConnection,
             executorService,
             energyPriceService,
-            persistenceService,
+            configService,
             clock,
             mapOf(
                 PriorityLoadSharing::class.java.simpleName to PriorityLoadSharing(clock)
@@ -112,14 +110,14 @@ class Configuration {
 
         val firmwareUploadService = FirmwareUploadService(evChargingStationConnection, userSettingsService)
 
-        val loRaConnection = LoRaConnection(persistenceService, executorService, AES265GCM(persistenceService), clock)
+        val loRaConnection = LoRaConnection(configService, executorService, AES265GCM(configService), clock)
         loRaConnection.start()
 
         val loRaSensorBoardService = EnvironmentSensorService(
             loRaConnection,
             clock,
             executorService,
-            persistenceService,
+            configService,
             influxDBClient
         )
 
@@ -135,7 +133,7 @@ class Configuration {
         val heaterService = UnderFloorHeaterService(
             loRaConnection,
             executorService,
-            persistenceService,
+            configService,
             influxDBClient,
             energyPriceService,
             clock,
@@ -156,7 +154,7 @@ class Configuration {
         val victronEssProcess = VictronEssProcess(
             executorService,
             victronService,
-            persistenceService,
+            configService,
             energyPriceService,
             dalyBmsDataLogger
         )

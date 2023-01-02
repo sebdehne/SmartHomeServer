@@ -1,6 +1,7 @@
 package com.dehnes.smarthome.environment_sensors
 
 import com.dehnes.smarthome.api.dtos.*
+import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.lora.*
@@ -20,7 +21,7 @@ class EnvironmentSensorService(
     private val loRaConnection: LoRaConnection,
     private val clock: Clock,
     private val executorService: ExecutorService,
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
     private val influxDBClient: InfluxDBClient
 ) {
 
@@ -46,10 +47,12 @@ class EnvironmentSensorService(
                         currentState,
                         packet
                     )
+
                     FIRMWARE_DATA_REQUEST -> if (currentState == null) null else onFirmwareDataRequest(
                         currentState,
                         packet
                     )
+
                     else -> null
                 }
 
@@ -57,7 +60,7 @@ class EnvironmentSensorService(
                     sensors[updatedState.id] = updatedState
 
                     // notify listeners
-                    executorService.submit {
+                    executorService.submit(withLogging {
                         listeners.forEach { (_, fn) ->
                             fn(
                                 EnvironmentSensorEvent(
@@ -67,7 +70,7 @@ class EnvironmentSensorService(
                                 )
                             )
                         }
-                    }
+                    })
 
                     true
                 } else {
@@ -100,6 +103,7 @@ class EnvironmentSensorService(
                     lastReceivedMessage.receivedAt,
                     lastReceivedMessage.rssi
                 )
+
                 is FirmwareDataRequest -> FirmwareUpgradeState(
                     it.data.size,
                     lastReceivedMessage.offset,
@@ -107,14 +111,17 @@ class EnvironmentSensorService(
                     lastReceivedMessage.receivedAt,
                     lastReceivedMessage.rssi
                 )
+
                 else -> null
             }
         }
 
+        val sensor = getSensor(sensorId)
+
         EnvironmentSensorState(
             sensorId,
-            getDisplayName(sensorId),
-            getSleepTimeInSeconds(sensorId),
+            sensor.displayName,
+            sensor.sleepTimeInSeconds,
             if (lastReceivedMessage is SensorData) EnvironmentSensorData(
                 lastReceivedMessage.temperature,
                 lastReceivedMessage.temperatureError,
@@ -134,19 +141,17 @@ class EnvironmentSensorService(
         )
     }
 
-    private fun getDisplayName(sensorId: Int) =
-        persistenceService["EnvironmentSensor.$sensorId.displayName", sensorId.toString()]!!
-
-    private fun getName(sensorId: Int) =
-        persistenceService["EnvironmentSensor.$sensorId.name", sensorId.toString()]!!
+    private fun getSensor(sensorId: Int) =
+        configService.getEnvironmentSensors().sensors.entries.firstOrNull { it.value.id == sensorId }?.value
+            ?: error("Fant ingen sensor med sensorId=$sensorId")
 
     private fun batteryAdcToMv(sensorId: Int, adcBattery: Long): Long {
-        val fiveVadc = persistenceService["EnvironmentSensor.$sensorId.5vADC", "3000"]!!.toLong()
+        val fiveVadc = getSensor(sensorId).fiveVoltADC
         val slope = (5000 * 1000) / fiveVadc
         return (adcBattery * slope) / 1000
     }
 
-    fun adjustSleepTimeInSeconds(sensorId: Int, sleepTimeInSecondsDelta: Long) = synchronized(this) {
+    fun adjustSleepTimeInSeconds(sensorId: Int, sleepTimeInSecondsDelta: Int) = synchronized(this) {
         val sensorState = sensors[sensorId]
         if (sensorState == null) {
             false
@@ -154,7 +159,7 @@ class EnvironmentSensorService(
             val newSleepTimeInSeconds = min(
                 max(
                     1,
-                    getSleepTimeInSeconds(sensorId) + sleepTimeInSecondsDelta
+                    getSensor(sensorId).sleepTimeInSeconds + sleepTimeInSecondsDelta
                 ),
                 10 * 60
             )
@@ -262,7 +267,7 @@ class EnvironmentSensorService(
                     packet.from,
                     FIRMWARE_DATA_RESPONSE,
                     data,
-                    if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+                    if (configService.getEnvironmentSensors().validateTimestamp) null else packet.timestampSecondsSince2000
                 ) { }
 
                 bytesSent += nextChunkSize
@@ -307,7 +312,7 @@ class EnvironmentSensorService(
             packet.from,
             FIRMWARE_INFO_RESPONSE,
             byteArray,
-            if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+            if (configService.getEnvironmentSensors().validateTimestamp) null else packet.timestampSecondsSince2000
         ) {
             if (!it) {
                 logger.info { "Could not send firmware-info-response" }
@@ -329,7 +334,8 @@ class EnvironmentSensorService(
             logger.warn { "Forced to ignore packet with invalid payloadSize=${packet.payload.size} != 21" }
             return existingState
         }
-        if (isIgnored(packet.from)) {
+        val sensor = getSensor(packet.from)
+        if (sensor.ignore) {
             logger.warn { "Ignoring $packet" }
             return existingState
         }
@@ -339,7 +345,7 @@ class EnvironmentSensorService(
             readLong32Bits(packet.payload, 4),
             readLong32Bits(packet.payload, 8),
             readLong32Bits(packet.payload, 12),
-            readLong32Bits(packet.payload, 16),
+            readLong32Bits(packet.payload, 16).toInt(),
             packet.payload[20].toInt(),
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
             clock.millis(),
@@ -350,7 +356,7 @@ class EnvironmentSensorService(
         val responsePayload = ByteArray(6) { 0 }
         responsePayload[0] = (existingState?.triggerFirmwareUpdate ?: false).toInt().toByte()
         responsePayload[1] = (existingState?.triggerTimeAdjustment ?: false).toInt().toByte()
-        val sleepTimeInSeconds = getSleepTimeInSeconds(packet.from)
+        val sleepTimeInSeconds = sensor.sleepTimeInSeconds
         val updatedSensorData = if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
             logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> $sleepTimeInSeconds" }
             System.arraycopy(
@@ -372,7 +378,7 @@ class EnvironmentSensorService(
             packet.from,
             SENSOR_DATA_RESPONSE,
             responsePayload,
-            if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+            if (configService.getEnvironmentSensors().validateTimestamp) null else packet.timestampSecondsSince2000
         ) {
             if (!it) {
                 logger.info { "Could not send sensor-data response" }
@@ -381,7 +387,7 @@ class EnvironmentSensorService(
 
         influxDBClient.recordSensorData(
             updatedSensorData.toInfluxDbRecord(
-                getName(packet.from),
+                sensor.name,
                 batteryAdcToMv(
                     packet.from,
                     updatedSensorData.adcBattery
@@ -428,7 +434,8 @@ class EnvironmentSensorService(
             logger.warn { "Forced to ignore packet with invalid payloadSize=${packet.payload.size} != 21" }
             return existingState
         }
-        if (isIgnored(packet.from)) {
+        val sensor = getSensor(packet.from)
+        if (sensor.ignore) {
             logger.warn { "Ignoring $packet" }
             return existingState
         }
@@ -438,7 +445,7 @@ class EnvironmentSensorService(
             readLong32Bits(packet.payload, 4),
             readLong32Bits(packet.payload, 8),
             readLong32Bits(packet.payload, 12),
-            readLong32Bits(packet.payload, 16),
+            readLong32Bits(packet.payload, 16).toInt(),
             packet.payload[20].toInt(),
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
             clock.millis(),
@@ -450,7 +457,7 @@ class EnvironmentSensorService(
         responsePayload[0] = (existingState?.triggerFirmwareUpdate ?: false).toInt().toByte()
         responsePayload[1] = (existingState?.triggerTimeAdjustment ?: false).toInt().toByte()
         responsePayload[2] = (existingState?.triggerReset ?: false).toInt().toByte()
-        val sleepTimeInSeconds = getSleepTimeInSeconds(packet.from)
+        val sleepTimeInSeconds = sensor.sleepTimeInSeconds
         val updatedSensorData = if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
             logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> $sleepTimeInSeconds" }
             System.arraycopy(
@@ -472,7 +479,7 @@ class EnvironmentSensorService(
             packet.from,
             SENSOR_DATA_RESPONSE_V2,
             responsePayload,
-            if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+            if (configService.getEnvironmentSensors().validateTimestamp) null else packet.timestampSecondsSince2000
         ) {
             if (!it) {
                 logger.info { "Could not send sensor-data response" }
@@ -481,7 +488,7 @@ class EnvironmentSensorService(
 
         influxDBClient.recordSensorData(
             updatedSensorData.toInfluxDbRecord(
-                getName(packet.from),
+                sensor.name,
                 batteryAdcToMv(
                     packet.from,
                     updatedSensorData.adcBattery
@@ -528,7 +535,8 @@ class EnvironmentSensorService(
             logger.warn { "Forced to ignore packet with invalid payloadSize=${packet.payload.size} != 22" }
             return existingState
         }
-        if (isIgnored(packet.from)) {
+        val sensor = getSensor(packet.from)
+        if (sensor.ignore) {
             logger.warn { "Ignoring $packet" }
             return existingState
         }
@@ -538,7 +546,7 @@ class EnvironmentSensorService(
             readLong32Bits(packet.payload, 4),
             readLong32Bits(packet.payload, 8),
             readLong32Bits(packet.payload, 12),
-            readLong32Bits(packet.payload, 16),
+            readLong32Bits(packet.payload, 16).toInt(),
             packet.payload[20].toInt(),
             clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
             clock.millis(),
@@ -550,7 +558,7 @@ class EnvironmentSensorService(
         responsePayload[0] = (existingState?.triggerFirmwareUpdate ?: false).toInt().toByte()
         responsePayload[1] = (existingState?.triggerTimeAdjustment ?: false).toInt().toByte()
         responsePayload[2] = (existingState?.triggerReset ?: false).toInt().toByte()
-        val sleepTimeInSeconds = getSleepTimeInSeconds(packet.from)
+        val sleepTimeInSeconds = sensor.sleepTimeInSeconds
         val updatedSensorData = if (sensorData.sleepTimeInSeconds != sleepTimeInSeconds) {
             logger.info { "Sending updated sleep time. ${sensorData.sleepTimeInSeconds} -> $sleepTimeInSeconds" }
             System.arraycopy(
@@ -572,7 +580,7 @@ class EnvironmentSensorService(
             packet.from,
             SENSOR_DATA_RESPONSE_V2,
             responsePayload,
-            if (persistenceService.validateTimestamp()) null else packet.timestampSecondsSince2000
+            if (configService.getEnvironmentSensors().validateTimestamp) null else packet.timestampSecondsSince2000
         ) {
             if (!it) {
                 logger.info { "Could not send sensor-data response" }
@@ -581,7 +589,7 @@ class EnvironmentSensorService(
 
         influxDBClient.recordSensorData(
             updatedSensorData.toInfluxDbRecord(
-                getName(packet.from),
+                sensor.name,
                 batteryAdcToMv(
                     packet.from,
                     updatedSensorData.adcBattery
@@ -623,15 +631,13 @@ class EnvironmentSensorService(
         )
     }
 
-    private fun getSleepTimeInSeconds(sensorId: Int) =
-        persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds", "20"]!!.toLong()
-
-    private fun setSleepTimeInSeconds(sensorId: Int, sleepTimeInSeconds: Long) {
-        persistenceService["EnvironmentSensor.${sensorId}.sleepTimeInSeconds"] = sleepTimeInSeconds.toString()
+    private fun setSleepTimeInSeconds(sensorId: Int, sleepTimeInSeconds: Int) {
+        configService.setEnvironmentSensor(
+            getSensor(sensorId).copy(
+                sleepTimeInSeconds = sleepTimeInSeconds
+            )
+        )
     }
-
-    private fun isIgnored(sensorId: Int): Boolean =
-        persistenceService["EnvironmentSensor.${sensorId}.ignore", "false"]!!.toBoolean()
 }
 
 data class SensorState(
@@ -650,7 +656,7 @@ data class SensorData(
     val humidity: Long,
     val adcBattery: Long,
     val adcLight: Long,
-    val sleepTimeInSeconds: Long,
+    val sleepTimeInSeconds: Int,
     val firmwareVersion: Int,
     override val timestampDelta: Long,
     override val receivedAt: Long,

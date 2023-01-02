@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.lora
 
+import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.io.Closeable
@@ -16,7 +17,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 
 class LoRaConnection(
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
     private val executorService: ExecutorService,
     private val aes265GCM: AES265GCM,
     private val clock: Clock
@@ -85,7 +86,7 @@ class LoRaConnection(
 
     private fun connect(): Connection {
 
-        val serialDev = persistenceService["lora.serial.port", "/dev/cu.usbmodem14401"]!!
+        val serialDev = configService.getLoraSerialPort()
 
         // set baud
         val process = ProcessBuilder("stty -F $serialDev 115200 raw -echo".split(" ")).start()
@@ -176,7 +177,7 @@ class LoRaConnection(
                             logger.info { "Ignoring packet not for me. $inboundPacket" }
                         } else if (inboundPacket.type == LoRaPacketType.SETUP_REQUEST) {
                             onSetupRequest(inboundPacket)
-                        } else if (persistenceService.validateTimestamp() && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
+                        } else if (configService.getEnvironmentSensors().validateTimestamp && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
                             logger.warn { "Ignoring received packet because of invalid timestampDelta. $inboundPacket" }
                         } else {
 
@@ -185,18 +186,14 @@ class LoRaConnection(
                                 logger.info { "Dropping outbound packet ${outQueue.poll()}" }
                             }
 
-                            executorService.submit {
-                                try {
-                                    val wasAccepted = listeners.any { listener ->
-                                        listener(inboundPacket)
-                                    }
-                                    if (!wasAccepted) {
-                                        logger.warn { "No listener handled message $inboundPacket" }
-                                    }
-                                } catch (e: Exception) {
-                                    logger.error("Error handling LoRa response $line", e)
+                            executorService.submit(withLogging {
+                                val wasAccepted = listeners.any { listener ->
+                                    listener(inboundPacket)
                                 }
-                            }
+                                if (!wasAccepted) {
+                                    logger.warn { "No listener handled message $inboundPacket" }
+                                }
+                            })
                         }
                     }
                 }
@@ -220,9 +217,9 @@ class LoRaConnection(
                         listOf("ok".toRegex(), "invalid_param".toRegex(), "busy".toRegex()),
                         listOf("radio_tx_ok".toRegex(), "radio_err".toRegex())
                     ) != null
-                    executorService.submit {
+                    executorService.submit(withLogging {
                         nextOutPacket.onResult(result)
-                    }
+                    })
 
                     if (outQueue.peek() != null) {
                         Thread.sleep(300) // receive needs some time to process and message + switch to receive mode again
@@ -325,9 +322,9 @@ class LoRaConnection(
 
         logger.info { "Handling setupRequest=$setupRequest" }
 
-        val loraAddr = getLoRaAddr(setupRequest.serialIdHex)
-        if (loraAddr != null) {
-            send(packet.keyId, loraAddr, LoRaPacketType.SETUP_RESPONSE, packet.payload, null) {
+        val sensorId = getSensor(setupRequest.serialIdHex)?.id
+        if (sensorId != null) {
+            send(packet.keyId, sensorId, LoRaPacketType.SETUP_RESPONSE, packet.payload, null) {
                 if (!it) {
                     logger.info { "Could not send pong response" }
                 }
@@ -337,12 +334,9 @@ class LoRaConnection(
         }
     }
 
-    private fun getLoRaAddr(serialId: String) =
-        persistenceService["EnvironmentSensor.loraAddr.$serialId", null]?.toInt()
+    private fun getSensor(serialId: String) = configService.getEnvironmentSensors().sensors[serialId]
 
 }
-
-fun PersistenceService.validateTimestamp() = this["EnvironmentSensor.validateTimestamp", "true"].toBoolean()
 
 val headerLength = 11
 val maxPayload = 255 - headerLength - AES265GCM.overhead()

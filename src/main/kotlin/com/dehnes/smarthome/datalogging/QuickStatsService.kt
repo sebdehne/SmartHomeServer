@@ -2,6 +2,7 @@ package com.dehnes.smarthome.datalogging
 
 import com.dehnes.smarthome.api.dtos.QuickStatsResponse
 import com.dehnes.smarthome.han.HanPortService
+import com.dehnes.smarthome.utils.withLogging
 import com.dehnes.smarthome.victron.SystemState
 import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
@@ -32,7 +33,7 @@ class QuickStatsService(
     }
 
     private fun notifyListeners() {
-        executorService.submit {
+        executorService.submit(withLogging {
             listeners.forEach { (t, u) ->
                 try {
                     u(getStats())
@@ -40,7 +41,7 @@ class QuickStatsService(
                     logger.error("t=$t", e)
                 }
             }
-        }
+        })
     }
 
 

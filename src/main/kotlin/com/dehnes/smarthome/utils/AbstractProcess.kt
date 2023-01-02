@@ -16,13 +16,9 @@ abstract class AbstractProcess(
 
     open fun start() {
         timer.scheduleWithFixedDelay({
-            executorService.submit {
-                try {
-                    tick()
-                } catch (e: Exception) {
-                    logger().error("", e)
-                }
-            }
+            executorService.submit(withLogging {
+                tick()
+            })
         }, intervalInSeconds, intervalInSeconds, TimeUnit.SECONDS)
     }
 

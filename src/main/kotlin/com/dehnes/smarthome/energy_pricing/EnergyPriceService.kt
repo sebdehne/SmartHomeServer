@@ -1,9 +1,10 @@
 package com.dehnes.smarthome.energy_pricing
 
+import com.dehnes.smarthome.config.ConfigService
+import com.dehnes.smarthome.config.EnergyPriceServiceSettings
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.utils.AbstractProcess
 import com.dehnes.smarthome.utils.DateTimeUtils
-import com.dehnes.smarthome.utils.PersistenceService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import java.time.Instant
@@ -21,15 +22,13 @@ class EnergyPriceService(
     private val priceSource: PriceSource,
     private val influxDBClient: InfluxDBClient,
     executorService: ExecutorService,
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
 ) : AbstractProcess(executorService, 60 * 5) {
 
     private val logger = KotlinLogging.logger { }
     private val backOffInMs = 60L * 60L * 1000L
     private var lastReload = 0L
     private var priceCache = listOf<Price>()
-
-    var gridIsOffline: Boolean = false
 
     @Synchronized
     override fun tickLocked(): Boolean {
@@ -54,42 +53,49 @@ class EnergyPriceService(
         return priceCache
     }
 
-    fun getAllSettings(): List<EnergyPriceConfig> = persistenceService.getAllFor("EnergyPriceService.neutralSpan.").map {
-        val service = it.first.replace("EnergyPriceService.neutralSpan.", "")
-        val today = Instant.now().atZone(DateTimeUtils.zoneId).toLocalDate()
-        val categorizedPrices = listOf(
-            today.minusDays(1),
-            today,
-            today.plusDays(1),
-        )
-            .map { findSuitablePrices(service, it) }
-            .flatten()
-        EnergyPriceConfig(
-            service,
-            getNeutralSpan(service),
-            getAvgMultiplier(service),
-            categorizedPrices,
-            categorizedPrices.priceDecision()
-        )
+    fun getAllSettings(): List<EnergyPriceConfig> {
+        return configService.getEnergyPriceServiceSettings().entries.map { (service, settings) ->
+            val today = Instant.now().atZone(DateTimeUtils.zoneId).toLocalDate()
+            val categorizedPrices = listOf(
+                today.minusDays(1),
+                today,
+                today.plusDays(1),
+            )
+                .map { findSuitablePrices(service, it) }
+                .flatten()
+            EnergyPriceConfig(
+                service,
+                settings.neutralSpan,
+                settings.avgMultiplier,
+                categorizedPrices,
+                categorizedPrices.priceDecision()
+            )
+        }
     }
-
-    fun getNeutralSpan(serviceType: String) =
-        persistenceService["EnergyPriceService.neutralSpan.$serviceType", "0.4"]!!.toDouble()
 
     fun setNeutralSpan(serviceType: String, neutralSpan: Double) {
-        persistenceService["EnergyPriceService.neutralSpan.$serviceType"] = neutralSpan.toString()
+        configService.setEnergiPriceServiceSetting(
+            serviceType,
+            getEnergyPriceServiceSetting(serviceType).copy(
+                neutralSpan = neutralSpan
+            )
+        )
     }
 
-    fun getAvgMultiplier(serviceType: String) =
-        persistenceService["EnergyPriceService.avgMultiplier.$serviceType", "0"]!!.toDouble()
 
     fun setAvgMultiplier(serviceType: String, avgMultiplier: Double) {
-        persistenceService["EnergyPriceService.avgMultiplier.$serviceType"] = avgMultiplier.toString()
+        configService.setEnergiPriceServiceSetting(
+            serviceType,
+            getEnergyPriceServiceSetting(serviceType).copy(
+                avgMultiplier = avgMultiplier
+            )
+        )
     }
 
     @Synchronized
     fun findSuitablePrices(serviceType: String, day: LocalDate): List<CategorizedPrice> {
         ensureCacheLoaded()
+        val settings = getEnergyPriceServiceSetting(serviceType)
 
         val periodFrom = day.atStartOfDay(DateTimeUtils.zoneId).toInstant()
         val periodUntil = (day.plusDays(1)).atStartOfDay(DateTimeUtils.zoneId).toInstant()
@@ -102,9 +108,9 @@ class EnergyPriceService(
         if (priceRange.isEmpty()) return emptyList()
 
         val avgRaw = priceRange.map { it.price }.average()
-        val avg = avgRaw + avgRaw * getAvgMultiplier(serviceType)
+        val avg = avgRaw + avgRaw * settings.avgMultiplier
 
-        val neutralSpan = getNeutralSpan(serviceType)
+        val neutralSpan = settings.neutralSpan
         val upperBound = avg + (neutralSpan / 2)
         val lowerBound = avg - (neutralSpan / 2)
 
@@ -119,6 +125,13 @@ class EnergyPriceService(
             )
         }
     }
+
+    private fun getEnergyPriceServiceSetting(serviceType: String) =
+        configService.getEnergyPriceServiceSettings()[serviceType] ?: run {
+            val default = EnergyPriceServiceSettings(0.0, 0.8)
+            configService.setEnergiPriceServiceSetting(serviceType, default)
+            default
+        }
 
     private fun ensureCacheLoaded() {
         if (lastReload + backOffInMs < System.currentTimeMillis()) {

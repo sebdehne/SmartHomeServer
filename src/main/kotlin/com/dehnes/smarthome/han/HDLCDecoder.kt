@@ -1,6 +1,6 @@
 package com.dehnes.smarthome.han
 
-import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.utils.merge
 import com.dehnes.smarthome.utils.toUnsignedInt
 import mu.KotlinLogging
@@ -70,7 +70,7 @@ enum class HanDecoderState {
 }
 
 class HanDecoder(
-    private val persistenceService: PersistenceService
+    private val configService: ConfigService
 ) {
 
     private val random = Random()
@@ -197,8 +197,8 @@ class HanDecoder(
 
     private fun debugData(data: ByteArray) {
         try {
-            val file = persistenceService.get("han_debug_file") ?: return
-            FileOutputStream(persistenceService["han_debug_file"], true).use { os ->
+            val file = configService.getHanDebugFile() ?: return
+            FileOutputStream(file, true).use { os ->
                 os.write(data)
             }
             logger.info { "Wrote ${data.size} to han-debug file $file" }

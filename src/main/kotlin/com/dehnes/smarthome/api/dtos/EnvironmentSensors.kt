@@ -18,7 +18,7 @@ data class EnvironmentSensorRequest(
     val sensorId: Int?,
     val firmwareFilename: String?,
     val firmwareBased64Encoded: String?,
-    val sleepTimeInSecondsDelta: Long?
+    val sleepTimeInSecondsDelta: Int?
 )
 
 data class EnvironmentSensorResponse(
@@ -34,7 +34,7 @@ data class FirmwareInfo(
 data class EnvironmentSensorState(
     val sensorId: Int,
     val displayName: String,
-    val sleepTimeInSeconds: Long,
+    val sleepTimeInSeconds: Int,
     val sensorData: EnvironmentSensorData?,
     val firmwareUpgradeState: FirmwareUpgradeState?,
     val firmwareVersion: Int,
@@ -57,7 +57,7 @@ data class EnvironmentSensorData(
     val humidity: Long,
     val batteryMilliVolts: Long,
     val adcLight: Long,
-    val sleepTimeInSeconds: Long,
+    val sleepTimeInSeconds: Int,
     val timestampDelta: Long,
     val receivedAt: Long,
     val rssi: Int

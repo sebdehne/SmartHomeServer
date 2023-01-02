@@ -1,6 +1,7 @@
 package com.dehnes.smarthome.utils
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.dehnes.smarthome.config.ConfigService
+import com.dehnes.smarthome.objectMapper
 import mu.KotlinLogging
 import java.nio.charset.Charset
 import javax.crypto.Cipher
@@ -10,7 +11,7 @@ import kotlin.random.Random
 
 
 class AES265GCM(
-    persistenceService: PersistenceService
+    configService: ConfigService
 ) {
 
     companion object {
@@ -20,14 +21,12 @@ class AES265GCM(
         fun overhead() = IV_SIZE + TAGSIZE
     }
 
-    private val keys = persistenceService["AES265GCM.keys", "key is missing"]!!
-        .split(",")
-        .associate { chunk ->
-            val split = chunk.split(":")
-            split[0].toInt() to split[1].chunked(2)
-                .map { it.toInt(16).toByte() }
-                .toByteArray()
-        }
+    private val keys = configService.getAesKeys().map { (keyId, keyString) ->
+        keyId.toInt() to keyString.chunked(2)
+            .map { it.toInt(16).toByte() }
+            .toByteArray()
+    }.toMap()
+
     private val logger = KotlinLogging.logger { }
 
     /**
@@ -89,7 +88,7 @@ fun main() {
     val decodeHexString =
         decodeHexString("DDC393D552DA8699292E8340208EEFE5CCE97B53F77B0AA91E83E6B79C0C7540C15FBB28A2FAB1FE8996579F796CD2A658069D36519B19E55A3D5AF4E5")
 
-    val aeS265GCM = AES265GCM(PersistenceService(ObjectMapper()))
+    val aeS265GCM = AES265GCM(ConfigService(objectMapper()))
     val (keyId, plainText) = aeS265GCM.decrypt(decodeHexString) ?: error("Could not decrypt")
     println("Done with keyId=$keyId: ${plainText.toString(Charset.defaultCharset())}")
 

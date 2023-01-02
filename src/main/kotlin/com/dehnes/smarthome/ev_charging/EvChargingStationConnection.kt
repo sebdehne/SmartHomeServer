@@ -1,12 +1,13 @@
 package com.dehnes.smarthome.ev_charging
 
+import com.dehnes.smarthome.api.dtos.EvChargingMode
 import com.dehnes.smarthome.api.dtos.EvChargingStationClient
 import com.dehnes.smarthome.api.dtos.ProximityPilotAmps
+import com.dehnes.smarthome.config.ConfigService
+import com.dehnes.smarthome.config.EvCharger
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.utils.*
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import mu.KotlinLogging
 import java.lang.Integer.max
 import java.net.ServerSocket
@@ -23,9 +24,8 @@ import kotlin.math.roundToInt
 class EvChargingStationConnection(
     private val port: Int,
     private val executorService: ExecutorService,
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
     private val influxDBClient: InfluxDBClient,
-    private val objectMapper: ObjectMapper,
     private val clock: Clock
 ) {
     private val logger = KotlinLogging.logger { }
@@ -139,7 +139,7 @@ class EvChargingStationConnection(
             clientContext.scheduledFuture.cancel(false)
             closeSocket(clientContext.socket)
 
-            executorService.submit {
+            executorService.submit(withLogging {
                 listeners.values.forEach { fn ->
                     try {
                         fn(Event(EventType.closedClientConnection, clientContext.evChargingStationClient, null))
@@ -147,7 +147,7 @@ class EvChargingStationConnection(
                         logger.error("", e)
                     }
                 }
-            }
+            })
         }
     }
 
@@ -164,6 +164,29 @@ class EvChargingStationConnection(
             socket.close()
         } catch (i: Exception) {
         }
+    }
+
+    private fun getOrCreateChargerSettings(serialId: String): EvCharger {
+        val evSettings = configService.getEvSettings()
+        var evCharger = evSettings.chargers[serialId]
+        if (evCharger == null) {
+            evCharger = EvCharger(
+                serialId,
+                "unknown",
+                "unknown charger",
+                "unknown",
+                CalibrationData(),
+                EvChargingMode.OFF,
+                LoadSharingPriority.NORMAL,
+                32
+            )
+            configService.setEvSettings(
+                evSettings.copy(
+                    chargers = evSettings.chargers + (serialId to evCharger)
+                )
+            )
+        }
+        return evCharger
     }
 
     private fun onNewClient(socket: Socket) {
@@ -188,24 +211,22 @@ class EvChargingStationConnection(
                 return
             }
 
-            val clientIdStr = clientId.toHexString().let { id ->
-                persistenceService["ChargerName.$id", id]!!
-            }
+            val settings = getOrCreateChargerSettings(clientId.toHexString())
 
             val evChargingStationClient = EvChargingStationClient(
-                clientIdStr,
-                persistenceService["ChargerDisplayName.$clientIdStr", clientIdStr]!!,
+                settings.name,
+                settings.displayName,
                 socket.inetAddress.toString(),
                 socket.port,
                 firmwareVersion,
-                persistenceService.get("ChargePowerConnection.$clientIdStr", "unknown")!!,
+                settings.powerConnection,
                 System.currentTimeMillis()
             )
 
             val inboundQueue: BlockingQueue<InboundPacket> = LinkedBlockingQueue()
 
             // reader thread
-            executorService.submit {
+            executorService.submit(withLogging {
                 logger.info { "New client connected $evChargingStationClient" }
 
                 try {
@@ -236,7 +257,7 @@ class EvChargingStationConnection(
 
                         val inboundPacket = responseType.parser(
                             msg,
-                            getCalibrationData(clientIdStr),
+                            settings.calibrationData,
                             evChargingStationClient.firmwareVersion,
                             clock.millis()
                         )
@@ -251,9 +272,9 @@ class EvChargingStationConnection(
                     }
                 } catch (e: Exception) {
                     logger.info { "Connection error for client $evChargingStationClient" }
-                    closeContext(clientIdStr)
+                    closeContext(settings.name)
                 }
-            }
+            })
 
             // keep-alive timer
             val timerRef = timer.scheduleAtFixedRate(
@@ -265,10 +286,10 @@ class EvChargingStationConnection(
                 TimeUnit.SECONDS
             )
 
-            connectedClientsById[clientIdStr] =
+            connectedClientsById[settings.name] =
                 ClientContext(socket, timerRef, evChargingStationClient, AtomicLong(), inboundQueue)
 
-            executorService.submit {
+            executorService.submit(withLogging {
                 listeners.values.forEach { fn ->
                     try {
                         fn(Event(EventType.newClientConnection, evChargingStationClient, null))
@@ -276,7 +297,7 @@ class EvChargingStationConnection(
                         logger.error("", e)
                     }
                 }
-            }
+            })
 
         } catch (t: Throwable) {
             logger.info("", t)
@@ -284,25 +305,18 @@ class EvChargingStationConnection(
     }
 
     fun collectDataAndDistribute(clientId: String) {
-        executorService.submit {
-            val evChargingStationClient = connectedClientsById[clientId]?.evChargingStationClient ?: return@submit
+        executorService.submit(withLogging {
+            val evChargingStationClient = connectedClientsById[clientId]?.evChargingStationClient ?: return@withLogging
             val data = collectData(clientId)
             logger.info { "Data response for $clientId $data" }
             data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=$clientId msg=$msg" } }
             recordData(data, evChargingStationClient)
-            executorService.submit {
+            executorService.submit(withLogging {
                 listeners.forEach { entry ->
                     entry.value(Event(EventType.clientData, evChargingStationClient, data))
                 }
-            }
-        }
-    }
-
-    private fun getCalibrationData(clientId: String): CalibrationData {
-        val default = objectMapper.writeValueAsString(CalibrationData())
-        return persistenceService["Charger.calibrationData.$clientId", default].let {
-            objectMapper.readValue(it!!)
-        }
+            })
+        })
     }
 
     private fun recordData(dataResponse: DataResponse, evChargingStationClient: EvChargingStationClient) {

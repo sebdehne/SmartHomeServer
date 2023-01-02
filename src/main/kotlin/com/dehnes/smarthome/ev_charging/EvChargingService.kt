@@ -1,6 +1,8 @@
 package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.api.dtos.*
+import com.dehnes.smarthome.config.ConfigService
+import com.dehnes.smarthome.config.EvCharger
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.PriceCategory
@@ -10,7 +12,7 @@ import com.dehnes.smarthome.users.SystemUser
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.DateTimeUtils
-import com.dehnes.smarthome.utils.PersistenceService
+import com.dehnes.smarthome.utils.withLogging
 import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
 import java.lang.Integer.min
@@ -69,7 +71,7 @@ class EvChargingService(
     private val eVChargingStationConnection: EvChargingStationConnection,
     private val executorService: ExecutorService,
     private val energyPriceService: EnergyPriceService,
-    private val persistenceService: PersistenceService,
+    private val configService: ConfigService,
     private val clock: Clock,
     private val loadSharingAlgorithms: Map<String, LoadSharing>,
     private val victronService: VictronService,
@@ -80,12 +82,9 @@ class EvChargingService(
     private val currentData = ConcurrentHashMap<String, InternalState>()
 
     // config
-    private val chargingEndingAmpDelta =
-        persistenceService["EvChargingService.chargingEndingAmpDelta", "2"]!!.toInt()
-    private val stayInStoppingChargingForMS =
-        persistenceService["EvChargingService.stayInStoppingChargingForMS", (1000 * 5).toString()]!!.toLong()
-    private val assumeStationLostAfterMs =
-        persistenceService["EvChargingService.assumeStationLostAfterMs", (1000 * 60 * 5).toString()]!!.toLong()
+    private val chargingEndingAmpDelta = configService.getEvSettings().chargingEndingAmpDelta
+    private val stayInStoppingChargingForMS = configService.getEvSettings().stayInStoppingChargingForMS
+    private val assumeStationLostAfterMs = configService.getEvSettings().assumeStationLostAfterMs
     private val rollingAverageDepth = 5
 
     companion object {
@@ -99,7 +98,7 @@ class EvChargingService(
             when (event.eventType) {
                 EventType.clientData -> {
                     onIncomingDataUpdate(event.evChargingStationClient, event.clientData!!)?.let { updatedState ->
-                        executorService.submit {
+                        executorService.submit(withLogging {
 
                             recordPower(updatedState)
 
@@ -111,7 +110,7 @@ class EvChargingService(
                                     )
                                 )
                             }
-                        }
+                        })
                     }
                 }
 
@@ -160,21 +159,40 @@ class EvChargingService(
         }
     }
 
+    fun getChargerSettings(clientId: String) =
+        configService.getEvSettings().chargers.entries.firstOrNull { it.value.name == clientId }?.value
+            ?: error("Fant ingen chargerSetings for $clientId")
+
+    fun setChargerSettings(evCharger: EvCharger) {
+        val evSettings = configService.getEvSettings()
+        configService.setEvSettings(
+            evSettings.copy(
+                chargers = evSettings.chargers + (evCharger.serialNumber to evCharger)
+            )
+        )
+    }
+
     fun updateMode(user: String?, clientId: String, evChargingMode: EvChargingMode): Boolean {
         if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return false
-        persistenceService["EvChargingService.client.mode.$clientId"] = evChargingMode.name
+        setChargerSettings(
+            getChargerSettings(clientId).copy(
+                evChargingMode = evChargingMode
+            )
+        )
         eVChargingStationConnection.collectDataAndDistribute(clientId)
         return true
     }
 
-    fun getMode(clientId: String) =
-        persistenceService["EvChargingService.client.mode.$clientId", EvChargingMode.ChargeDuringCheapHours.name]!!
-            .let { EvChargingMode.valueOf(it) }
+    fun getMode(clientId: String) = getChargerSettings(clientId).evChargingMode
 
     fun setPriorityFor(user: String?, clientId: String, loadSharingPriority: LoadSharingPriority) = synchronized(this) {
         if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return@synchronized false
 
-        persistenceService["EvChargingService.client.priorty.$clientId"] = loadSharingPriority.name
+        val evCharger = getChargerSettings(clientId)
+        setChargerSettings(
+            evCharger.copy(priority = loadSharingPriority)
+        )
+
         var result = false
         currentData.computeIfPresent(clientId) { _, internalState ->
             result = true
@@ -183,16 +201,20 @@ class EvChargingService(
         result
     }
 
-    private fun getPriorityFor(clientId: String) =
-        persistenceService["EvChargingService.client.priorty.$clientId", LoadSharingPriority.NORMAL.name]!!.let {
-            LoadSharingPriority.valueOf(it)
-        }
+    private fun getPriorityFor(clientId: String) = getChargerSettings(clientId).priority
 
     fun setChargeRateLimitFor(user: String?, clientId: String, chargeRateLimit: Int) = synchronized(this) {
         if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return@synchronized false
 
         check(chargeRateLimit in 6..32)
-        persistenceService["EvChargingService.client.chargeRateLimit.$clientId"] = chargeRateLimit.toString()
+
+        val settings = getChargerSettings(clientId)
+        setChargerSettings(
+            settings.copy(
+                chargeRateLimit = chargeRateLimit
+            )
+        )
+
         var result = false
         currentData.computeIfPresent(clientId) { _, internalState ->
             result = true
@@ -201,18 +223,21 @@ class EvChargingService(
         result
     }
 
-    private fun getChargeRateLimit(clientId: String) =
-        persistenceService["EvChargingService.client.chargeRateLimit.$clientId", 32.toString()]!!.toInt()
+    private fun getChargeRateLimit(clientId: String) = getChargerSettings(clientId).chargeRateLimit
 
     fun getPowerConnection(powerConnectionId: String): PowerConnection = object : PowerConnection {
         override fun availableAmpsCapacity(): Int {
-            return persistenceService["PowerConnection.availableCapacity.$powerConnectionId", "32"]!!.toInt()
+            return getPowerConnectionSettings(powerConnectionId).availableCapacity
         }
 
         override fun availablePowerCapacity(): Int {
             return (230 * availableAmpsCapacity()) * 3 // TODO ony provide the headroom up to the configured power-target
         }
     }
+
+    private fun getPowerConnectionSettings(powerConnectionId: String) =
+        configService.getEvSettings().powerConnections[powerConnectionId]
+            ?: error("Fant ingen powerConnection=$powerConnectionId")
 
     internal fun onIncomingDataUpdate(
         evChargingStationClient: EvChargingStationClient,
@@ -241,8 +266,7 @@ class EvChargingService(
             )
         }
         val powerConnectionId = existingState.powerConnectionId
-        val loadSharingAlgorithmId =
-            persistenceService["EvChargingService.powerConnection.loadSharingAlgorithm.$powerConnectionId", PriorityLoadSharing::class.java.simpleName]!!
+        val loadSharingAlgorithmId = getPowerConnectionSettings(powerConnectionId).loadSharingAlgorithm
         val loadSharingAlgorithm = loadSharingAlgorithms[loadSharingAlgorithmId]
             ?: error("Could not find loadSharingAlgorithmId=$loadSharingAlgorithmId")
 
