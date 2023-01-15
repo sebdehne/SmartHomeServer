@@ -21,6 +21,7 @@ import {
 } from "@material-ui/core";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
+import { useUserSettings } from "../../Websocket/websocketClient";
 
 const stateToText = (currentMilliSeconds: number, sensor: EnvironmentSensorState) => {
     if (sensor.firmwareUpgradeState != null) {
@@ -59,7 +60,7 @@ export const getSensorStatus = (sensor: EnvironmentSensorState, currentMilliSeco
         if (sensor.sensorData!!.timestampDelta > 10 || sensor.sensorData!!.timestampDelta < -10) {
             status = SensorStatus.yellow;
         }
-        if (sensor.sensorData!!.batteryMilliVolts < 3100) {
+        if (sensor.sensorData!!.batteryMilliVolts < 3200) {
             status = SensorStatus.yellow;
         }
         if (sensor.sensorData!!.temperatureError) {
@@ -95,6 +96,8 @@ export const EnvironmentSensor = ({
                                       firmwareInfo,
                                       sendUpdate
                                   }: EnvironmentSensorProps) => {
+
+    const userSettings = useUserSettings();
 
     const sendCommand = (cmd: EnvironmentSensorRequestType) => sendUpdate({
         type: cmd,
@@ -138,6 +141,7 @@ export const EnvironmentSensor = ({
                             margin: "10px"
                         }}>
                             <Button
+                                disabled={!userSettings.userCanAdmin("environmentSensors")}
                                 color={sensor.timeAdjustmentSchedule ? 'secondary' : 'primary'}
                                 onClick={() =>
                                     sensor.timeAdjustmentSchedule
@@ -146,7 +150,7 @@ export const EnvironmentSensor = ({
                                 }
                             >Adjust time</Button>
                             <Button
-                                disabled={!firmwareInfo?.filename}
+                                disabled={!firmwareInfo?.filename || !userSettings.userCanAdmin("environmentSensors")}
                                 color={sensor.firmwareUpgradeScheduled ? 'secondary' : 'primary'}
                                 onClick={() =>
                                     sensor.firmwareUpgradeScheduled
@@ -155,6 +159,7 @@ export const EnvironmentSensor = ({
                                 }
                             >Upgrade firmware</Button>
                             <Button
+                                disabled={!userSettings.userCanAdmin("environmentSensors")}
                                 color={sensor.resetScheduled ? 'secondary' : 'primary'}
                                 onClick={() =>
                                     sensor.resetScheduled
@@ -180,10 +185,10 @@ export const EnvironmentSensor = ({
                                                      margin: "10px"
                                                  }}>
                                         <Button
-                                            disabled={sensor.sleepTimeInSeconds < 11}
+                                            disabled={sensor.sleepTimeInSeconds < 11 || !userSettings.userCanAdmin("environmentSensors")}
                                             onClick={() => adjustSleepTimeInSeconds(-10)}>-</Button>
                                         <Button
-                                            disabled={sensor.sleepTimeInSeconds >= 590}
+                                            disabled={sensor.sleepTimeInSeconds >= 590 || !userSettings.userCanAdmin("environmentSensors")}
                                             onClick={() => adjustSleepTimeInSeconds(10)}>+</Button>
                                     </ButtonGroup>
                                 </Grid>

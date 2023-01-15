@@ -63,7 +63,7 @@ fun main() {
     f.outputStream().writer(Charsets.UTF_8).use { os ->
         os.write("\ufeff")
 
-        for (d in (1..28)) {
+        for (d in (1..31)) {
             val prices = client.getDay(LocalDate.of(2022, 12, d))
             prices.forEach { p ->
                 val line = listOf(

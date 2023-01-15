@@ -12,7 +12,7 @@ class FirmwareUploadService(
     private val logger = KotlinLogging.logger { }
 
     fun uploadVersion(user: String?, clientId: String, firmwareBased64Encoded: String): Boolean {
-        if (!userSettingsService.canUserWrite(user, UserRole.firmwareUpgrades)) return false
+        if (!userSettingsService.canUserAdmin(user, UserRole.evCharging)) return false
 
         return try {
             val firmware = Base64.getDecoder().decode(firmwareBased64Encoded)

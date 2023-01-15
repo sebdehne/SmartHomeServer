@@ -79,10 +79,15 @@ class WebSocketServer : Endpoint() {
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
             userSettings -> RpcResponse(userSettings = userSettingsService.getUserSettings(userEmail))
-            essRead -> RpcResponse(essState = victronEssProcess.current())
+            readAllUserSettings -> RpcResponse(allUserSettings = userSettingsService.getAllUserSettings(userEmail))
+            writeUserSettings -> {
+                userSettingsService.handleWrite(userEmail, rpcRequest.writeUserSettings!!)
+                RpcResponse(allUserSettings = userSettingsService.getAllUserSettings(userEmail))
+            }
+            essRead -> RpcResponse(essState = victronEssProcess.current(userEmail))
             essWrite -> {
-                victronEssProcess.handleWrite(rpcRequest.essWrite!!)
-                RpcResponse(essState = victronEssProcess.current())
+                victronEssProcess.handleWrite(userEmail, rpcRequest.essWrite!!)
+                RpcResponse(essState = victronEssProcess.current(userEmail, ))
             }
 
             quickStats -> RpcResponse(quickStatsResponse = quickStatsService.getStats())
@@ -109,7 +114,7 @@ class WebSocketServer : Endpoint() {
                         SubscriptionType.getUnderFloorHeaterStatus -> UnderFloorHeaterSubscription(
                             subscriptionId, argSession
                         ).apply {
-                            underFloopHeaterService.listeners[subscriptionId] = this::onEvent
+                            underFloopHeaterService.addListener(userEmail, subscriptionId, this::onEvent)
                         }
 
                         SubscriptionType.evChargingStationEvents -> EvChargingStationSubscription(
@@ -123,7 +128,7 @@ class WebSocketServer : Endpoint() {
                             subscriptionId,
                             argSession,
                         ).apply {
-                            loRaSensorBoardService.listeners[subscriptionId] = this::onEvent
+                            loRaSensorBoardService.addListener(userEmail, subscriptionId, this::onEvent)
                         }
                     }
 
@@ -144,7 +149,7 @@ class WebSocketServer : Endpoint() {
             }
 
             garageRequest -> RpcResponse(garageResponse = garageRequest(rpcRequest.garageRequest!!, userEmail))
-            underFloorHeaterRequest -> RpcResponse(underFloorHeaterResponse = underFloorHeaterRequest(rpcRequest.underFloorHeaterRequest!!))
+            underFloorHeaterRequest -> RpcResponse(underFloorHeaterResponse = underFloorHeaterRequest(userEmail, rpcRequest.underFloorHeaterRequest!!))
             evChargingStationRequest -> RpcResponse(
                 evChargingStationResponse = evChargingStationRequest(
                     userEmail,
@@ -152,25 +157,25 @@ class WebSocketServer : Endpoint() {
                 )
             )
 
-            environmentSensorRequest -> RpcResponse(environmentSensorResponse = environmentSensorRequest(rpcRequest.environmentSensorRequest!!))
-            RequestType.videoBrowser -> RpcResponse(videoBrowserResponse = videoBrowser.rpc(rpcRequest.videoBrowserRequest!!))
+            environmentSensorRequest -> RpcResponse(environmentSensorResponse = environmentSensorRequest(userEmail, rpcRequest.environmentSensorRequest!!))
+            RequestType.videoBrowser -> RpcResponse(videoBrowserResponse = videoBrowser.rpc(userEmail, rpcRequest.videoBrowserRequest!!))
             readEnergyPricingSettings -> RpcResponse(
                 energyPricingSettingsRead = EnergyPricingSettingsRead(
-                    energyPriceService.getAllSettings(),
+                    energyPriceService.getAllSettings(userEmail),
                 )
             )
 
             writeEnergyPricingSettings -> {
                 val req = rpcRequest.energyPricingSettingsWrite!!
                 if (req.neutralSpan != null) {
-                    energyPriceService.setNeutralSpan(req.service, req.neutralSpan)
+                    energyPriceService.setNeutralSpan(userEmail, req.service, req.neutralSpan)
                 }
                 if (req.avgMultiplier != null) {
-                    energyPriceService.setAvgMultiplier(req.service, req.avgMultiplier)
+                    energyPriceService.setAvgMultiplier(userEmail, req.service, req.avgMultiplier)
                 }
                 RpcResponse(
                     energyPricingSettingsRead = EnergyPricingSettingsRead(
-                        energyPriceService.getAllSettings(),
+                        energyPriceService.getAllSettings(userEmail),
                     )
                 )
             }
@@ -189,46 +194,46 @@ class WebSocketServer : Endpoint() {
         )
     }
 
-    private fun environmentSensorRequest(request: EnvironmentSensorRequest) = when (request.type) {
-        EnvironmentSensorRequestType.getAllEnvironmentSensorData -> loRaSensorBoardService.getEnvironmentSensorResponse()
+    private fun environmentSensorRequest(userEmail: String?, request: EnvironmentSensorRequest) = when (request.type) {
+        EnvironmentSensorRequestType.getAllEnvironmentSensorData -> loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         EnvironmentSensorRequestType.scheduleFirmwareUpgrade -> {
-            loRaSensorBoardService.firmwareUpgrade(request.sensorId!!, true)
-            loRaSensorBoardService.getEnvironmentSensorResponse()
+            loRaSensorBoardService.firmwareUpgrade(userEmail, request.sensorId!!, true)
+            loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
 
         EnvironmentSensorRequestType.cancelFirmwareUpgrade -> {
-            loRaSensorBoardService.firmwareUpgrade(request.sensorId!!, false)
-            loRaSensorBoardService.getEnvironmentSensorResponse()
+            loRaSensorBoardService.firmwareUpgrade(userEmail, request.sensorId!!, false)
+            loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
 
         EnvironmentSensorRequestType.scheduleTimeAdjustment -> {
-            loRaSensorBoardService.timeAdjustment(request.sensorId, true)
-            loRaSensorBoardService.getEnvironmentSensorResponse()
+            loRaSensorBoardService.timeAdjustment(userEmail, request.sensorId, true)
+            loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
 
         EnvironmentSensorRequestType.cancelTimeAdjustment -> {
-            loRaSensorBoardService.timeAdjustment(request.sensorId, false)
-            loRaSensorBoardService.getEnvironmentSensorResponse()
+            loRaSensorBoardService.timeAdjustment(userEmail, request.sensorId, false)
+            loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
 
         EnvironmentSensorRequestType.scheduleReset -> {
-            loRaSensorBoardService.configureReset(request.sensorId, true)
-            loRaSensorBoardService.getEnvironmentSensorResponse()
+            loRaSensorBoardService.configureReset(userEmail, request.sensorId, true)
+            loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
 
         EnvironmentSensorRequestType.cancelReset -> {
-            loRaSensorBoardService.configureReset(request.sensorId, false)
-            loRaSensorBoardService.getEnvironmentSensorResponse()
+            loRaSensorBoardService.configureReset(userEmail, request.sensorId, false)
+            loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
 
         EnvironmentSensorRequestType.adjustSleepTimeInSeconds -> {
-            loRaSensorBoardService.adjustSleepTimeInSeconds(request.sensorId!!, request.sleepTimeInSecondsDelta!!)
-            loRaSensorBoardService.getEnvironmentSensorResponse()
+            loRaSensorBoardService.adjustSleepTimeInSeconds(userEmail, request.sensorId!!, request.sleepTimeInSecondsDelta!!)
+            loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
 
         EnvironmentSensorRequestType.uploadFirmware -> {
-            loRaSensorBoardService.setFirmware(request.firmwareFilename!!, request.firmwareBased64Encoded!!)
-            loRaSensorBoardService.getEnvironmentSensorResponse()
+            loRaSensorBoardService.setFirmware(userEmail, request.firmwareFilename!!, request.firmwareBased64Encoded!!)
+            loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
     }
 
@@ -270,32 +275,32 @@ class WebSocketServer : Endpoint() {
         )
     }
 
-    private fun underFloorHeaterRequest(request: UnderFloorHeaterRequest) = when (request.type) {
+    private fun underFloorHeaterRequest(userEmail: String?, request: UnderFloorHeaterRequest) = when (request.type) {
         UnderFloorHeaterRequestType.updateMode -> {
-            val success = underFloopHeaterService.updateMode(request.newMode!!)
-            underFloopHeaterService.getCurrentState().copy(
+            val success = underFloopHeaterService.updateMode(userEmail, request.newMode!!)
+            underFloopHeaterService.getCurrentState(userEmail).copy(
                 updateUnderFloorHeaterModeSuccess = success
             )
         }
 
         UnderFloorHeaterRequestType.updateTargetTemperature -> {
-            val success = underFloopHeaterService.updateTargetTemperature(request.newTargetTemperature!!)
-            underFloopHeaterService.getCurrentState().copy(
+            val success = underFloopHeaterService.updateTargetTemperature(userEmail, request.newTargetTemperature!!)
+            underFloopHeaterService.getCurrentState(userEmail).copy(
                 updateUnderFloorHeaterModeSuccess = success
             )
         }
 
-        UnderFloorHeaterRequestType.getStatus -> underFloopHeaterService.getCurrentState()
+        UnderFloorHeaterRequestType.getStatus -> underFloopHeaterService.getCurrentState(userEmail)
         UnderFloorHeaterRequestType.adjustTime -> {
-            val success = underFloopHeaterService.adjustTime()
-            underFloopHeaterService.getCurrentState().copy(
+            val success = underFloopHeaterService.adjustTime(userEmail)
+            underFloopHeaterService.getCurrentState(userEmail).copy(
                 adjustTimeSuccess = success
             )
         }
 
         UnderFloorHeaterRequestType.firmwareUpgrade -> {
-            val success = underFloopHeaterService.startFirmwareUpgrade(request.firmwareBased64Encoded!!)
-            underFloopHeaterService.getCurrentState().copy(
+            val success = underFloopHeaterService.startFirmwareUpgrade(userEmail, request.firmwareBased64Encoded!!)
+            underFloopHeaterService.getCurrentState(userEmail).copy(
                 firmwareUploadSuccess = success
             )
         }
@@ -454,7 +459,7 @@ class WebSocketServer : Endpoint() {
         }
 
         override fun close() {
-            loRaSensorBoardService.listeners.remove(subscriptionId)
+            loRaSensorBoardService.removeListener(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }
@@ -516,7 +521,7 @@ class WebSocketServer : Endpoint() {
         }
 
         override fun close() {
-            underFloopHeaterService.listeners.remove(subscriptionId)
+            underFloopHeaterService.removeListener(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }

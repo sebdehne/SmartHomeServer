@@ -12,6 +12,12 @@ data class PowerPeriodeStart(
     val consumerId: String,
 )
 
+enum class WellKnownConsumers {
+    HouseTotal,
+    Grid,
+    HomeBattery,
+}
+
 class EnergyConsumptionService(
     private val influxDBClient: InfluxDBClient
 ) {
@@ -67,20 +73,24 @@ class EnergyConsumptionService(
         """.trimIndent()
         )
 
-        fun getValueFor(consumerId: String): Double {
-            return data.firstOrNull { it.tags["consumerId"] == consumerId }?.value ?: 0.0
+        fun getValueFor(consumerId: WellKnownConsumers): Double {
+            return data.firstOrNull { it.tags["consumerId"] == consumerId.name }?.value ?: 0.0
         }
 
         val houseKnownConsumers = data
-            .filterNot { it.tags["consumerId"]!! in listOf("Grid", "HomeBattery", "HouseTotal") }
+            .filterNot { it.tags["consumerId"]!! in listOf(
+                WellKnownConsumers.Grid,
+                WellKnownConsumers.HomeBattery,
+                WellKnownConsumers.HouseTotal
+            ).map { it.name } }
             .associate { it.tags["consumerId"]!! to it.value }
 
-        val houseTotal = getValueFor("HouseTotal")
+        val houseTotal = getValueFor(WellKnownConsumers.HouseTotal)
         val rest = houseTotal - houseKnownConsumers.values.sum()
 
         return EnergyConsumptionData(
-            getValueFor("Grid"),
-            getValueFor("HomeBattery"),
+            getValueFor(WellKnownConsumers.Grid),
+            getValueFor(WellKnownConsumers.HomeBattery),
             houseTotal,
             houseKnownConsumers + ("Other" to rest),
         )

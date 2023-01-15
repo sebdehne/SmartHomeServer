@@ -4,6 +4,8 @@ import com.dehnes.smarthome.api.dtos.VideoBrowserRequest
 import com.dehnes.smarthome.api.dtos.VideoBrowserResponse
 import com.dehnes.smarthome.api.dtos.VideoDirectory
 import com.dehnes.smarthome.api.dtos.VideoFile
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -13,9 +15,14 @@ import java.time.ZoneId
 //val videoRootDir = "testdir"
 val videoRootDir = "/mnt/motion"
 
-class VideoBrowser {
+class VideoBrowser(
+    private val userSettingsService: UserSettingsService
+) {
 
-    fun rpc(request: VideoBrowserRequest): VideoBrowserResponse {
+    fun rpc(user: String?, request: VideoBrowserRequest): VideoBrowserResponse {
+        check(
+            userSettingsService.canUserRead(user, UserRole.recordings)
+        ) { "User=$user cannot read recordings" }
         val minFileSize = request.minFileSize ?: 0
         val maxFileSize = request.maxFileSize?.let { if (it >= 200000000) Long.MAX_VALUE else it } ?: Long.MAX_VALUE
         val fromDate = request.fromDate?.let { Instant.ofEpochMilli(it) } ?: Instant.MIN
@@ -40,7 +47,7 @@ class VideoBrowser {
         return VideoBrowserResponse(result)
     }
 
-    fun getFiles(dir: File, minFileSize: Long, maxFileSize: Long, fromDate: Instant, toDate: Instant): List<VideoFile> {
+    private fun getFiles(dir: File, minFileSize: Long, maxFileSize: Long, fromDate: Instant, toDate: Instant): List<VideoFile> {
         val result = mutableListOf<VideoFile>()
         dir.listFiles().forEach { file ->
             if (!file.isDirectory && file.name.matches("\\d\\d_\\d\\d_\\d\\d\\.mp4".toRegex())) {

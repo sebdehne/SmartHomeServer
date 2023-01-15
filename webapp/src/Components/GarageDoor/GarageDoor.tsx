@@ -199,7 +199,7 @@ const GarageDoor = () => {
                         </Button>
                     </Grid>
                     <Grid item xs={4}>
-                        {userSettings.userCanWrite("firmwareUpgrades") &&
+                        {userSettings.userCanAdmin("garageDoor") &&
                             <FirmwareUpload setCmdResult={setCmdResult} setSending={setSending}/>
                         }
                     </Grid>

@@ -10,7 +10,7 @@ import {
     TableContainer,
     TableRow
 } from "@material-ui/core";
-import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 import Header from "../Header";
 import './HeaterController.css';
@@ -26,6 +26,7 @@ const HeaterController = () => {
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
     const [currentSeconds, setCurrentSeconds] = useState(Date.now());
+    const userSettings = useUserSettings();
 
     useEffect(() => {
         setTimeout(() => setCurrentSeconds(Date.now()), 1000)
@@ -93,6 +94,7 @@ const HeaterController = () => {
                         justifyContent: "space-between"
                     }}>
                         <Button
+                            disabled={!userSettings.userCanWrite("heaterUnderFloor")}
                             variant="contained"
                             color={
                                 underFloorHeaterStatus.underFloorHeaterStatus.mode === "constantTemperature"
@@ -106,6 +108,7 @@ const HeaterController = () => {
                             Constant Temp
                         </Button>
                         <Button
+                            disabled={!userSettings.userCanWrite("heaterUnderFloor")}
                             variant="contained"
                             color={
                                 underFloorHeaterStatus.underFloorHeaterStatus.mode === "permanentOn"
@@ -119,6 +122,7 @@ const HeaterController = () => {
                             On
                         </Button>
                         <Button
+                            disabled={!userSettings.userCanWrite("heaterUnderFloor")}
                             variant="contained"
                             color={
                                 underFloorHeaterStatus.underFloorHeaterStatus.mode === "permanentOff"
@@ -158,13 +162,13 @@ const HeaterController = () => {
                                             margin: "10px"
                                         }}>
                                         <Button
-                                            disabled={underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature <= 10}
+                                            disabled={underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature <= 10 ||!userSettings.userCanWrite("heaterUnderFloor")}
                                             onClick={() => sendUpdate({
                                                 type: "updateTargetTemperature",
                                                 newTargetTemperature: underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature - 1
                                             })}>-</Button>
                                         <Button
-                                            disabled={underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature >= 50}
+                                            disabled={underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature >= 50 || !userSettings.userCanWrite("heaterUnderFloor")}
                                             onClick={() => sendUpdate({
                                                 type: "updateTargetTemperature",
                                                 newTargetTemperature: underFloorHeaterStatus.underFloorHeaterStatus.targetTemperature + 1
@@ -206,6 +210,7 @@ const HeaterController = () => {
                                     <TableCell
                                         align="right">
                                         <Button
+                                            disabled={!userSettings.userCanAdmin("heaterUnderFloor")}
                                             style={{ margin: "10px" }} variant="contained" color="primary"
                                             onClick={() => adjustTime()}>
                                             Adjust time

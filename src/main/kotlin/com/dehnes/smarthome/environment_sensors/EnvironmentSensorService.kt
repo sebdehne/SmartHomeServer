@@ -4,8 +4,13 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
-import com.dehnes.smarthome.lora.*
+import com.dehnes.smarthome.lora.LoRaConnection
+import com.dehnes.smarthome.lora.LoRaInboundPacketDecrypted
 import com.dehnes.smarthome.lora.LoRaPacketType.*
+import com.dehnes.smarthome.lora.ReceivedMessage
+import com.dehnes.smarthome.lora.maxPayload
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.*
 import mu.KotlinLogging
 import java.time.Clock
@@ -22,10 +27,11 @@ class EnvironmentSensorService(
     private val clock: Clock,
     private val executorService: ExecutorService,
     private val configService: ConfigService,
-    private val influxDBClient: InfluxDBClient
+    private val influxDBClient: InfluxDBClient,
+    private val userSettingsService: UserSettingsService,
 ) {
 
-    val listeners = ConcurrentHashMap<String, (EnvironmentSensorEvent) -> Unit>()
+    private val listeners = ConcurrentHashMap<String, (EnvironmentSensorEvent) -> Unit>()
     val outsideSensorIds = listOf(4, 5)
 
     private val logger = KotlinLogging.logger { }
@@ -80,10 +86,132 @@ class EnvironmentSensorService(
         }
     }
 
-    fun getEnvironmentSensorResponse() = EnvironmentSensorResponse(
-        getAllState(),
-        getFirmwareInfo()
-    )
+    fun addListener(user: String?, id: String, l: (EnvironmentSensorEvent) -> Unit) {
+        check(
+            userSettingsService.canUserRead(
+                user,
+                UserRole.environmentSensors
+            )
+        ) { "User $user cannot read environment sensors" }
+        listeners[id] = l
+    }
+
+    fun removeListener(id: String) {
+        listeners.remove(id)
+    }
+
+    fun getEnvironmentSensorResponse(user: String?): EnvironmentSensorResponse {
+        check(
+            userSettingsService.canUserRead(
+                user,
+                UserRole.environmentSensors
+            )
+        ) { "User $user cannot read environment sensors" }
+        return EnvironmentSensorResponse(
+            getAllState(),
+            getFirmwareInfo()
+        )
+    }
+
+    fun adjustSleepTimeInSeconds(user: String?, sensorId: Int, sleepTimeInSecondsDelta: Int) = synchronized(this) {
+        check(
+            userSettingsService.canUserAdmin(
+                user,
+                UserRole.environmentSensors
+            )
+        ) { "User $user cannot update environment sensors" }
+
+        val sensorState = sensors[sensorId]
+        if (sensorState == null) {
+            false
+        } else {
+            val newSleepTimeInSeconds = min(
+                max(
+                    1,
+                    getSensor(sensorId).sleepTimeInSeconds + sleepTimeInSecondsDelta
+                ),
+                10 * 60
+            )
+            setSleepTimeInSeconds(sensorId, newSleepTimeInSeconds)
+            true
+        }
+    }
+
+    fun firmwareUpgrade(user: String?, sensorId: Int, scheduled: Boolean) = synchronized(this) {
+        check(
+            userSettingsService.canUserAdmin(
+                user,
+                UserRole.environmentSensors
+            )
+        ) { "User $user cannot update environment sensors" }
+        val sensorState = sensors[sensorId]
+        if (sensorState == null) {
+            false
+        } else {
+            sensors[sensorId] = sensorState.copy(
+                triggerFirmwareUpdate = scheduled
+            )
+            true
+        }
+    }
+
+    fun timeAdjustment(user: String?, sensorId: Int?, scheduled: Boolean) = synchronized(this) {
+        check(
+            userSettingsService.canUserAdmin(
+                user,
+                UserRole.environmentSensors
+            )
+        ) { "User $user cannot update environment sensors" }
+
+        val selectedSensors = sensorId?.let { listOfNotNull(sensors[it]) } ?: sensors.values
+
+        var adjustedSome = false
+        selectedSensors.forEach {
+            sensors[it.id] = it.copy(
+                triggerTimeAdjustment = scheduled
+            )
+            adjustedSome = true
+        }
+
+        adjustedSome
+    }
+
+    fun configureReset(user: String?, sensorId: Int?, scheduled: Boolean) = synchronized(this) {
+        check(
+            userSettingsService.canUserAdmin(
+                user,
+                UserRole.environmentSensors
+            )
+        ) { "User $user cannot update environment sensors" }
+
+        val selectedSensors = sensorId?.let { listOfNotNull(sensors[it]) } ?: sensors.values
+
+        var adjustedSome = false
+        selectedSensors.forEach {
+            sensors[it.id] = it.copy(
+                triggerReset = scheduled
+            )
+            adjustedSome = true
+        }
+
+        adjustedSome
+    }
+
+    fun setFirmware(user: String?, filename: String, firmwareBased64Encoded: String) {
+        check(
+            userSettingsService.canUserAdmin(
+                user,
+                UserRole.environmentSensors
+            )
+        ) { "User $user cannot update environment sensors" }
+
+        synchronized(this) {
+            firmwareHolder = FirmwareHolder(
+                filename,
+                Base64.getDecoder().decode(firmwareBased64Encoded)
+            )
+        }
+    }
 
     private fun getFirmwareInfo() = firmwareHolder?.let {
         FirmwareInfo(
@@ -149,72 +277,6 @@ class EnvironmentSensorService(
         val fiveVadc = getSensor(sensorId).fiveVoltADC
         val slope = (5000 * 1000) / fiveVadc
         return (adcBattery * slope) / 1000
-    }
-
-    fun adjustSleepTimeInSeconds(sensorId: Int, sleepTimeInSecondsDelta: Int) = synchronized(this) {
-        val sensorState = sensors[sensorId]
-        if (sensorState == null) {
-            false
-        } else {
-            val newSleepTimeInSeconds = min(
-                max(
-                    1,
-                    getSensor(sensorId).sleepTimeInSeconds + sleepTimeInSecondsDelta
-                ),
-                10 * 60
-            )
-            setSleepTimeInSeconds(sensorId, newSleepTimeInSeconds)
-            true
-        }
-    }
-
-    fun firmwareUpgrade(sensorId: Int, scheduled: Boolean) = synchronized(this) {
-        val sensorState = sensors[sensorId]
-        if (sensorState == null) {
-            false
-        } else {
-            sensors[sensorId] = sensorState.copy(
-                triggerFirmwareUpdate = scheduled
-            )
-            true
-        }
-    }
-
-    fun timeAdjustment(sensorId: Int?, scheduled: Boolean) = synchronized(this) {
-        val selectedSensors = sensorId?.let { listOfNotNull(sensors[it]) } ?: sensors.values
-
-        var adjustedSome = false
-        selectedSensors.forEach {
-            sensors[it.id] = it.copy(
-                triggerTimeAdjustment = scheduled
-            )
-            adjustedSome = true
-        }
-
-        adjustedSome
-    }
-
-    fun configureReset(sensorId: Int?, scheduled: Boolean) = synchronized(this) {
-        val selectedSensors = sensorId?.let { listOfNotNull(sensors[it]) } ?: sensors.values
-
-        var adjustedSome = false
-        selectedSensors.forEach {
-            sensors[it.id] = it.copy(
-                triggerReset = scheduled
-            )
-            adjustedSome = true
-        }
-
-        adjustedSome
-    }
-
-    fun setFirmware(filename: String, firmwareBased64Encoded: String) {
-        synchronized(this) {
-            firmwareHolder = FirmwareHolder(
-                filename,
-                Base64.getDecoder().decode(firmwareBased64Encoded)
-            )
-        }
     }
 
     private fun onFirmwareDataRequest(existingState: SensorState, packet: LoRaInboundPacketDecrypted): SensorState {

@@ -13,7 +13,7 @@ data class ConfigurationRoot(
     val devMode: Boolean = false,
     val hanDebugFile: String? = null,
     val loraSerialPort: String = "/dev/ttyACM0",
-    val authorization: Map<String, UserAuthorization> = emptyMap(),
+    val userSettings: Map<String, UserSettings> = emptyMap(),
     val environmentSensors: EnvironmentSensors = EnvironmentSensors(),
     val energyPriceServiceSettings: Map<String, EnergyPriceServiceSettings> = emptyMap(),
     val heatingControllerSettings: HeatingControllerSettings = HeatingControllerSettings(),
@@ -91,9 +91,9 @@ data class EnvironmentSensor(
 )
 
 
-data class UserAuthorization(
+data class UserSettings(
     val user: String,
-    val authorization: Map<UserRole, Level>
+    val authorization: Map<UserRole, Level> = emptyMap()
 )
 
 

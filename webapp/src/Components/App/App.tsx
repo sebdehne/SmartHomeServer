@@ -15,7 +15,8 @@ import {
     mdiHomeBattery,
     mdiHomeThermometer,
     mdiTransmissionTower,
-    mdiVhs
+    mdiVhs,
+    mdiAccountSupervisor
 } from '@mdi/js'
 
 const App = () => {
@@ -148,6 +149,17 @@ const App = () => {
                                 color="primary" onClick={relative("/recordings")}>
                             <Icon path={mdiVhs} size={3}/>
                         </Button>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "row" }}>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
+                        <Button disabled={!userSettings.userCanRead("userSettings")} fullWidth variant="contained"
+                                color="primary" onClick={relative("/users")}>
+                            <Icon path={mdiAccountSupervisor} size={3}/>
+                        </Button>
+                    </div>
+                    <div style={{ margin: "5px 5px 5px 5px", width: "50%" }}>
                     </div>
                 </div>
 

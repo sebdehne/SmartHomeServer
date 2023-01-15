@@ -3,6 +3,8 @@ package com.dehnes.smarthome.energy_pricing
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.config.EnergyPriceServiceSettings
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.AbstractProcess
 import com.dehnes.smarthome.utils.DateTimeUtils
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -23,6 +25,7 @@ class EnergyPriceService(
     private val influxDBClient: InfluxDBClient,
     executorService: ExecutorService,
     private val configService: ConfigService,
+    private val userSettingsService: UserSettingsService,
 ) : AbstractProcess(executorService, 60 * 5) {
 
     private val logger = KotlinLogging.logger { }
@@ -53,7 +56,8 @@ class EnergyPriceService(
         return priceCache
     }
 
-    fun getAllSettings(): List<EnergyPriceConfig> {
+    fun getAllSettings(user: String?): List<EnergyPriceConfig> {
+        check(userSettingsService.canUserRead(user, UserRole.energyPricing)) {"User $user cannot read price settings"}
         return configService.getEnergyPriceServiceSettings().entries.map { (service, settings) ->
             val today = Instant.now().atZone(DateTimeUtils.zoneId).toLocalDate()
             val categorizedPrices = listOf(
@@ -61,7 +65,7 @@ class EnergyPriceService(
                 today,
                 today.plusDays(1),
             )
-                .map { findSuitablePrices(service, it) }
+                .map { findSuitablePrices(user, service, it) }
                 .flatten()
             EnergyPriceConfig(
                 service,
@@ -73,7 +77,8 @@ class EnergyPriceService(
         }
     }
 
-    fun setNeutralSpan(serviceType: String, neutralSpan: Double) {
+    fun setNeutralSpan(user: String?, serviceType: String, neutralSpan: Double) {
+        check(userSettingsService.canUserWrite(user, UserRole.energyPricing)) {"User $user cannot update price settings"}
         configService.setEnergiPriceServiceSetting(
             serviceType,
             getEnergyPriceServiceSetting(serviceType).copy(
@@ -82,8 +87,8 @@ class EnergyPriceService(
         )
     }
 
-
-    fun setAvgMultiplier(serviceType: String, avgMultiplier: Double) {
+    fun setAvgMultiplier(user: String?, serviceType: String, avgMultiplier: Double) {
+        check(userSettingsService.canUserWrite(user, UserRole.energyPricing)) {"User $user cannot update price settings"}
         configService.setEnergiPriceServiceSetting(
             serviceType,
             getEnergyPriceServiceSetting(serviceType).copy(
@@ -93,7 +98,8 @@ class EnergyPriceService(
     }
 
     @Synchronized
-    fun findSuitablePrices(serviceType: String, day: LocalDate): List<CategorizedPrice> {
+    fun findSuitablePrices(user: String?, serviceType: String, day: LocalDate): List<CategorizedPrice> {
+        check(userSettingsService.canUserRead(user, UserRole.energyPricing)) {"User $user cannot read price settings"}
         ensureCacheLoaded()
         val settings = getEnergyPriceServiceSetting(serviceType)
 

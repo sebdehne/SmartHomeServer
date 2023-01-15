@@ -1,6 +1,6 @@
 import { Button, Grid, Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@material-ui/core";
 import React from "react";
-import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import { EnvironmentSensorRequest, FirmwareInfo } from "../../Websocket/types/EnvironmentSensors";
 import { arrayBufferToBase64 } from "../Utils/utils";
 
@@ -19,6 +19,8 @@ export const AdminTools = ({
                                setFirmwareInfo,
                                sendUpdate
                            }: AdminToolsProps) => {
+
+    const userSettings = useUserSettings();
 
     const uploadFirmware = (file: File) => {
         setSending(true);
@@ -92,7 +94,8 @@ export const AdminTools = ({
                                         }}
                                     />
                                     <label htmlFor="firmwareUploadFileSelector">
-                                        <Button variant="contained" component="span">
+                                        <Button disabled={!userSettings.userCanAdmin("environmentSensors")}
+                                                variant="contained" component="span">
                                             Upload firmware
                                         </Button>
                                     </label>
@@ -101,7 +104,8 @@ export const AdminTools = ({
                             <TableRow>
                                 <TableCell component="th" scope="row"/>
                                 <TableCell align="right">
-                                    <Button variant="contained" component="span" onClick={scheduleTimeAdjustment}>
+                                    <Button disabled={!userSettings.userCanAdmin("environmentSensors")}
+                                            variant="contained" component="span" onClick={scheduleTimeAdjustment}>
                                         Adjust time for all
                                     </Button>
                                 </TableCell>
@@ -109,7 +113,8 @@ export const AdminTools = ({
                             <TableRow>
                                 <TableCell component="th" scope="row"/>
                                 <TableCell align="right">
-                                    <Button variant="contained" component="span" onClick={scheduleReset}>
+                                    <Button disabled={!userSettings.userCanAdmin("environmentSensors")}
+                                            variant="contained" component="span" onClick={scheduleReset}>
                                         Reset all
                                     </Button>
                                 </TableCell>

@@ -10,7 +10,7 @@ import {
     Select,
     TextField
 } from "@material-ui/core";
-import React, { Dispatch, SetStateAction, useEffect, useMemo, useState } from "react";
+import React, { Dispatch, SetStateAction, useEffect, useState } from "react";
 import Header from "../Header";
 import {
     CategorizedPrice,
@@ -19,7 +19,7 @@ import {
     EnergyPricingSettingsWrite,
     PriceCategory
 } from "../../Websocket/types/EnergyPricingSettings";
-import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import { currentDay, formatTime } from "../Utils/dateUtils";
 import { Bar, Doughnut } from 'react-chartjs-2';
@@ -53,6 +53,7 @@ export const EnergyPricingSettings = () => {
     const [settings, setSettings] = useState<EnergyPriceConfig[]>([]);
     const [textfields, setTextfields] = useState<any>({});
     const [dayOffset, setDayOffset] = useState<number>(0);
+    const userSettings = useUserSettings();
 
     const reload = () => {
         setSending(true)
@@ -183,29 +184,31 @@ export const EnergyPricingSettings = () => {
                                 />
                             </Grid>
                             <Grid item xs={3}>
-                                <Button onClick={() => {
-                                    let req: EnergyPricingSettingsWrite = {
-                                        service: s.service
-                                    }
-                                    const np = textfields["neutralSpan." + s.service];
-                                    if (np && !isNaN(parseFloat(np))) {
-                                        req = {
-                                            ...req,
-                                            neutralSpan: parseFloat(np)
+                                <Button
+                                    disabled={!userSettings.userCanWrite("energyPricing")}
+                                    onClick={() => {
+                                        let req: EnergyPricingSettingsWrite = {
+                                            service: s.service
                                         }
-                                    }
-
-                                    const am = textfields["avgMultiplier." + s.service];
-                                    if (am && !isNaN(parseFloat(am))) {
-                                        req = {
-                                            ...req,
-                                            avgMultiplier: parseFloat(am)
+                                        const np = textfields["neutralSpan." + s.service];
+                                        if (np && !isNaN(parseFloat(np))) {
+                                            req = {
+                                                ...req,
+                                                neutralSpan: parseFloat(np)
+                                            }
                                         }
-                                    }
 
-                                    saveAndReload(req)
-                                }
-                                }>Update</Button>
+                                        const am = textfields["avgMultiplier." + s.service];
+                                        if (am && !isNaN(parseFloat(am))) {
+                                            req = {
+                                                ...req,
+                                                avgMultiplier: parseFloat(am)
+                                            }
+                                        }
+
+                                        saveAndReload(req)
+                                    }
+                                    }>Update</Button>
                             </Grid>
                         </Grid>
                     </Grid>

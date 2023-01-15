@@ -14,6 +14,9 @@ import com.dehnes.smarthome.lora.LoRaConnection
 import com.dehnes.smarthome.lora.LoRaInboundPacketDecrypted
 import com.dehnes.smarthome.lora.LoRaPacketType
 import com.dehnes.smarthome.lora.maxPayload
+import com.dehnes.smarthome.users.SystemUser
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.*
 import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
@@ -35,6 +38,7 @@ class UnderFloorHeaterService(
     private val clock: Clock,
     private val victronService: VictronService,
     private val energyConsumptionService: EnergyConsumptionService,
+    private val userSettingsService: UserSettingsService,
 ) : AbstractProcess(executorService, 42) {
 
     private val loRaAddr = 18
@@ -53,7 +57,7 @@ class UnderFloorHeaterService(
 
     private val logger = KotlinLogging.logger { }
 
-    val listeners = ConcurrentHashMap<String, (UnderFloorHeaterResponse) -> Unit>()
+    private val listeners = ConcurrentHashMap<String, (UnderFloorHeaterResponse) -> Unit>()
     var gridOK = true
 
     init {
@@ -145,7 +149,21 @@ class UnderFloorHeaterService(
         return success
     }
 
-    fun startFirmwareUpgrade(firmwareBased64Encoded: String) = asLocked {
+    fun addListener(user: String?, id: String, l: (UnderFloorHeaterResponse) -> Unit) {
+        check(
+            userSettingsService.canUserRead(user, UserRole.heaterUnderFloor)
+        ) { "User=$user cannot read underFloorHeater" }
+        listeners[id] = l
+    }
+
+    fun removeListener(id: String) {
+        listeners.remove(id)
+    }
+
+    fun startFirmwareUpgrade(user: String?, firmwareBased64Encoded: String) = asLocked {
+        check(
+            userSettingsService.canUserAdmin(user, UserRole.heaterUnderFloor)
+        ) { "User=$user cannot admin underFloorHeater" }
         val firmwareHolder = FirmwareHolder(
             "unknown.file.name",
             Base64.getDecoder().decode(firmwareBased64Encoded)
@@ -193,7 +211,11 @@ class UnderFloorHeaterService(
         sent
     } ?: false
 
-    fun adjustTime() = asLocked {
+    fun adjustTime(user: String?) = asLocked {
+        check(
+            userSettingsService.canUserAdmin(user, UserRole.heaterUnderFloor)
+        ) { "User=$user cannot admin underFloorHeater" }
+
         val ct = CountDownLatch(1)
         receiveQueue.clear()
         loRaConnection.send(
@@ -208,6 +230,47 @@ class UnderFloorHeaterService(
         ct.await(2, TimeUnit.SECONDS)
         receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.ADJUST_TIME_RESPONSE
     } ?: false
+
+    fun getCurrentState(user: String?) = asLocked {
+        check(
+            userSettingsService.canUserRead(user, UserRole.heaterUnderFloor)
+        ) { "User=$user cannot read underFloorHeater" }
+
+        firmwareDataRequest?.let {
+            UnderFloorHeaterResponse(
+                firmwareUpgradeState = FirmwareUpgradeState(
+                    firmwareHolder?.data?.size ?: 0,
+                    it.offset,
+                    it.timestampDelta,
+                    it.receivedAt,
+                    it.rssi
+                )
+            )
+        } ?: UnderFloorHeaterResponse(lastStatus)
+    }!!
+
+    fun updateMode(user: String?, newMode: UnderFloorHeaterMode): Boolean {
+        check(
+            userSettingsService.canUserWrite(user, UserRole.heaterUnderFloor)
+        ) { "User=$user cannot write underFloorHeater" }
+        setCurrentMode(newMode.mode)
+        return tick()
+    }
+
+    fun updateTargetTemperature(user: String?, targetTemperature: Int): Boolean {
+        check(
+            userSettingsService.canUserWrite(user, UserRole.heaterUnderFloor)
+        ) { "User=$user cannot write underFloorHeater" }
+        check(targetTemperature in 10..50)
+        setTargetTemperature(targetTemperature)
+        lastStatus = lastStatus.copy(
+            targetTemperature = targetTemperature
+        )
+        executorService.submit(withLogging {
+            tick()
+        })
+        return true
+    }
 
     private fun onFirmwareDataRequest(packet: LoRaInboundPacketDecrypted) {
 
@@ -305,7 +368,11 @@ class UnderFloorHeaterService(
                     logger.info("Evaluating target temperature now: $targetTemperature")
 
                     val suitablePrices =
-                        energyPriceService.findSuitablePrices(serviceType, LocalDate.now(DateTimeUtils.zoneId))
+                        energyPriceService.findSuitablePrices(
+                            SystemUser,
+                            serviceType,
+                            LocalDate.now(DateTimeUtils.zoneId)
+                        )
                     val priceDecision = suitablePrices.priceDecision()
 
                     if (!victronService.isGridOk()) {
@@ -375,40 +442,9 @@ class UnderFloorHeaterService(
     private fun onStatusChanged() {
         executorService.submit(withLogging {
             listeners.forEach {
-                it.value(getCurrentState())
+                it.value(getCurrentState(SystemUser))
             }
         })
-    }
-
-    fun getCurrentState() = asLocked {
-        firmwareDataRequest?.let {
-            UnderFloorHeaterResponse(
-                firmwareUpgradeState = FirmwareUpgradeState(
-                    firmwareHolder?.data?.size ?: 0,
-                    it.offset,
-                    it.timestampDelta,
-                    it.receivedAt,
-                    it.rssi
-                )
-            )
-        } ?: UnderFloorHeaterResponse(lastStatus)
-    }!!
-
-    fun updateMode(newMode: UnderFloorHeaterMode): Boolean {
-        setCurrentMode(newMode.mode)
-        return tick()
-    }
-
-    fun updateTargetTemperature(targetTemperature: Int): Boolean {
-        check(targetTemperature in 10..50)
-        setTargetTemperature(targetTemperature)
-        lastStatus = lastStatus.copy(
-            targetTemperature = targetTemperature
-        )
-        executorService.submit(withLogging {
-            tick()
-        })
-        return true
     }
 
     private fun parseAndRecord(
@@ -470,7 +506,10 @@ class UnderFloorHeaterService(
             ct.countDown()
         }
 
-        return ct.await(10, TimeUnit.SECONDS) && receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.HEATER_RESPONSE
+        return ct.await(10, TimeUnit.SECONDS) && receiveQueue.poll(
+            2,
+            TimeUnit.SECONDS
+        )?.type == LoRaPacketType.HEATER_RESPONSE
     }
 
     private fun setCurrentMode(m: Mode) {

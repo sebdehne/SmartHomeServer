@@ -14,6 +14,8 @@ import { VideoRecordings } from "./Components/VideoRecordings/VideoRecordings";
 import { EnergyPricingSettings } from "./Components/EnergyPricingSettings/EnergyPricingSettings";
 import { EnergyStorageSystem } from "./Components/EnergyStorageSystem/EnergyStorageSystem";
 import { createRoot } from 'react-dom/client';
+import { UserSettingsAdmin } from "./Components/UserSettingsAdmin/UserSettingsAdmin";
+
 const container = document.getElementById('root');
 
 const root = createRoot(container!);
@@ -31,6 +33,7 @@ root.render(
                     <Route path="/environmentSensors" element={<EnvironmentSensors/>}/>
                     <Route path="/webcams" element={<Webcams/>}/>
                     <Route path="/recordings" element={<VideoRecordings/>}/>
+                    <Route path="/users" element={<UserSettingsAdmin/>}/>
                     <Route path="/energy_price_settings" element={<EnergyPricingSettings/>}/>
                     <Route path="/energy" element={<EnergyStorageSystem/>}/>
                 </Routes>

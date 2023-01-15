@@ -19,12 +19,17 @@ let userSettings: UserSettings | undefined = undefined;
 
 const userCanRead = (r: UserRole) => {
     const l = userSettings?.authorization?.[r]!!;
-    return l === "read" || l === "readWrite";
+    return l === "read" || l === "readWrite" || l === "readWriteAdmin";
 }
 
 const userCanWrite = (r: UserRole) => {
     const l = userSettings?.authorization?.[r]!!;
-    return l === "readWrite";
+    return l === "readWrite" || l === "readWriteAdmin";
+}
+
+const userCanAdmin = (r: UserRole) => {
+    const l = userSettings?.authorization?.[r]!!;
+    return l === "readWriteAdmin";
 }
 
 function subscribe(type: SubscriptionType, onNotify: (notify: Notify) => void, onOpened: () => void) {
@@ -178,6 +183,7 @@ const WebsocketService = {
     unsubscribe,
     userCanWrite,
     userCanRead,
+    userCanAdmin,
     monitorConnectionStatus: (fn: (connectionStatis: ConnectionStatus) => void) => {
         const id = uuidv4();
         ConnectionStatusSubscriptionsById.set(id, fn);
@@ -188,12 +194,12 @@ const WebsocketService = {
     }
 };
 
-export const useUserSettings = () => {
-    return ({
+export const useUserSettings = () =>
+    ({
         userCanWrite,
-        userCanRead
+        userCanRead,
+        userCanAdmin
     })
-}
 
 export default WebsocketService;
 

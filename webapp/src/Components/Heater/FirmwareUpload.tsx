@@ -1,6 +1,6 @@
 import { Button } from "@material-ui/core";
 import React from "react";
-import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import { arrayBufferToBase64 } from "../Utils/utils";
 
 type FirmwareUploadProps = {
@@ -9,6 +9,8 @@ type FirmwareUploadProps = {
 }
 
 export const FirmwareUpload = ({ setSending, setCmdResult }: FirmwareUploadProps) => {
+
+    const userSettings = useUserSettings();
 
     const uploadFirmware = (file: File) => {
         setSending(true);
@@ -51,7 +53,11 @@ export const FirmwareUpload = ({ setSending, setCmdResult }: FirmwareUploadProps
                 }}
             />
             <label htmlFor="firmwareUploadFileSelector">
-                <Button variant="contained" component="span">
+                <Button
+                    variant="contained"
+                    component="span"
+                    disabled={!userSettings.userCanAdmin("heaterUnderFloor")}
+                >
                     Upload firmware
                 </Button>
             </label>

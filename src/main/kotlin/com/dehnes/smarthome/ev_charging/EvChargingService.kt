@@ -119,6 +119,84 @@ class EvChargingService(
         }
     }
 
+    fun addListener(user: String?, id: String, listener: (EvChargingEvent) -> Unit) {
+        if (!userSettingsService.canUserRead(user, UserRole.evCharging)) return
+        listeners[id] = listener
+    }
+
+    fun removeListener(id: String) {
+        listeners.remove(id)
+    }
+
+    fun getChargingStationsDataAndConfig(user: String?): List<EvChargingStationDataAndConfig> {
+        if (!userSettingsService.canUserRead(user, UserRole.evCharging)) return emptyList()
+        return currentData.map { entry ->
+            toEvChargingStationDataAndConfig(entry.value)
+        }
+    }
+
+    fun updateMode(user: String?, clientId: String, evChargingMode: EvChargingMode): Boolean {
+        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return false
+        setChargerSettings(
+            getChargerSettings(clientId).copy(
+                evChargingMode = evChargingMode
+            )
+        )
+        eVChargingStationConnection.collectDataAndDistribute(clientId)
+        return true
+    }
+
+    fun setPriorityFor(user: String?, clientId: String, loadSharingPriority: LoadSharingPriority) = synchronized(this) {
+        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return@synchronized false
+
+        val evCharger = getChargerSettings(clientId)
+        setChargerSettings(
+            evCharger.copy(priority = loadSharingPriority)
+        )
+
+        var result = false
+        currentData.computeIfPresent(clientId) { _, internalState ->
+            result = true
+            internalState.copy(loadSharingPriority = loadSharingPriority)
+        }
+        result
+    }
+
+    fun setChargeRateLimitFor(user: String?, clientId: String, chargeRateLimit: Int) = synchronized(this) {
+        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return@synchronized false
+
+        check(chargeRateLimit in 6..32)
+
+        val settings = getChargerSettings(clientId)
+        setChargerSettings(
+            settings.copy(
+                chargeRateLimit = chargeRateLimit
+            )
+        )
+
+        var result = false
+        currentData.computeIfPresent(clientId) { _, internalState ->
+            result = true
+            internalState.copy(chargeRateLimit = chargeRateLimit)
+        }
+        result
+    }
+
+    private fun getChargerSettings(clientId: String) =
+        configService.getEvSettings().chargers.entries.firstOrNull { it.value.name == clientId }?.value
+            ?: error("Fant ingen chargerSetings for $clientId")
+
+    private fun setChargerSettings(evCharger: EvCharger) {
+        val evSettings = configService.getEvSettings()
+        configService.setEvSettings(
+            evSettings.copy(
+                chargers = evSettings.chargers + (evCharger.serialNumber to evCharger)
+            )
+        )
+    }
+
+    private fun getMode(clientId: String) = getChargerSettings(clientId).evChargingMode
+
     private fun recordPower(updatedState: InternalState) {
         if (updatedState.isCharging()) {
             val ampsL1 = updatedState.dataResponse.phase1Milliamps.toDouble() / 1000
@@ -143,89 +221,11 @@ class EvChargingService(
         }
     }
 
-    fun addListener(user: String?, id: String, listener: (EvChargingEvent) -> Unit) {
-        if (!userSettingsService.canUserRead(user, UserRole.evCharging)) return
-        listeners[id] = listener
-    }
-
-    fun removeListener(id: String) {
-        listeners.remove(id)
-    }
-
-    fun getChargingStationsDataAndConfig(user: String?): List<EvChargingStationDataAndConfig> {
-        if (!userSettingsService.canUserRead(user, UserRole.evCharging)) return emptyList()
-        return currentData.map { entry ->
-            toEvChargingStationDataAndConfig(entry.value)
-        }
-    }
-
-    fun getChargerSettings(clientId: String) =
-        configService.getEvSettings().chargers.entries.firstOrNull { it.value.name == clientId }?.value
-            ?: error("Fant ingen chargerSetings for $clientId")
-
-    fun setChargerSettings(evCharger: EvCharger) {
-        val evSettings = configService.getEvSettings()
-        configService.setEvSettings(
-            evSettings.copy(
-                chargers = evSettings.chargers + (evCharger.serialNumber to evCharger)
-            )
-        )
-    }
-
-    fun updateMode(user: String?, clientId: String, evChargingMode: EvChargingMode): Boolean {
-        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return false
-        setChargerSettings(
-            getChargerSettings(clientId).copy(
-                evChargingMode = evChargingMode
-            )
-        )
-        eVChargingStationConnection.collectDataAndDistribute(clientId)
-        return true
-    }
-
-    fun getMode(clientId: String) = getChargerSettings(clientId).evChargingMode
-
-    fun setPriorityFor(user: String?, clientId: String, loadSharingPriority: LoadSharingPriority) = synchronized(this) {
-        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return@synchronized false
-
-        val evCharger = getChargerSettings(clientId)
-        setChargerSettings(
-            evCharger.copy(priority = loadSharingPriority)
-        )
-
-        var result = false
-        currentData.computeIfPresent(clientId) { _, internalState ->
-            result = true
-            internalState.copy(loadSharingPriority = loadSharingPriority)
-        }
-        result
-    }
-
     private fun getPriorityFor(clientId: String) = getChargerSettings(clientId).priority
-
-    fun setChargeRateLimitFor(user: String?, clientId: String, chargeRateLimit: Int) = synchronized(this) {
-        if (!userSettingsService.canUserWrite(user, UserRole.evCharging)) return@synchronized false
-
-        check(chargeRateLimit in 6..32)
-
-        val settings = getChargerSettings(clientId)
-        setChargerSettings(
-            settings.copy(
-                chargeRateLimit = chargeRateLimit
-            )
-        )
-
-        var result = false
-        currentData.computeIfPresent(clientId) { _, internalState ->
-            result = true
-            internalState.copy(chargeRateLimit = chargeRateLimit)
-        }
-        result
-    }
 
     private fun getChargeRateLimit(clientId: String) = getChargerSettings(clientId).chargeRateLimit
 
-    fun getPowerConnection(powerConnectionId: String): PowerConnection = object : PowerConnection {
+    private fun getPowerConnection(powerConnectionId: String): PowerConnection = object : PowerConnection {
         override fun availableAmpsCapacity(): Int {
             return getPowerConnectionSettings(powerConnectionId).availableCapacity
         }
@@ -282,7 +282,7 @@ class EvChargingService(
             val mode = getMode(clientId)
             val gridOk = victronService.isGridOk()
             val suitablePrices =
-                energyPriceService.findSuitablePrices("EvCharger$clientId", LocalDate.now(DateTimeUtils.zoneId))
+                energyPriceService.findSuitablePrices(SystemUser, "EvCharger$clientId", LocalDate.now(DateTimeUtils.zoneId))
             val priceDecision = suitablePrices.priceDecision()
             var reasonCannotCharge: String? = null
 

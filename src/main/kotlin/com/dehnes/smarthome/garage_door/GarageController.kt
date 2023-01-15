@@ -80,7 +80,7 @@ class GarageController(
 
     fun startFirmwareUpgrade(user: String?, firmwareBased64Encoded: String) = asLocked {
 
-        if (!userSettingsService.canUserWrite(user, UserRole.firmwareUpgrades)) return@asLocked false
+        if (!userSettingsService.canUserAdmin(user, UserRole.garageDoor)) return@asLocked false
 
         val firmwareHolder = FirmwareHolder(
             "unknown.file.name",

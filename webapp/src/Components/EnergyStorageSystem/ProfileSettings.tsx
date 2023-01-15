@@ -2,7 +2,7 @@ import React, { Dispatch, SetStateAction, useState } from "react";
 import { ESSState, ProfileSettings } from "../../Websocket/types/EnergyStorageSystem";
 import { Accordion, AccordionDetails, AccordionSummary, Button, Grid, TextField } from "@material-ui/core";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
-import WebsocketClient from "../../Websocket/websocketClient";
+import WebsocketClient, { useUserSettings } from "../../Websocket/websocketClient";
 
 export type ProfileSettingsProps = {
     profileSettings: ProfileSettings[];
@@ -33,6 +33,7 @@ const ProfileSetting = ({ settings, setSending, onNewData }: ProfileSettingProps
     const [acPowerSetPoint, setAcPowerSetPoint] = useState(settings.acPowerSetPoint.toString());
     const [maxChargePower, setMaxChargePower] = useState(settings.maxChargePower.toString());
     const [maxDischargePower, setMaxDischargePower] = useState(settings.maxDischargePower.toString());
+    const userSettings = useUserSettings();
 
     const write = (obj: any) => {
         setSending(true);
@@ -70,7 +71,9 @@ const ProfileSetting = ({ settings, setSending, onNewData }: ProfileSettingProps
                     <div>
                         <TextField value={acPowerSetPoint}
                                    onChange={e => setAcPowerSetPoint(e.target.value.trim())}/>
-                        <Button variant={"contained"} onClick={() => {
+                        <Button
+                            disabled={!userSettings.userCanWrite("energyStorageSystem")}
+                            variant={"contained"} onClick={() => {
                             write({ acPowerSetPoint: parseInt(acPowerSetPoint) })
                         }}>Update</Button>
                     </div>
@@ -79,7 +82,9 @@ const ProfileSetting = ({ settings, setSending, onNewData }: ProfileSettingProps
                     <div>Max charge power:</div>
                     <div>
                         <TextField value={maxChargePower} onChange={e => setMaxChargePower(e.target.value.trim())}/>
-                        <Button variant={"contained"} onClick={() => {
+                        <Button
+                            disabled={!userSettings.userCanWrite("energyStorageSystem")}
+                            variant={"contained"} onClick={() => {
                             write({ maxChargePower: parseInt(maxChargePower) })
                         }}>Update</Button>
                     </div>
@@ -89,7 +94,9 @@ const ProfileSetting = ({ settings, setSending, onNewData }: ProfileSettingProps
                     <div>
                         <TextField value={maxDischargePower}
                                    onChange={e => setMaxDischargePower(e.target.value.trim())}/>
-                        <Button variant={"contained"} onClick={() => {
+                        <Button
+                            disabled={!userSettings.userCanWrite("energyStorageSystem")}
+                            variant={"contained"} onClick={() => {
                             write({ maxDischargePower: parseInt(maxDischargePower) })
                         }}>Update</Button>
                     </div>

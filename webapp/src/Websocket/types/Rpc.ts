@@ -12,7 +12,7 @@ import {
     EnergyPricingSettingsWrite
 } from "./EnergyPricingSettings";
 import { ESSState, ESSWrite } from "./EnergyStorageSystem";
-import { UserSettings } from "./UserSettings";
+import { UserSettings, WriteUserSettings } from "./UserSettings";
 
 export type RequestType =
     "subscribe"
@@ -29,6 +29,8 @@ export type RequestType =
     | "essRead"
     | "essWrite"
     | "userSettings"
+    | "readAllUserSettings"
+    | "writeUserSettings"
     ;
 
 export type RpcRequest = {
@@ -44,6 +46,7 @@ export type RpcRequest = {
     essWrite?: ESSWrite;
     energyPricingSettingsWrite?: EnergyPricingSettingsWrite;
     energyConsumptionQuery?: EnergyConsumptionQuery;
+    writeUserSettings?: WriteUserSettings,
 }
 
 export type RpcResponse = {
@@ -60,4 +63,5 @@ export type RpcResponse = {
     energyPricingSettingsRead?: EnergyPricingSettingsRead;
     userSettings?: UserSettings;
     energyConsumptionData?: EnergyConsumptionData;
+    allUserSettings?: { [userId: string]: UserSettings },
 }

@@ -60,7 +60,8 @@ class Configuration {
             priceSource,
             influxDBClient,
             executorService,
-            configService
+            configService,
+            userSettingsService
         )
         energyPriceService.start()
 
@@ -118,7 +119,8 @@ class Configuration {
             clock,
             executorService,
             configService,
-            influxDBClient
+            influxDBClient,
+            userSettingsService
         )
 
         val garageDoorService = GarageController(
@@ -138,11 +140,12 @@ class Configuration {
             energyPriceService,
             clock,
             victronService,
-            energyConsumptionService
+            energyConsumptionService,
+            userSettingsService
         )
         heaterService.start()
 
-        val videoBrowser = VideoBrowser()
+        val videoBrowser = VideoBrowser(userSettingsService)
 
         val dalyBmsDataLogger = DalyBmsDataLogger(influxDBClient, objectMapper, victronHost, executorService)
         dalyBmsDataLogger.apply {
@@ -156,7 +159,8 @@ class Configuration {
             victronService,
             configService,
             energyPriceService,
-            dalyBmsDataLogger
+            dalyBmsDataLogger,
+            userSettingsService
         )
         victronEssProcess.start()
 

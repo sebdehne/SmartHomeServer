@@ -8,6 +8,9 @@ import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.PriceCategory
 import com.dehnes.smarthome.energy_pricing.priceDecision
 import com.dehnes.smarthome.energy_pricing.serviceEnergyStorage
+import com.dehnes.smarthome.users.SystemUser
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.AbstractProcess
 import com.dehnes.smarthome.utils.DateTimeUtils.zoneId
 import com.dehnes.smarthome.victron.VictronEssCalculation.VictronEssCalculationInput
@@ -26,7 +29,8 @@ class VictronEssProcess(
     private val victronService: VictronService,
     private val configService: ConfigService,
     private val energyPriceService: EnergyPriceService,
-    private val dalyBmsDataLogger: DalyBmsDataLogger
+    private val dalyBmsDataLogger: DalyBmsDataLogger,
+    private val userSettingsService: UserSettingsService,
 ) : AbstractProcess(executorService, 5) {
 
     private val logger = KotlinLogging.logger { }
@@ -43,7 +47,7 @@ class VictronEssProcess(
         super.start()
         victronService.listeners["VictronEssProcess"] = {
             listeners.values.forEach { l ->
-                l(current())
+                l(current(SystemUser))
             }
         }
         dalyBmsDataLogger.listeners["VictronEssProcess"] = {
@@ -51,13 +55,43 @@ class VictronEssProcess(
         }
     }
 
+    fun current(user: String?): ESSState {
+        check(
+            userSettingsService.canUserRead(user, UserRole.energyStorageSystem)
+        ) { "User $user cannot read ESS state" }
+        return ESSState(
+            victronService.essValues,
+            getCurrentOperationMode(),
+            currentProfile?.profileType,
+            getSoCLimit(),
+            ProfileType.values().map { t -> getProfile(t) },
+            essState
+        )
+    }
+
+    fun handleWrite(user: String?, essWrite: ESSWrite) {
+        check(
+            userSettingsService.canUserWrite(user, UserRole.energyStorageSystem)
+        ) { "User $user cannot read ESS state" }
+
+        if (essWrite.operationMode != null) {
+            setCurrentOperationMode(essWrite.operationMode)
+        }
+        if (essWrite.soCLimit != null) {
+            setSoCLimit(essWrite.soCLimit)
+        }
+        if (essWrite.updateProfile != null) {
+            setProfile(essWrite.updateProfile)
+        }
+    }
+
     private fun onBmsData(bmsData: List<BmsData>) {
         this.bmsData = bmsData
     }
 
-    fun getCurrentOperationMode() = configService.getVictronEssProcessSettings().currentOperationMode
+    private fun getCurrentOperationMode() = configService.getVictronEssProcessSettings().currentOperationMode
 
-    fun setCurrentOperationMode(operationMode: OperationMode) {
+    private fun setCurrentOperationMode(operationMode: OperationMode) {
         configService.setVictronEssProcessSettings(
             configService.getVictronEssProcessSettings().copy(
                 currentOperationMode = operationMode
@@ -123,7 +157,8 @@ class VictronEssProcess(
                 essState = "Not enough BMSes online: ${onlineBmses.joinToString(", ") { it.bmsId.displayName }}"
                 null
             } else {
-                val suitablePrices = energyPriceService.findSuitablePrices(serviceEnergyStorage, LocalDate.now(zoneId))
+                val suitablePrices =
+                    energyPriceService.findSuitablePrices(SystemUser, serviceEnergyStorage, LocalDate.now(zoneId))
                 val priceDecision = suitablePrices.priceDecision()
 
                 if (priceDecision == null) {
@@ -162,7 +197,7 @@ class VictronEssProcess(
         return soc > getSoCLimit().to
     }
 
-    fun setSoCLimit(soCLimit: SoCLimit) {
+    private fun setSoCLimit(soCLimit: SoCLimit) {
         configService.setVictronEssProcessSettings(
             configService.getVictronEssProcessSettings().copy(
                 socLimitFrom = soCLimit.from,
@@ -171,7 +206,7 @@ class VictronEssProcess(
         )
     }
 
-    fun getSoCLimit(): SoCLimit {
+    private fun getSoCLimit(): SoCLimit {
         val settings = configService.getVictronEssProcessSettings()
         return SoCLimit(
             settings.socLimitFrom,
@@ -179,33 +214,14 @@ class VictronEssProcess(
         )
     }
 
-    fun bmsAssumeDeadAfterSeconds() = configService.getVictronEssProcessSettings().bmsAssumeDeadAfterSeconds.toLong()
-    fun minNumberOfOnlineBmses() = configService.getVictronEssProcessSettings().minNumberOfOnlineBmses
+    private fun bmsAssumeDeadAfterSeconds() =
+        configService.getVictronEssProcessSettings().bmsAssumeDeadAfterSeconds.toLong()
+
+    private fun minNumberOfOnlineBmses() = configService.getVictronEssProcessSettings().minNumberOfOnlineBmses
 
     override fun logger() = logger
 
-    fun current() = ESSState(
-        victronService.essValues,
-        getCurrentOperationMode(),
-        currentProfile?.profileType,
-        getSoCLimit(),
-        ProfileType.values().map { t -> getProfile(t) },
-        essState
-    )
-
-    fun handleWrite(essWrite: ESSWrite) {
-        if (essWrite.operationMode != null) {
-            setCurrentOperationMode(essWrite.operationMode)
-        }
-        if (essWrite.soCLimit != null) {
-            setSoCLimit(essWrite.soCLimit)
-        }
-        if (essWrite.updateProfile != null) {
-            setProfile(essWrite.updateProfile)
-        }
-    }
-
-    fun getProfile(profileType: ProfileType): ProfileSettings {
+    private fun getProfile(profileType: ProfileType): ProfileSettings {
         val profile = configService.getVictronEssProcessSettings().profiles[profileType.name]!!
         return ProfileSettings(
             profileType,
@@ -215,14 +231,16 @@ class VictronEssProcess(
         )
     }
 
-    fun setProfile(profileSettings: ProfileSettings) {
+    private fun setProfile(profileSettings: ProfileSettings) {
         val settings = configService.getVictronEssProcessSettings()
         configService.setVictronEssProcessSettings(
-            settings.copy(profiles = settings.profiles + (profileSettings.profileType.name to VictronEssProcessProfile(
-                profileSettings.acPowerSetPoint,
-                profileSettings.maxChargePower,
-                profileSettings.maxDischargePower
-            )))
+            settings.copy(
+                profiles = settings.profiles + (profileSettings.profileType.name to VictronEssProcessProfile(
+                    profileSettings.acPowerSetPoint,
+                    profileSettings.maxChargePower,
+                    profileSettings.maxDischargePower
+                ))
+            )
         )
     }
 

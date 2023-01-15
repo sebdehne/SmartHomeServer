@@ -48,7 +48,7 @@ internal class EvChargingServiceTest {
 
     init {
         every {
-            energyPriceService.findSuitablePrices(any(), any())
+            energyPriceService.findSuitablePrices(any(), any(), any())
         } answers {
             listOf(CategorizedPrice(
                 PriceCategory.cheap,

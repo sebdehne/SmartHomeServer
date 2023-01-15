@@ -7,10 +7,10 @@ export type UserRole =
     | "environmentSensors"
     | "cameras"
     | "recordings"
-    | "firmwareUpgrades"
+    | "userSettings"
     ;
 
-export type Level = "none" | "read" | "readWrite";
+export type Level = "none" | "read" | "readWrite" | "readWriteAdmin";
 
 export type UserSettings = {
     authorization: AuthorizationMap;
@@ -18,4 +18,17 @@ export type UserSettings = {
 
 export type AuthorizationMap = {
     [key in UserRole]: Level;
+}
+
+export type WriteCommand = "addUser" | "removeUser" | "updateAuthorization";
+
+export type WriteUserSettings = {
+    user: string;
+    command: WriteCommand;
+    writeAuthorization?: WriteAuthorization
+}
+
+export type WriteAuthorization = {
+    userRole: UserRole,
+    level: Level,
 }

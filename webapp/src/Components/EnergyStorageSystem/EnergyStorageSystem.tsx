@@ -10,7 +10,7 @@ import {
 import Header from "../Header";
 import React, { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { ESSState, OperationMode, SoCLimit } from "../../Websocket/types/EnergyStorageSystem";
-import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import { ProfileSettingsComponent } from "./ProfileSettings";
 import { Visualization } from "./Visualization";
@@ -67,6 +67,8 @@ type OperationModeSwitchProps = {
 }
 const OperationModeSwitch = ({ soCLimit, operationMode, setSending, onNewData }: OperationModeSwitchProps) => {
 
+    const userSettings = useUserSettings();
+
     const updateModeTo = (mode: OperationMode) => {
         setSending(true)
         WebsocketService.rpc({
@@ -85,11 +87,15 @@ const OperationModeSwitch = ({ soCLimit, operationMode, setSending, onNewData }:
                 margin: "10px"
             }}>
                 <Button
+                    disabled={!userSettings.userCanWrite("energyStorageSystem")}
                     color={operationMode === "automatic" ? 'secondary' : 'primary'}
                     onClick={() => updateModeTo("automatic")}>Automatic</Button>
-                <Button color={operationMode === "passthrough" ? 'secondary' : 'primary'}
-                        onClick={() => updateModeTo("passthrough")}>Passthrough</Button>
                 <Button
+                    disabled={!userSettings.userCanWrite("energyStorageSystem")}
+                    color={operationMode === "passthrough" ? 'secondary' : 'primary'}
+                    onClick={() => updateModeTo("passthrough")}>Passthrough</Button>
+                <Button
+                    disabled={!userSettings.userCanWrite("energyStorageSystem")}
                     color={operationMode === "manual" ? 'secondary' : 'primary'}
                     onClick={() => updateModeTo("manual")}
                 >Manual</Button>
@@ -116,6 +122,7 @@ type SoCLimitProps = {
 const SoCLimitComponent = ({ soCLimit, setSending, onNewData }: SoCLimitProps) => {
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
+    const userSettings = useUserSettings();
 
     const update = (soCLimit: SoCLimit) => {
         setSending(true);
@@ -152,7 +159,9 @@ const SoCLimitComponent = ({ soCLimit, setSending, onNewData }: SoCLimitProps) =
                     <div>From:</div>
                     <div>
                         <TextField value={from} onChange={e => setFrom(e.target.value.trim())}/>
-                        <Button variant={"contained"} onClick={() => {
+                        <Button
+                            disabled={!userSettings.userCanWrite("energyStorageSystem")}
+                            variant={"contained"} onClick={() => {
                             const limit: SoCLimit = {
                                 from: parseInt(from),
                                 to: soCLimit.to
@@ -165,7 +174,9 @@ const SoCLimitComponent = ({ soCLimit, setSending, onNewData }: SoCLimitProps) =
                     <div>To:</div>
                     <div>
                         <TextField value={to} onChange={e => setTo(e.target.value.trim())}/>
-                        <Button variant={"contained"} onClick={() => {
+                        <Button
+                            disabled={!userSettings.userCanWrite("energyStorageSystem")}
+                            variant={"contained"} onClick={() => {
                             const limit: SoCLimit = {
                                 from: soCLimit.from,
                                 to: parseInt(to)

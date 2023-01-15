@@ -94,12 +94,12 @@ class VictronService(
         }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
     }
 
-    fun reconnect() {
+    private fun reconnect() {
         asyncClient.disconnect()
         asyncClient.connect().get(20, TimeUnit.SECONDS)
     }
 
-    fun resubscribe() {
+    private fun resubscribe() {
         asyncClient.subscribe(
             MqttSubscribe(
                 ImmutableList.of(
@@ -116,7 +116,7 @@ class VictronService(
         )
     }
 
-    fun onMqttMessage(msg: Mqtt5Publish) {
+    private fun onMqttMessage(msg: Mqtt5Publish) {
         val body = msg.payload.orElse(null)?.let {
             Charsets.UTF_8.decode(it)
         }?.toString() ?: "{}"
@@ -167,7 +167,7 @@ class VictronService(
 
     fun current() = essValues
 
-    fun writeEnabled() = configService.getVictronServiceSettings().writeEnabled
+    private fun writeEnabled() = configService.getVictronServiceSettings().writeEnabled
 
     fun essMode3_setAcPowerSetPointMode(acSetPoints: VictronEssCalculation.VictronEssCalculationResult?) {
         if (acSetPoints == null) {
@@ -220,7 +220,7 @@ class VictronService(
         ).get()
     }
 
-    fun topic(type: TopicType, path: String) = when (type) {
+    private fun topic(type: TopicType, path: String) = when (type) {
         TopicType.notify -> "N"
         TopicType.read -> "R"
         TopicType.write -> "W"

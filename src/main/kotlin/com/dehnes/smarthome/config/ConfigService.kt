@@ -41,7 +41,27 @@ class ConfigService(
 
     fun getLoraSerialPort() = readConfig().loraSerialPort
     fun getEnvironmentSensors() = readConfig().environmentSensors
-    fun getUserAuthorization(username: String) = readConfig().authorization[username]
+    fun getUserSettings(userId: String) = readConfig().userSettings[userId]
+    fun updateUserAuthorization(user: String, a: UserSettings) {
+        update { c ->
+            c.copy(userSettings = c.userSettings + (user to a))
+        }
+    }
+
+    fun addUser(user: String) {
+        update { c ->
+            c.copy(userSettings = c.userSettings + (user to UserSettings(user, emptyMap())))
+        }
+    }
+
+    fun removeUser(user: String) {
+        update { c ->
+            c.copy(userSettings = c.userSettings.filterNot { it.key == user })
+        }
+    }
+
+
+    fun getAuthorization() = readConfig().userSettings
     fun getEnergyPriceServiceSettings() = readConfig().energyPriceServiceSettings
     fun getHeaterSettings() = readConfig().heatingControllerSettings
     fun setHeaterSettings(settings: HeatingControllerSettings) {
