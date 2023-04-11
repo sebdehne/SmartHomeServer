@@ -13,6 +13,7 @@ import {
 } from "./EnergyPricingSettings";
 import { ESSState, ESSWrite } from "./EnergyStorageSystem";
 import { UserSettings, WriteUserSettings } from "./UserSettings";
+import { WriteBms } from "./Bms";
 
 export type RequestType =
     "subscribe"
@@ -31,6 +32,7 @@ export type RequestType =
     | "userSettings"
     | "readAllUserSettings"
     | "writeUserSettings"
+    | "writeBms"
     ;
 
 export type RpcRequest = {
@@ -47,6 +49,7 @@ export type RpcRequest = {
     energyPricingSettingsWrite?: EnergyPricingSettingsWrite;
     energyConsumptionQuery?: EnergyConsumptionQuery;
     writeUserSettings?: WriteUserSettings,
+    writeBms?: WriteBms,
 }
 
 export type RpcResponse = {

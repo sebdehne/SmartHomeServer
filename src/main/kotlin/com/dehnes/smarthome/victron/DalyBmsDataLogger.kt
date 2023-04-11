@@ -2,12 +2,16 @@ package com.dehnes.smarthome.victron
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.toInt
 import com.dehnes.smarthome.utils.withLogging
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.hivemq.client.internal.mqtt.datatypes.MqttTopicFilterImpl
+import com.hivemq.client.internal.mqtt.datatypes.MqttTopicImpl
 import com.hivemq.client.internal.mqtt.datatypes.MqttUserPropertiesImpl
+import com.hivemq.client.internal.mqtt.message.publish.MqttWillPublish
 import com.hivemq.client.internal.mqtt.message.subscribe.MqttSubscribe
 import com.hivemq.client.internal.mqtt.message.subscribe.MqttSubscription
 import com.hivemq.client.internal.util.collections.ImmutableList
@@ -17,6 +21,7 @@ import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5RetainHandling
 import mu.KotlinLogging
 import java.net.InetSocketAddress
+import java.nio.ByteBuffer
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -28,7 +33,8 @@ class DalyBmsDataLogger(
     private val influxDBClient: InfluxDBClient,
     private val objectMapper: ObjectMapper,
     victronHost: String,
-    private val executorService: ExecutorService
+    private val executorService: ExecutorService,
+    private val userSettingsService: UserSettingsService,
 ) {
 
     private val asyncClient = MqttClient.builder()
@@ -69,22 +75,55 @@ class DalyBmsDataLogger(
         )
     }
 
+    fun write(user: String?, writeBms: WriteBms) {
+        check(
+            userSettingsService.canUserWrite(user, UserRole.energyStorageSystem)
+        ) { "User $user cannot write ESS state" }
+        when (writeBms.type) {
+            WriteBmsType.writeSoc -> writeSoc(writeBms.soc!!, writeBms.bmsId)
+        }
+    }
+
+    fun writeSoc(soc: Int, bmsId: String) {
+        check(soc in 0..100)
+
+        val msg = mapOf(
+            "value" to soc
+        )
+
+        asyncClient.publish(
+            MqttWillPublish(
+                MqttTopicImpl.of("W/daly_bms_service/soc/$bmsId"),
+                ByteBuffer.wrap(objectMapper.writeValueAsBytes(msg)),
+                MqttQos.AT_LEAST_ONCE,
+                false,
+                1000,
+                null,
+                null,
+                null,
+                null,
+                MqttUserPropertiesImpl.NO_USER_PROPERTIES,
+                0
+            )
+        ).get()
+    }
+
     fun onMqttMessage(msg: Mqtt5Publish) {
         val body = msg.payload.orElse(null)?.let {
             Charsets.UTF_8.decode(it)
         }?.toString() ?: "{}"
         logger.debug { "Msg received" }
 
-        val dbusService = objectMapper.readValue<DbusService>(body)
+        val dbusServiceMqttMessage = objectMapper.readValue<DbusServiceMqttMessage>(body)
 
         executorService.submit(withLogging {
-            listeners.forEach { l -> l.value(dbusService.bmsData) }
+            listeners.forEach { l -> l.value(dbusServiceMqttMessage.bmsData) }
         })
 
         executorService.submit(withLogging {
             if (lock.tryLock()) {
                 try {
-                    onMqttMessageLocked(dbusService)
+                    onMqttMessageLocked(dbusServiceMqttMessage)
                 } finally {
                     lock.unlock()
                 }
@@ -92,13 +131,16 @@ class DalyBmsDataLogger(
         })
     }
 
-    private fun onMqttMessageLocked(msg: DbusService) {
+    private fun onMqttMessageLocked(msg: DbusServiceMqttMessage) {
         val records = msg.bmsData.flatMap { bmsData ->
             bmsData.cellVoltages.mapIndexed { index, d ->
                 InfluxDBRecord(
                     bmsData.timestamp,
                     "bms_data",
-                    mapOf("cell_voltage" to d),
+                    mapOf(
+                        "cell_voltage" to d,
+                        "soc_estimate" to bmsData.socEstimates[index]
+                    ),
                     mapOf(
                         "bmsId" to bmsData.bmsId.bmsId,
                         "cell_id" to (index + 1).toString(),
@@ -111,7 +153,7 @@ class DalyBmsDataLogger(
                     "voltage" to bmsData.voltage,
                     "current" to bmsData.current,
                     "soc" to bmsData.soc,
-
+                    "avgEstimatedSoc" to bmsData.avgEstimatedSoc,
                     "maxCellVoltage" to bmsData.maxCellVoltage,
                     "maxCellNumber" to bmsData.maxCellNumber,
                     "minCellVoltage" to bmsData.minCellVoltage,
@@ -139,7 +181,7 @@ class DalyBmsDataLogger(
     }
 }
 
-data class DbusService(
+data class DbusServiceMqttMessage(
     val service: String,
     val serviceType: String,
     val serviceInstance: Int,
@@ -152,6 +194,7 @@ data class BmsData(
     val voltage: Double,
     val current: Double,
     val soc: Double,
+    val avgEstimatedSoc: Double,
 
     val maxCellVoltage: Double,
     val maxCellNumber: Int,
@@ -176,6 +219,7 @@ data class BmsData(
     val cycles: Int,
 
     val cellVoltages: List<Double>,
+    val socEstimates: List<Double>,
     val errors: List<String>,
 )
 
@@ -192,3 +236,12 @@ data class BmsId(
     val capacity: Int,
 )
 
+enum class WriteBmsType {
+    writeSoc
+}
+
+data class WriteBms(
+    val type: WriteBmsType,
+    val bmsId: String,
+    val soc: Int? = null,
+)

@@ -5,6 +5,7 @@ import com.dehnes.smarthome.energy_consumption.EnergyConsumptionData
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionQuery
 import com.dehnes.smarthome.victron.ESSState
 import com.dehnes.smarthome.victron.ESSWrite
+import com.dehnes.smarthome.victron.WriteBms
 
 enum class RequestType {
     subscribe,
@@ -22,6 +23,8 @@ enum class RequestType {
 
     essRead,
     essWrite,
+
+    writeBms,
 
     readEnergyPricingSettings,
     writeEnergyPricingSettings,
@@ -44,6 +47,7 @@ data class RpcRequest(
     val energyPricingSettingsWrite: EnergyPricingSettingsWrite?,
     val energyConsumptionQuery: EnergyConsumptionQuery?,
     val writeUserSettings: WriteUserSettings?,
+    val writeBms: WriteBms? = null,
 )
 
 data class RpcResponse(

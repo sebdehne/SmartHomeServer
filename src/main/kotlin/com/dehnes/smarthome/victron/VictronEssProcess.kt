@@ -51,7 +51,7 @@ class VictronEssProcess(
             }
         }
         dalyBmsDataLogger.listeners["VictronEssProcess"] = {
-            onBmsData(it)
+            this.bmsData = it
         }
     }
 
@@ -65,7 +65,8 @@ class VictronEssProcess(
             currentProfile?.profileType,
             getSoCLimit(),
             ProfileType.values().map { t -> getProfile(t) },
-            essState
+            essState,
+            bmsData,
         )
     }
 
@@ -85,9 +86,6 @@ class VictronEssProcess(
         }
     }
 
-    private fun onBmsData(bmsData: List<BmsData>) {
-        this.bmsData = bmsData
-    }
 
     private fun getCurrentOperationMode() = configService.getVictronEssProcessSettings().currentOperationMode
 
@@ -273,6 +271,7 @@ data class ESSState(
     val soCLimit: SoCLimit,
     val profileSettings: List<VictronEssProcess.ProfileSettings>,
     val essState: String,
+    val bmsData: List<BmsData>
 )
 
 data class ESSWrite(

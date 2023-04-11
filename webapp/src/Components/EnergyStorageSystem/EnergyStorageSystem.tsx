@@ -5,15 +5,18 @@ import {
     Button,
     ButtonGroup,
     Container,
+    Grid,
     TextField
 } from "@material-ui/core";
 import Header from "../Header";
-import React, { Dispatch, SetStateAction, useEffect, useState } from "react";
+import React, { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
 import { ESSState, OperationMode, SoCLimit } from "../../Websocket/types/EnergyStorageSystem";
-import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
+import WebsocketService from "../../Websocket/websocketClient";
+import WebsocketClient, { useUserSettings } from "../../Websocket/websocketClient";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import { ProfileSettingsComponent } from "./ProfileSettings";
 import { Visualization } from "./Visualization";
+import { BmsData } from "../../Websocket/types/Bms";
 
 
 export const EnergyStorageSystem = () => {
@@ -49,6 +52,15 @@ export const EnergyStorageSystem = () => {
 
                 <Visualization essValues={essState.measurements} essState={essState.essState}/>
 
+                <Grid container spacing={1} direction={"column"}>
+                    <Grid item xs={12}><h3>BMSes:</h3></Grid>
+                    <Grid item xs={12}>
+                        {essState.bmsData
+                            .sort((a, b) => a.bmsId.displayName.localeCompare(b.bmsId.displayName))
+                            .map((bmsData) => (<Bms bmsdata={bmsData} setSending={setSending}/>))}
+                    </Grid>
+                </Grid>
+
                 <ProfileSettingsComponent
                     profileSettings={essState.profileSettings}
                     setSending={setSending}
@@ -57,6 +69,108 @@ export const EnergyStorageSystem = () => {
             </>
         }
     </Container>
+}
+
+type BmsProps = {
+    bmsdata: BmsData,
+    setSending: Dispatch<SetStateAction<boolean>>;
+}
+const Bms = ({ bmsdata, setSending }: BmsProps) => {
+    const [socInput, setSocInput] = useState(bmsdata.avgEstimatedSoc.toString());
+    const userSettings = useUserSettings();
+
+    const writeSoc = useCallback((soc: number) => {
+        setSending(true);
+        WebsocketClient.rpc({
+            type: "writeBms",
+            writeBms: {
+                type: "writeSoc",
+                bmsId: bmsdata.bmsId.bmsId,
+                soc
+            }
+        })
+            .finally(() => setSending(false))
+    }, []);
+
+    return <Accordion>
+        <AccordionSummary
+            expandIcon={<ExpandMoreIcon/>}
+            aria-controls="panel1a-content"
+            id="panel1a-header">
+            <div
+                style={{
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "row",
+                    justifyContent: "space-between"
+                }}
+            >
+                <div>{bmsdata.bmsId.displayName}</div>
+                <div>{bmsdata.soc} %</div>
+            </div>
+        </AccordionSummary>
+        <AccordionDetails>
+            <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Pack voltage:</div>
+                    <div>{bmsdata.voltage} V</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Pack current:</div>
+                    <div>{bmsdata.current} V</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Estimated SoC:</div>
+                    <div>{bmsdata.avgEstimatedSoc} %</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>SoC:</div>
+                    <div>{bmsdata.soc} %</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Status:</div>
+                    <div>{bmsdata.status}</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>MaxCellVoltage:</div>
+                    <div>{bmsdata.maxCellVoltage} V</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>MaxCellNumber:</div>
+                    <div>{bmsdata.maxCellNumber}</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>MinCellVoltage:</div>
+                    <div>{bmsdata.minCellVoltage} V</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>MinCellNumber:</div>
+                    <div>{bmsdata.minCellNumber}</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Cycles:</div>
+                    <div>{bmsdata.cycles}</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>LifeCycles:</div>
+                    <div>{bmsdata.lifeCycles}</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <div>Timestamp:</div>
+                    <div>{bmsdata.timestamp}</div>
+                </div>
+                <div>
+                    <TextField value={socInput}
+                               onChange={e => setSocInput(e.target.value.trim())}/>
+                    <Button
+                        disabled={!userSettings.userCanWrite("energyStorageSystem")}
+                        variant={"contained"} onClick={() => {
+                        writeSoc(parseInt(socInput))
+                    }}>Update</Button>
+                </div>
+            </div>
+        </AccordionDetails>
+    </Accordion>
 }
 
 type OperationModeSwitchProps = {

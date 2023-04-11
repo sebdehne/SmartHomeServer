@@ -3,6 +3,8 @@ package com.dehnes.smarthome.datalogging
 import com.dehnes.smarthome.api.dtos.QuickStatsResponse
 import com.dehnes.smarthome.han.HanPortService
 import com.dehnes.smarthome.utils.withLogging
+import com.dehnes.smarthome.victron.BmsData
+import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.SystemState
 import com.dehnes.smarthome.victron.VictronService
 import mu.KotlinLogging
@@ -16,7 +18,11 @@ class QuickStatsService(
     hanPortService: HanPortService,
     private val executorService: ExecutorService,
     private val victronService: VictronService,
+    dalyBmsDataLogger: DalyBmsDataLogger,
 ) {
+
+    @Volatile
+    private var bmsData = listOf<BmsData>()
 
     val listeners = ConcurrentHashMap<String, (QuickStatsResponse) -> Unit>()
     private val logger = KotlinLogging.logger { }
@@ -29,6 +35,9 @@ class QuickStatsService(
         victronService.listeners["QuickStatsService"] = {
             refetch()
             notifyListeners()
+        }
+        dalyBmsDataLogger.listeners["QuickStatsService"] = {
+            this.bmsData = it
         }
     }
 

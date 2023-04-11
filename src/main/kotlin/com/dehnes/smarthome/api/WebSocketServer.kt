@@ -13,6 +13,7 @@ import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.users.UserSettingsService
+import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.ESSState
 import com.dehnes.smarthome.victron.VictronEssProcess
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -53,6 +54,8 @@ class WebSocketServer : Endpoint() {
         configuration.getBean<UserSettingsService>(UserSettingsService::class)
     private val energyConsumptionService =
         configuration.getBean<EnergyConsumptionService>(EnergyConsumptionService::class)
+    private val dalyBmsDataLogger =
+        configuration.getBean<DalyBmsDataLogger>(DalyBmsDataLogger::class)
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info("$instanceId Socket connected: $sess")
@@ -78,6 +81,10 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            writeBms -> {
+                dalyBmsDataLogger.write(userEmail, rpcRequest.writeBms!!)
+                RpcResponse()
+            }
             userSettings -> RpcResponse(userSettings = userSettingsService.getUserSettings(userEmail))
             readAllUserSettings -> RpcResponse(allUserSettings = userSettingsService.getAllUserSettings(userEmail))
             writeUserSettings -> {

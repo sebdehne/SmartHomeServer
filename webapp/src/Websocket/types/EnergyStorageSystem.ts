@@ -1,3 +1,5 @@
+import { BmsData } from "./Bms";
+
 export type OperationMode = "automatic" | "passthrough" | "manual";
 export type ProfileType = "autoCharging" | "autoDischarging" | "manual"
 export type ProfileSettings = {
@@ -13,6 +15,7 @@ export type ESSState = {
     soCLimit: SoCLimit;
     profileSettings: ProfileSettings[];
     essState: string;
+    bmsData: BmsData[];
 }
 
 export type ESSWrite = {
