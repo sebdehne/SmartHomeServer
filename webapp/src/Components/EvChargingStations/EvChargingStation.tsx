@@ -24,8 +24,8 @@ import {
     TableContainer,
     TableHead,
     TableRow
-} from "@material-ui/core";
-import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+} from "@mui/material";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 import { FirmwareUpload } from "./FirmwareUpload";
@@ -94,147 +94,149 @@ export const EvChargingStation = ({
         chargeRateLimit: station.config.chargeRateLimit + delta
     });
 
-    return <Accordion key={station.clientConnection.clientId}>
-        <AccordionSummary
-            expandIcon={<ExpandMoreIcon/>}
-            aria-controls="panel1a-content"
-            id="panel1a-header"
-        >
-            <div>
+    return (
+        <Accordion key={station.clientConnection.clientId}>
+            <AccordionSummary
+                expandIcon={<ExpandMoreIcon/>}
+                aria-controls="panel1a-content"
+                id="panel1a-header"
+            >
                 <div>
-                    <span style={{
-                        fontWeight: "bold",
-                        fontSize: "140%"
-                    }
-                    }>{station.clientConnection.displayName}</span> - {stateToText(station.data.chargingState, station.data.reasonChargingUnavailable)}
+                    <div>
+                        <span style={{
+                            fontWeight: "bold",
+                            fontSize: "140%"
+                        }
+                        }>{station.clientConnection.displayName}</span> - {stateToText(station.data.chargingState, station.data.reasonChargingUnavailable)}
+                    </div>
                 </div>
-            </div>
-        </AccordionSummary>
-        <AccordionDetails>
+            </AccordionSummary>
+            <AccordionDetails>
 
-            <Grid container spacing={2}>
-                <Grid item xs={12}>
-                    <Grid container justify="space-between" spacing={2}>
-                        <ButtonGroup variant="contained" style={{
-                            margin: "10px"
-                        }}>
-                            <Button
-                                disabled={!userSettings.userCanWrite("evCharging")}
-                                color={station.config.mode === "ON" ? 'secondary' : 'primary'}
-                                onClick={() => updateModeTo("ON")}>On</Button>
-                            <Button
-                                disabled={!userSettings.userCanWrite("evCharging")}
-                                color={station.config.mode === "OFF" ? 'secondary' : 'primary'}
-                                    onClick={() => updateModeTo("OFF")}>Off</Button>
-                            <Button
-                                disabled={!userSettings.userCanWrite("evCharging")}
-                                color={station.config.mode === "ChargeDuringCheapHours" ? 'secondary' : 'primary'}
-                                onClick={() => updateModeTo("ChargeDuringCheapHours")}
-                            >Low-cost</Button>
-                        </ButtonGroup>
-                        <Link
-                            href={"https://dehnes.com/stats/d/dYYFH4_Mk/ev-charging?orgId=1&refresh=1m&var-clientId=" + station.clientConnection.clientId}>
-                            <Button color="primary" variant="contained" style={{
-                                margin: "10px"
-                            }}>Stats</Button>
-                        </Link>
-                    </Grid>
-                </Grid>
-                <Grid item xs={12}>
-                    <Grid container justify="flex-start" spacing={2}>
-
-                        <ButtonGroup variant="contained" style={{
-                            margin: "10px"
-                        }}>
-                            <Button
-                                disabled={!userSettings.userCanWrite("evCharging")}
-                                color={station.config.loadSharingPriority === "HIGH" ? 'secondary' : 'primary'}
-                                onClick={() => updatePriorityTo("HIGH")}>High priority</Button>
-                            <Button
-                                disabled={!userSettings.userCanWrite("evCharging")}
-                                color={station.config.loadSharingPriority === "NORMAL" ? 'secondary' : 'primary'}
-                                onClick={() => updatePriorityTo("NORMAL")}>Normal priority</Button>
-                            <Button
-                                disabled={!userSettings.userCanWrite("evCharging")}
-                                color={station.config.loadSharingPriority === "LOW" ? 'secondary' : 'primary'}
-                                onClick={() => updatePriorityTo("LOW")}>Low priority</Button>
-                        </ButtonGroup>
-
-                    </Grid>
-                </Grid>
-
-                <Grid item xs={12}>
-                    <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
-
-                        <Grid item xs={4}>
-                            <span>Charge limit in Amps: </span>
-                            <span>{station.config.chargeRateLimit}</span>
-                        </Grid>
-                        <Grid item xs={8}>
-                            <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
+                <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                        <Grid container justifyContent="space-between" spacing={2}>
+                            <ButtonGroup variant="contained" style={{
                                 margin: "10px"
                             }}>
                                 <Button
-                                    disabled={!userSettings.userCanWrite("evCharging") || station.config.chargeRateLimit <= 6}
-                                    onClick={() => setChargeRateLimit(-1)}>-</Button>
+                                    disabled={!userSettings.userCanWrite("evCharging")}
+                                    color={station.config.mode === "ON" ? 'secondary' : 'primary'}
+                                    onClick={() => updateModeTo("ON")}>On</Button>
                                 <Button
-                                    disabled={!userSettings.userCanWrite("evCharging") || station.config.chargeRateLimit >= 32}
-                                    onClick={() => setChargeRateLimit(1)}>+</Button>
+                                    disabled={!userSettings.userCanWrite("evCharging")}
+                                    color={station.config.mode === "OFF" ? 'secondary' : 'primary'}
+                                        onClick={() => updateModeTo("OFF")}>Off</Button>
+                                <Button
+                                    disabled={!userSettings.userCanWrite("evCharging")}
+                                    color={station.config.mode === "ChargeDuringCheapHours" ? 'secondary' : 'primary'}
+                                    onClick={() => updateModeTo("ChargeDuringCheapHours")}
+                                >Low-cost</Button>
                             </ButtonGroup>
+                            <Link
+                                href={"https://dehnes.com/stats/d/dYYFH4_Mk/ev-charging?orgId=1&refresh=1m&var-clientId=" + station.clientConnection.clientId}>
+                                <Button color="primary" variant="contained" style={{
+                                    margin: "10px"
+                                }}>Stats</Button>
+                            </Link>
                         </Grid>
                     </Grid>
-                </Grid>
+                    <Grid item xs={12}>
+                        <Grid container justifyContent="flex-start" spacing={2}>
 
-                <Grid item xs={12}>
-                    <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
-                        <Switch
-                            checked={showData}
-                            onChange={e => setShowData(e.target.checked)}
-                            name="showData"
-                            inputProps={{ 'aria-label': 'secondary checkbox' }}
-                        />
-                        {showData && 'Hide details'}
-                        {!showData && 'Show details'}
+                            <ButtonGroup variant="contained" style={{
+                                margin: "10px"
+                            }}>
+                                <Button
+                                    disabled={!userSettings.userCanWrite("evCharging")}
+                                    color={station.config.loadSharingPriority === "HIGH" ? 'secondary' : 'primary'}
+                                    onClick={() => updatePriorityTo("HIGH")}>High priority</Button>
+                                <Button
+                                    disabled={!userSettings.userCanWrite("evCharging")}
+                                    color={station.config.loadSharingPriority === "NORMAL" ? 'secondary' : 'primary'}
+                                    onClick={() => updatePriorityTo("NORMAL")}>Normal priority</Button>
+                                <Button
+                                    disabled={!userSettings.userCanWrite("evCharging")}
+                                    color={station.config.loadSharingPriority === "LOW" ? 'secondary' : 'primary'}
+                                    onClick={() => updatePriorityTo("LOW")}>Low priority</Button>
+                            </ButtonGroup>
+
+                        </Grid>
                     </Grid>
+
+                    <Grid item xs={12}>
+                        <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
+
+                            <Grid item xs={4}>
+                                <span>Charge limit in Amps: </span>
+                                <span>{station.config.chargeRateLimit}</span>
+                            </Grid>
+                            <Grid item xs={8}>
+                                <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
+                                    margin: "10px"
+                                }}>
+                                    <Button
+                                        disabled={!userSettings.userCanWrite("evCharging") || station.config.chargeRateLimit <= 6}
+                                        onClick={() => setChargeRateLimit(-1)}>-</Button>
+                                    <Button
+                                        disabled={!userSettings.userCanWrite("evCharging") || station.config.chargeRateLimit >= 32}
+                                        onClick={() => setChargeRateLimit(1)}>+</Button>
+                                </ButtonGroup>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                        <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
+                            <Switch
+                                checked={showData}
+                                onChange={e => setShowData(e.target.checked)}
+                                name="showData"
+                                inputProps={{ 'aria-label': 'secondary checkbox' }}
+                            />
+                            {showData && 'Hide details'}
+                            {!showData && 'Show details'}
+                        </Grid>
+                    </Grid>
+
+                    {showData &&
+                        <>
+                            <Grid item xs={12}>
+                                <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
+                                    <PowerComponent
+                                        phase1volts={station.data.phase1Millivolts / 1000}
+                                        phase2volts={station.data.phase2Millivolts / 1000}
+                                        phase3volts={station.data.phase3Millivolts / 1000}
+                                        phase1amps={station.data.phase1Milliamps / 1000}
+                                        phase2amps={station.data.phase2Milliamps / 1000}
+                                        phase3amps={station.data.phase3Milliamps / 1000}
+                                    />
+                                </Grid>
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
+                                    <StationsDetails
+                                        maxChargingRate={station.data.maxChargingRate}
+                                        proximityPilotAmps={station.data.proximityPilotAmps}
+                                        reasonChargingUnavailable={station.data.reasonChargingUnavailable}
+                                        systemUptime={station.data.systemUptime}
+                                        utcTimestampInMs={station.data.utcTimestampInMs}
+                                        wifiRSSI={station.data.wifiRSSI}
+                                        currentSeconds={currentMilliSeconds}
+                                        clientConnection={station.clientConnection}
+                                        setSending={setSending}
+                                        setCmdResult={setCmdResult}
+                                    />
+                                </Grid>
+                            </Grid>
+                        </>
+                    }
+
                 </Grid>
-
-                {showData &&
-                    <>
-                        <Grid item xs={12}>
-                            <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
-                                <PowerComponent
-                                    phase1volts={station.data.phase1Millivolts / 1000}
-                                    phase2volts={station.data.phase2Millivolts / 1000}
-                                    phase3volts={station.data.phase3Millivolts / 1000}
-                                    phase1amps={station.data.phase1Milliamps / 1000}
-                                    phase2amps={station.data.phase2Milliamps / 1000}
-                                    phase3amps={station.data.phase3Milliamps / 1000}
-                                />
-                            </Grid>
-                        </Grid>
-
-                        <Grid item xs={12}>
-                            <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
-                                <StationsDetails
-                                    maxChargingRate={station.data.maxChargingRate}
-                                    proximityPilotAmps={station.data.proximityPilotAmps}
-                                    reasonChargingUnavailable={station.data.reasonChargingUnavailable}
-                                    systemUptime={station.data.systemUptime}
-                                    utcTimestampInMs={station.data.utcTimestampInMs}
-                                    wifiRSSI={station.data.wifiRSSI}
-                                    currentSeconds={currentMilliSeconds}
-                                    clientConnection={station.clientConnection}
-                                    setSending={setSending}
-                                    setCmdResult={setCmdResult}
-                                />
-                            </Grid>
-                        </Grid>
-                    </>
-                }
-
-            </Grid>
-        </AccordionDetails>
-    </Accordion>;
+            </AccordionDetails>
+        </Accordion>
+    );
 };
 
 type StationsDetailsProps = {

@@ -1,4 +1,4 @@
-import { Button, Grid, Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@material-ui/core";
+import { Button, Grid, Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
 import React from "react";
 import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import { EnvironmentSensorRequest, FirmwareInfo } from "../../Websocket/types/EnvironmentSensors";
@@ -63,7 +63,7 @@ export const AdminTools = ({
 
     return (
         <Grid item xs={12}>
-            <Grid container justify="flex-start" spacing={2} alignItems={"center"}>
+            <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
                 <TableContainer component={Paper} style={{
                     marginTop: "20px"
                 }}>

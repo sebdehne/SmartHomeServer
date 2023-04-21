@@ -1,7 +1,7 @@
 import React, { Dispatch, SetStateAction, useState } from "react";
 import { ESSState, ProfileSettings } from "../../Websocket/types/EnergyStorageSystem";
-import { Accordion, AccordionDetails, AccordionSummary, Button, Grid, TextField } from "@material-ui/core";
-import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import { Accordion, AccordionDetails, AccordionSummary, Button, Grid, TextField } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import WebsocketClient, { useUserSettings } from "../../Websocket/websocketClient";
 
 export type ProfileSettingsProps = {

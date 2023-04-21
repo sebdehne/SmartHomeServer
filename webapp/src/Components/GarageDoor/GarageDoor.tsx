@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Container, Grid } from "@material-ui/core";
+import { Button, Container, Grid } from "@mui/material";
 import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import Header from "../Header";
-import { ArrowDownward, ArrowUpward } from "@material-ui/icons";
+import { ArrowDownward, ArrowUpward } from "@mui/icons-material";
 import { DoorStatus, GarageRequestType, GarageResponse } from "../../Websocket/types/Garage";
 import { RpcResponse } from "../../Websocket/types/Rpc";
 import { Notify } from "../../Websocket/types/Subscription";
@@ -118,7 +118,7 @@ const GarageDoor = () => {
             <Grid
                 container
                 direction="column"
-                justify="space-between"
+                justifyContent="space-between"
                 alignItems="center"
             >
                 <Grid

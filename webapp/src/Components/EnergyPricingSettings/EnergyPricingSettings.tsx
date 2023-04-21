@@ -7,9 +7,9 @@ import {
     Grid,
     MenuItem,
     Paper,
-    Select,
+    Select, SelectChangeEvent,
     TextField
-} from "@material-ui/core";
+} from "@mui/material";
 import React, { Dispatch, SetStateAction, useEffect, useState } from "react";
 import Header from "../Header";
 import {
@@ -20,7 +20,7 @@ import {
     PriceCategory
 } from "../../Websocket/types/EnergyPricingSettings";
 import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
-import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { currentDay, formatTime } from "../Utils/dateUtils";
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
@@ -34,7 +34,7 @@ import {
     Title,
     Tooltip,
 } from 'chart.js';
-import { ArrowLeft, ArrowRight } from "@material-ui/icons";
+import { ArrowLeft, ArrowRight } from "@mui/icons-material";
 import { isNumber, numberTo2Decimal } from "../Utils/utils";
 
 ChartJS.register(
@@ -258,7 +258,7 @@ const EnergyConsumption = ({ setSending }: EnergyConsumptionProps) => {
     const [extraParam, setExtraParam] = useState<string>(currentDay().toString());
     const [data, setData] = useState<EnergyConsumptionData>();
 
-    const handleChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    const handleChange = (event: SelectChangeEvent) => {
         setSelectedPeriode(event.target.value as string);
     };
 

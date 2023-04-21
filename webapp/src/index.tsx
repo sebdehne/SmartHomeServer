@@ -2,7 +2,7 @@ import React from 'react';
 import './index.css';
 import App from './Components/App/App';
 import reportWebVitals from './reportWebVitals';
-import { CssBaseline, MuiThemeProvider } from "@material-ui/core";
+import { CssBaseline, ThemeProvider, StyledEngineProvider } from "@mui/material";
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
@@ -16,14 +16,15 @@ import { EnergyStorageSystem } from "./Components/EnergyStorageSystem/EnergyStor
 import { createRoot } from 'react-dom/client';
 import { UserSettingsAdmin } from "./Components/UserSettingsAdmin/UserSettingsAdmin";
 
+
 const container = document.getElementById('root');
 
 const root = createRoot(container!);
 
 root.render(
     <React.StrictMode>
-        <MuiThemeProvider theme={theme}>
-            <CssBaseline/>
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
             <BrowserRouter basename={process.env.REACT_APP_BASENAME}>
                 <Routes>
                     <Route path="/" element={<App/>}/>
@@ -38,7 +39,7 @@ root.render(
                     <Route path="/energy" element={<EnergyStorageSystem/>}/>
                 </Routes>
             </BrowserRouter>
-        </MuiThemeProvider>
+        </ThemeProvider>
     </React.StrictMode>
 );
 

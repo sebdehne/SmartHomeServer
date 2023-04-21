@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Checkbox, Container } from "@material-ui/core";
+import { Button, Checkbox, Container } from "@mui/material";
 import './Webcams.css';
 import VideoService from "./video";
 import Header from "../Header";

@@ -14,11 +14,11 @@ import {
     TableHead,
     TableRow,
     Typography
-} from "@material-ui/core";
+} from "@mui/material";
 import { VideoBrowserRequest, VideoBrowserResponse, VideoFile } from "../../Websocket/types/Video";
 import websocketClient from "../../Websocket/websocketClient";
-import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
 const nowDate = () => {
     const fromDate = new Date();

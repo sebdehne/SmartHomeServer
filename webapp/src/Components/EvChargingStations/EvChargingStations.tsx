@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { EvChargingStationDataAndConfig } from "../../Websocket/types/EVChargingStation";
 import WebsocketService from "../../Websocket/websocketClient";
-import { Container } from "@material-ui/core";
+import { Container } from "@mui/material";
 import Header from "../Header";
 import { EvChargingStation } from "./EvChargingStation";
 

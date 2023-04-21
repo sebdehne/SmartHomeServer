@@ -13,11 +13,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <kotlin.version>1.7.0</kotlin.version>
-        <jetty.version>11.0.11</jetty.version>
-        <httpclient.version>4.5.13</httpclient.version>
+        <kotlin.version>1.8.20</kotlin.version>
+        <jetty.version>11.0.15</jetty.version>
+        <httpclient.version>4.5.14</httpclient.version>
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
-        <jackson.version>2.13.4</jackson.version>
+        <jackson.version>2.15.0-rc3</jackson.version>
     </properties>
 
     <build>
@@ -28,7 +28,7 @@
             <plugin>
                 <groupId>com.github.eirslett</groupId>
                 <artifactId>frontend-maven-plugin</artifactId>
-                <version>1.11.0</version>
+                <version>1.12.1</version>
                 <executions>
                     <execution>
                         <id>install node and npm</id>
@@ -58,6 +58,7 @@
 
                 </executions>
                 <configuration>
+                    <npmVersion>9.6.5</npmVersion>
                     <nodeVersion>v16.15.1</nodeVersion>
                     <workingDirectory>webapp</workingDirectory>
                     <installDirectory>target</installDirectory>
@@ -188,7 +189,7 @@
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20220924</version>
+            <version>20230227</version>
         </dependency>
         <dependency>
             <groupId>com.ghgande</groupId>
@@ -198,7 +199,7 @@
         <dependency>
             <groupId>com.hivemq</groupId>
             <artifactId>hivemq-mqtt-client</artifactId>
-            <version>1.3.0</version>
+            <version>1.3.1</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
@@ -229,7 +230,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.2.8</version>
+            <version>1.4.7</version>
         </dependency>
         <dependency>
             <groupId>io.github.microutils</groupId>
@@ -266,14 +267,14 @@
 
         <dependency>
             <groupId>io.mockk</groupId>
-            <artifactId>mockk</artifactId>
-            <version>1.12.4</version>
+            <artifactId>mockk-jvm</artifactId>
+            <version>1.13.5</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.8.2</version>
+            <version>5.9.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -285,7 +286,7 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.8.2</version>
+            <version>5.9.2</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

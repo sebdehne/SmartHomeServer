@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Container, Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@material-ui/core";
+import { Button, Container, Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import './App.css';
 import { QuickStatsResponse } from "../../Websocket/types/QuickStats";

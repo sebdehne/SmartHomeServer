@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import WebsocketService, { ConnectionStatus } from "../Websocket/websocketClient";
-import { Button, CircularProgress } from "@material-ui/core";
+import { Button, CircularProgress } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import ArrowBackIcon from '@material-ui/icons/ArrowBack';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 type HeaderProps = {
     title: string,

@@ -7,13 +7,13 @@ import {
     Container,
     Grid,
     TextField
-} from "@material-ui/core";
+} from "@mui/material";
 import Header from "../Header";
 import React, { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
 import { ESSState, OperationMode, SoCLimit } from "../../Websocket/types/EnergyStorageSystem";
 import WebsocketService from "../../Websocket/websocketClient";
 import WebsocketClient, { useUserSettings } from "../../Websocket/websocketClient";
-import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { ProfileSettingsComponent } from "./ProfileSettings";
 import { Visualization } from "./Visualization";
 import { BmsData } from "../../Websocket/types/Bms";

@@ -1,4 +1,4 @@
-import { Button } from "@material-ui/core";
+import { Button } from "@mui/material";
 import React from "react";
 import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import { arrayBufferToBase64 } from "../Utils/utils";

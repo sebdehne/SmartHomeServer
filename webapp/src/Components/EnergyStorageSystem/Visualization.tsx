@@ -1,5 +1,5 @@
 import { ESSValues, GridData } from "../../Websocket/types/EnergyStorageSystem";
-import { Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@material-ui/core";
+import { Paper, Table, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
 import React from "react";
 import { eesAlarms, numberTo2Decimal } from "../Utils/utils";
 

@@ -10,9 +10,9 @@ import {
     Container,
     Grid,
     TextField
-} from "@material-ui/core";
+} from "@mui/material";
 import { Level, UserRole, UserSettings } from "../../Websocket/types/UserSettings";
-import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import WebsocketClient from "../../Websocket/websocketClient";
 
 export const UserSettingsAdmin = () => {

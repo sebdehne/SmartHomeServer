@@ -9,7 +9,7 @@ import {
     TableCell,
     TableContainer,
     TableRow
-} from "@material-ui/core";
+} from "@mui/material";
 import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
 import { timeToDelta } from "../GarageDoor/GarageDoor";
 import Header from "../Header";
