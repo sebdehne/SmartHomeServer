@@ -44,10 +44,17 @@ class HvakosterstrommenClient(
 
         val prices = objectMapper.readValue<List<Map<String, Any>>>(response)
         prices.map { price ->
+            val any = price["NOK_per_kWh"].let {
+                when (it) {
+                    is Int -> it.toDouble()
+                    is Double -> it
+                    else -> error("type $it not supported")
+                }
+            }
             Price(
                 Instant.parse(price["time_start"] as String),
                 Instant.parse(price["time_end"] as String),
-                (price["NOK_per_kWh"] as Double) * 1.25,
+                any * 1.25,
             )
         }
     } catch (e: Exception) {
