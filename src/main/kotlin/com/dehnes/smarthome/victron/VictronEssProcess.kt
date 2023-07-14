@@ -142,8 +142,16 @@ class VictronEssProcess(
         }
 
         OperationMode.manual -> {
-            essState = "Manual mode"
-            ProfileType.manual
+            if (isSoCTooLow()) {
+                essState = "Manual mode (SoC too low)"
+                null
+            } else if (isSoCTooHigh()) {
+                essState = "Manual mode (SoC too high)"
+                null
+            } else {
+                essState = "Manual mode"
+                ProfileType.manual
+            }
         }
 
         OperationMode.automatic -> {

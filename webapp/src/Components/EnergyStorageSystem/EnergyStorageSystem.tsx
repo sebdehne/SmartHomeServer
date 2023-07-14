@@ -17,6 +17,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { ProfileSettingsComponent } from "./ProfileSettings";
 import { Visualization } from "./Visualization";
 import { BmsData } from "../../Websocket/types/Bms";
+import {number2Decimal, numberTo2Decimal} from "../Utils/utils";
 
 
 export const EnergyStorageSystem = () => {
@@ -76,7 +77,7 @@ type BmsProps = {
     setSending: Dispatch<SetStateAction<boolean>>;
 }
 const Bms = ({ bmsdata, setSending }: BmsProps) => {
-    const [socInput, setSocInput] = useState(bmsdata.avgEstimatedSoc.toString());
+    const [socInput, setSocInput] = useState(number2Decimal(bmsdata.avgEstimatedSoc)?.toString() ?? '');
     const userSettings = useUserSettings();
 
     const writeSoc = useCallback((soc: number) => {
@@ -117,11 +118,11 @@ const Bms = ({ bmsdata, setSending }: BmsProps) => {
                 </div>
                 <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
                     <div>Pack current:</div>
-                    <div>{bmsdata.current} V</div>
+                    <div>{bmsdata.current} A</div>
                 </div>
                 <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
                     <div>Estimated SoC:</div>
-                    <div>{bmsdata.avgEstimatedSoc} %</div>
+                    <div>{numberTo2Decimal(bmsdata.avgEstimatedSoc)} %</div>
                 </div>
                 <div style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
                     <div>SoC:</div>
