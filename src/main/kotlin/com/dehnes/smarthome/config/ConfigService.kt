@@ -32,7 +32,9 @@ class ConfigService(
     }
 
     private fun update(fn: (ConfigurationRoot) -> ConfigurationRoot) {
-        writeConfig(fn(readConfig()))
+        synchronized(this) {
+            writeConfig(fn(readConfig()))
+        }
     }
 
     fun isDevMode() = readConfig().devMode
