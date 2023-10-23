@@ -145,12 +145,27 @@ class EnergyPriceService(
         }
     }
 
+    private fun transformPrices(original: List<Price>): List<Price> = original.map {
+        val price = it.price
+        // https://www.regjeringen.no/no/tema/energi/regjeringens-stromtiltak/id2900232/?expand=factbox2900261
+
+        val finalPrice = if (price > 0.7) {
+            val topPart = price - 0.7
+            val tenPercent = topPart * 0.1
+            0.7 + tenPercent
+        } else price
+
+        it.copy(
+            price = finalPrice
+        )
+    }
+
     private fun reloadCacheNow() {
         logger.info("Fetching energy prices...")
         val prices = priceSource.getPrices()
         lastReload = System.currentTimeMillis()
         if (!prices.isNullOrEmpty()) {
-            priceCache = prices
+            priceCache = transformPrices(prices)
             logger.info("Fetching energy prices...SUCCESS. " + objectMapper.writeValueAsString(prices))
         } else {
             logger.info("Fetching energy prices...FAILED")

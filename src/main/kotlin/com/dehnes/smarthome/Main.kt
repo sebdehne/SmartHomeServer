@@ -16,6 +16,7 @@ import org.eclipse.jetty.websocket.jakarta.common.ServerEndpointConfigWrapper
 import org.eclipse.jetty.websocket.jakarta.server.config.ContainerDefaultConfigurator
 import org.eclipse.jetty.websocket.jakarta.server.config.JakartaWebSocketServletContainerInitializer
 import org.eclipse.jetty.websocket.jakarta.server.internal.BasicServerEndpointConfig
+import java.time.Duration
 
 val configuration = Configuration()
 
@@ -40,6 +41,7 @@ fun main() {
     handler.addServlet(ServletHolder(StaticFilesServlet()), "/*")
 
     JakartaWebSocketServletContainerInitializer.configure(handler) { context, container ->
+        container.defaultMaxSessionIdleTimeout = Duration.ofMinutes(60).toMillis()
         container.addEndpoint(ServerEndpointConfig.Builder
             .create(WebSocketServer::class.java, "/api")
             .configurator(object : ServerEndpointConfig.Configurator() {
