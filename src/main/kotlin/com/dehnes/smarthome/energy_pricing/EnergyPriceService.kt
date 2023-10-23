@@ -148,11 +148,12 @@ class EnergyPriceService(
     private fun transformPrices(original: List<Price>): List<Price> = original.map {
         val price = it.price
         // https://www.regjeringen.no/no/tema/energi/regjeringens-stromtiltak/id2900232/?expand=factbox2900261
+        val threshold = 0.7 * 1.25
 
-        val finalPrice = if (price > 0.7) {
-            val topPart = price - 0.7
+        val finalPrice = if (price > threshold) {
+            val topPart = price - threshold
             val tenPercent = topPart * 0.1
-            0.7 + tenPercent
+            threshold + tenPercent
         } else price
 
         it.copy(
