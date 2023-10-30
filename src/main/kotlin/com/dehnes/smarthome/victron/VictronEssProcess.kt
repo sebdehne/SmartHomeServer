@@ -106,7 +106,7 @@ class VictronEssProcess(
                 currentProfile = null
                 logger.info { "Switching to passthrough" }
             } else {
-                logger.info { "Not writing to victron - passthrough" }
+                logger.debug { "Not writing to victron - passthrough" }
             }
             return true
         }
@@ -129,7 +129,7 @@ class VictronEssProcess(
             )
         }
 
-        logger.info { "Using targetProfile=$targetProfile profileSettings=$profileSettings result=$result" }
+        logger.debug { "Using targetProfile=$targetProfile profileSettings=$profileSettings result=$result" }
         victronService.essMode3_setAcPowerSetPointMode(result)
         currentProfile = profileSettings
         return true

@@ -57,7 +57,7 @@ class EnergyPriceService(
     }
 
     fun getAllSettings(user: String?): List<EnergyPriceConfig> {
-        check(userSettingsService.canUserRead(user, UserRole.energyPricing)) {"User $user cannot read price settings"}
+        check(userSettingsService.canUserRead(user, UserRole.energyPricing)) { "User $user cannot read price settings" }
         return configService.getEnergyPriceServiceSettings().entries.map { (service, settings) ->
             val today = Instant.now().atZone(DateTimeUtils.zoneId).toLocalDate()
             val categorizedPrices = listOf(
@@ -78,7 +78,12 @@ class EnergyPriceService(
     }
 
     fun setNeutralSpan(user: String?, serviceType: String, neutralSpan: Double) {
-        check(userSettingsService.canUserWrite(user, UserRole.energyPricing)) {"User $user cannot update price settings"}
+        check(
+            userSettingsService.canUserWrite(
+                user,
+                UserRole.energyPricing
+            )
+        ) { "User $user cannot update price settings" }
         configService.setEnergiPriceServiceSetting(
             serviceType,
             getEnergyPriceServiceSetting(serviceType).copy(
@@ -88,7 +93,12 @@ class EnergyPriceService(
     }
 
     fun setAvgMultiplier(user: String?, serviceType: String, avgMultiplier: Double) {
-        check(userSettingsService.canUserWrite(user, UserRole.energyPricing)) {"User $user cannot update price settings"}
+        check(
+            userSettingsService.canUserWrite(
+                user,
+                UserRole.energyPricing
+            )
+        ) { "User $user cannot update price settings" }
         configService.setEnergiPriceServiceSetting(
             serviceType,
             getEnergyPriceServiceSetting(serviceType).copy(
@@ -99,7 +109,7 @@ class EnergyPriceService(
 
     @Synchronized
     fun findSuitablePrices(user: String?, serviceType: String, day: LocalDate): List<CategorizedPrice> {
-        check(userSettingsService.canUserRead(user, UserRole.energyPricing)) {"User $user cannot read price settings"}
+        check(userSettingsService.canUserRead(user, UserRole.energyPricing)) { "User $user cannot read price settings" }
         ensureCacheLoaded()
         val settings = getEnergyPriceServiceSetting(serviceType)
 
@@ -156,9 +166,7 @@ class EnergyPriceService(
             threshold + tenPercent
         } else price
 
-        it.copy(
-            price = finalPrice
-        )
+        it.copy(price = finalPrice)
     }
 
     private fun reloadCacheNow() {

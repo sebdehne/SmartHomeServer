@@ -8,6 +8,7 @@ import com.dehnes.smarthome.ev_charging.LoadSharingPriority
 import com.dehnes.smarthome.users.Level
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.victron.VictronEssProcess
+import com.dehnes.smarthome.zwave.VarmeKabelTrappSettings
 
 data class ConfigurationRoot(
     val devMode: Boolean = false,
@@ -15,6 +16,7 @@ data class ConfigurationRoot(
     val loraSerialPort: String = "/dev/ttyACM0",
     val userSettings: Map<String, UserSettings> = emptyMap(),
     val environmentSensors: EnvironmentSensors = EnvironmentSensors(),
+    val varmeKabelTrappSettings: VarmeKabelTrappSettings = VarmeKabelTrappSettings(),
     val energyPriceServiceSettings: Map<String, EnergyPriceServiceSettings> = emptyMap(),
     val heatingControllerSettings: HeatingControllerSettings = HeatingControllerSettings(),
     val evChargerSettings: EvChargerSettings = EvChargerSettings(),

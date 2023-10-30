@@ -66,33 +66,33 @@ class VictronService(
 
     private val lock = ReentrantLock()
 
-    init {
-        scheduledExecutorService.scheduleAtFixedRate({
-            executorService.submit(withLogging {
+        init {
+            scheduledExecutorService.scheduleAtFixedRate({
+                executorService.submit(withLogging {
 
-                lock.tryLock()
-                try {
-                    val oldestUpdatedField = essValues.getOldestUpdatedField()
-                    if (oldestUpdatedField == null || oldestUpdatedField.second.isBefore(
-                            Instant.now().minusSeconds(60 * 5)
-                        )
-                    ) {
-                        logger.warn { "Need to re-connect. oldestUpdatedField=$oldestUpdatedField" }
-                        reconnect()
+                    lock.tryLock()
+                    try {
+                        val oldestUpdatedField = essValues.getOldestUpdatedField()
+                        if (oldestUpdatedField == null || oldestUpdatedField.second.isBefore(
+                                Instant.now().minusSeconds(60 * 5)
+                            )
+                        ) {
+                            logger.warn { "Need to re-connect. oldestUpdatedField=$oldestUpdatedField" }
+                            reconnect()
+                        }
+
+                        send(topic(TopicType.read, "/system/0/Serial"))
+                        send(topic(TopicType.read, "/system/0/SystemState/State"))
+
+                        send(topic(TopicType.read, "/vebus/276/Hub4/L1/AcPowerSetpoint"))
+                        send(topic(TopicType.read, "/vebus/276/Hub4/L2/AcPowerSetpoint"))
+                        send(topic(TopicType.read, "/vebus/276/Hub4/L3/AcPowerSetpoint"))
+                    } finally {
+                        lock.unlock()
                     }
-
-                    send(topic(TopicType.read, "/system/0/Serial"))
-                    send(topic(TopicType.read, "/system/0/SystemState/State"))
-
-                    send(topic(TopicType.read, "/vebus/276/Hub4/L1/AcPowerSetpoint"))
-                    send(topic(TopicType.read, "/vebus/276/Hub4/L2/AcPowerSetpoint"))
-                    send(topic(TopicType.read, "/vebus/276/Hub4/L3/AcPowerSetpoint"))
-                } finally {
-                    lock.unlock()
-                }
-            })
-        }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
-    }
+                })
+            }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
+        }
 
     private fun reconnect() {
         asyncClient.disconnect()
@@ -130,7 +130,7 @@ class VictronService(
             )
             if (lastNotify < (System.currentTimeMillis() - delayInMs)) {
                 lastNotify = System.currentTimeMillis()
-                logger.info { "sending notify $essValues listeners=${listeners.size}" }
+                logger.debug { "sending notify $essValues listeners=${listeners.size}" }
                 executorService.submit(withLogging {
                     val c = essValues
                     influxDBClient.recordSensorData(

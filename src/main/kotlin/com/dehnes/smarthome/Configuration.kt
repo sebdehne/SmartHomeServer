@@ -21,6 +21,8 @@ import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.VictronEssProcess
 import com.dehnes.smarthome.victron.VictronService
+import com.dehnes.smarthome.zwave.VarmeKabelTrappService
+import com.dehnes.smarthome.zwave.ZWaveMqttClient
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -84,9 +86,9 @@ class Configuration {
         )
         evChargingStationConnection.start()
 
-        val victronHost = "192.168.1.18"
+        val mqttBroker = "192.168.1.18"
         val victronService = VictronService(
-            victronHost,
+            mqttBroker,
             objectMapper,
             executorService,
             configService,
@@ -147,7 +149,7 @@ class Configuration {
 
         val videoBrowser = VideoBrowser(userSettingsService)
 
-        val dalyBmsDataLogger = DalyBmsDataLogger(influxDBClient, objectMapper, victronHost, executorService, userSettingsService)
+        val dalyBmsDataLogger = DalyBmsDataLogger(influxDBClient, objectMapper, mqttBroker, executorService, userSettingsService)
         dalyBmsDataLogger.apply {
             reconnect()
             resubscribe()
@@ -165,6 +167,22 @@ class Configuration {
         victronEssProcess.start()
 
         val quickStatsService = QuickStatsService(influxDBClient, hanPortService, executorService, victronService, dalyBmsDataLogger)
+
+        val zWaveMqttClient = ZWaveMqttClient(
+            mqttBroker,
+            objectMapper,
+            executorService
+        )
+
+        val varmeKabelTrappService = VarmeKabelTrappService(
+            zWaveMqttClient,
+            clock,
+            influxDBClient,
+            quickStatsService,
+            configService
+        )
+
+        varmeKabelTrappService.init()
 
 
         beans[UnderFloorHeaterService::class] = heaterService

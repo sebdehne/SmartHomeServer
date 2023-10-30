@@ -176,7 +176,7 @@ class DalyBmsDataLogger(
             )
         }
 
-        logger.info { "Sending ${records.size} to influxDB" }
+        logger.debug { "Sending ${records.size} to influxDB" }
         influxDBClient.recordSensorData(records)
     }
 }

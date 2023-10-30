@@ -308,8 +308,8 @@ class EvChargingStationConnection(
         executorService.submit(withLogging {
             val evChargingStationClient = connectedClientsById[clientId]?.evChargingStationClient ?: return@withLogging
             val data = collectData(clientId)
-            logger.info { "Data response for $clientId $data" }
-            data.logMessages.forEach { msg -> chargerStationLogger.info { "charger=$clientId msg=$msg" } }
+            logger.debug { "Data response for $clientId $data" }
+            data.logMessages.forEach { msg -> chargerStationLogger.debug { "charger=$clientId msg=$msg" } }
             recordData(data, evChargingStationClient)
             executorService.submit(withLogging {
                 listeners.forEach { entry ->

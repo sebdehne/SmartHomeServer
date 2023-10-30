@@ -12,19 +12,19 @@ class UserSettingsService(private val configService: ConfigService) {
 
     fun canUserRead(user: String?, userRole: UserRole): Boolean {
         val result = getUserAccessLevel(user, userRole) in listOf(Level.read, Level.readWrite, Level.readWriteAdmin)
-        logger.info { "canUserRead: user=$user userRole=$userRole result=$result" }
+        logger.debug { "canUserRead: user=$user userRole=$userRole result=$result" }
         return result
     }
 
     fun canUserWrite(user: String?, userRole: UserRole): Boolean {
         val result = getUserAccessLevel(user, userRole) in listOf(Level.readWrite, Level.readWriteAdmin)
-        logger.info { "canUserWrite: user=$user userRole=$userRole result=$result" }
+        logger.debug { "canUserWrite: user=$user userRole=$userRole result=$result" }
         return result
     }
 
     fun canUserAdmin(user: String?, userRole: UserRole): Boolean {
         val result = getUserAccessLevel(user, userRole) == Level.readWriteAdmin
-        logger.info { "canUserWrite: user=$user userRole=$userRole result=$result" }
+        logger.debug { "canUserWrite: user=$user userRole=$userRole result=$result" }
         return result
     }
 
