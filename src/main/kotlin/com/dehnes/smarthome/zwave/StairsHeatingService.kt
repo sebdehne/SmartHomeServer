@@ -227,7 +227,7 @@ class StairsHeatingService(
                 true
             }
 
-            temperature > settings.targetTemperature -> {
+            temperature >= settings.targetTemperature -> {
                 if (currentState) {
                     logger.debug { "Switching off" }
                 }
