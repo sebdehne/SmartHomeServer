@@ -14,6 +14,7 @@ import {
 import { ESSState, ESSWrite } from "./EnergyStorageSystem";
 import { UserSettings, WriteUserSettings } from "./UserSettings";
 import { WriteBms } from "./Bms";
+import {StairsHeatingRequest, StairsHeatingResponse} from "./stairsHeating";
 
 export type RequestType =
     "subscribe"
@@ -33,6 +34,7 @@ export type RequestType =
     | "readAllUserSettings"
     | "writeUserSettings"
     | "writeBms"
+    | "stairsHeatingRequest"
     ;
 
 export type RpcRequest = {
@@ -50,6 +52,7 @@ export type RpcRequest = {
     energyConsumptionQuery?: EnergyConsumptionQuery;
     writeUserSettings?: WriteUserSettings,
     writeBms?: WriteBms,
+    stairsHeatingRequest?: StairsHeatingRequest;
 }
 
 export type RpcResponse = {
@@ -67,4 +70,5 @@ export type RpcResponse = {
     userSettings?: UserSettings;
     energyConsumptionData?: EnergyConsumptionData;
     allUserSettings?: { [userId: string]: UserSettings },
+    stairsHeatingResponse?: StairsHeatingResponse;
 }

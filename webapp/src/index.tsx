@@ -15,6 +15,7 @@ import { EnergyPricingSettings } from "./Components/EnergyPricingSettings/Energy
 import { EnergyStorageSystem } from "./Components/EnergyStorageSystem/EnergyStorageSystem";
 import { createRoot } from 'react-dom/client';
 import { UserSettingsAdmin } from "./Components/UserSettingsAdmin/UserSettingsAdmin";
+import {StairsHeater} from "./Components/StairsHeater/StairsHeater";
 
 
 const container = document.getElementById('root');
@@ -30,6 +31,7 @@ root.render(
                     <Route path="/" element={<App/>}/>
                     <Route path="/garage" element={<GarageDoor/>}/>
                     <Route path="/heater" element={<HeaterController/>}/>
+                    <Route path="/stairs" element={<StairsHeater/>}/>
                     <Route path="/evChargingStations" element={<EvChargingStations/>}/>
                     <Route path="/environmentSensors" element={<EnvironmentSensors/>}/>
                     <Route path="/webcams" element={<Webcams/>}/>

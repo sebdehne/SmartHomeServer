@@ -1,8 +1,6 @@
 package com.dehnes.smarthome.zwave
 
 import com.dehnes.smarthome.utils.withLogging
-import com.dehnes.smarthome.victron.TopicType
-import com.dehnes.smarthome.victron.VictronService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.hivemq.client.internal.mqtt.datatypes.MqttTopicFilterImpl
@@ -144,8 +142,6 @@ class ZWaveMqttClient(
                 0
             )
         ).get()
-
-        logger.info { "Published" }
     }
 
     private fun onMqttMessage(l: Listener) = { msg: Mqtt5Publish ->

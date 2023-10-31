@@ -4,6 +4,7 @@ export type UserRole =
     | "energyStorageSystem"
     | "energyPricing"
     | "heaterUnderFloor"
+    | "heaterStairs"
     | "environmentSensors"
     | "cameras"
     | "recordings"

@@ -475,8 +475,8 @@ class EvChargingService(
                             else
                                 existingState.measuredCurrentPeakAt
 
-                        logger.info {
-                            "Lader=$clientId measuredCurrentPeakAt=${
+                        logger.debug {
+                            "Charger=$clientId measuredCurrentPeakAt=${
                                 Instant.ofEpochMilli(
                                     measuredCurrentPeakAt
                                 )

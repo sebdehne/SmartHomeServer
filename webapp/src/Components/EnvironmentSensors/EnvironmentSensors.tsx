@@ -19,8 +19,9 @@ export const EnvironmentSensors = () => {
     const [firmwareInfo, setFirmwareInfo] = useState<FirmwareInfo | undefined>(undefined);
 
     useEffect(() => {
-        setTimeout(() => setCurrentSeconds(Date.now()), 1000)
-    }, [currentSeconds]);
+        const timeout = setTimeout(() => setCurrentSeconds(Date.now()), 1000);
+        return () => clearTimeout(timeout);
+    }, [setCurrentSeconds]);
 
     useEffect(() => {
         const subId = WebsocketService.subscribe("environmentSensorEvents", notify => {

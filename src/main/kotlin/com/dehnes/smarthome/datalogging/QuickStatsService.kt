@@ -24,7 +24,7 @@ class QuickStatsService(
     @Volatile
     private var bmsData = listOf<BmsData>()
 
-    val listeners = ConcurrentHashMap<String, (QuickStatsResponse) -> Unit>()
+    val listeners: MutableMap<String, (QuickStatsResponse) -> Unit> = ConcurrentHashMap<String, (QuickStatsResponse) -> Unit>()
     private val logger = KotlinLogging.logger { }
 
     init {

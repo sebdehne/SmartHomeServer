@@ -168,21 +168,22 @@ class Configuration {
 
         val quickStatsService = QuickStatsService(influxDBClient, hanPortService, executorService, victronService, dalyBmsDataLogger)
 
-//        val zWaveMqttClient = ZWaveMqttClient(
-//            mqttBroker,
-//            objectMapper,
-//            executorService
-//        )
-//
-//        val stairsHeatingService = StairsHeatingService(
-//            zWaveMqttClient,
-//            clock,
-//            influxDBClient,
-//            quickStatsService,
-//            configService,
-//            executorService
-//        )
-//        stairsHeatingService.init()
+        val zWaveMqttClient = ZWaveMqttClient(
+            mqttBroker,
+            objectMapper,
+            executorService
+        )
+
+        val stairsHeatingService = StairsHeatingService(
+            zWaveMqttClient,
+            clock,
+            influxDBClient,
+            quickStatsService,
+            configService,
+            executorService,
+            userSettingsService
+        )
+        stairsHeatingService.init()
 
 
         beans[UnderFloorHeaterService::class] = heaterService
@@ -200,7 +201,7 @@ class Configuration {
         beans[UserSettingsService::class] = userSettingsService
         beans[EnergyConsumptionService::class] = energyConsumptionService
         beans[DalyBmsDataLogger::class] = dalyBmsDataLogger
-        //beans[StairsHeatingService::class] = stairsHeatingService
+        beans[StairsHeatingService::class] = stairsHeatingService
     }
 
     inline fun <reified T> getBean(): T {

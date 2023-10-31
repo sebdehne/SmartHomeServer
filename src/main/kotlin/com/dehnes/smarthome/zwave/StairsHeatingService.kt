@@ -2,10 +2,13 @@ package com.dehnes.smarthome.zwave
 
 import com.dehnes.smarthome.api.dtos.StairsHeatingRequest
 import com.dehnes.smarthome.api.dtos.StairsHeatingResponse
+import com.dehnes.smarthome.api.dtos.StairsHeatingType.*
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.datalogging.QuickStatsService
+import com.dehnes.smarthome.users.UserRole
+import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.toInt
 import com.dehnes.smarthome.utils.withLogging
 import com.dehnes.smarthome.victron.doubleValue
@@ -13,9 +16,11 @@ import mu.KotlinLogging
 import java.time.Clock
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 
 data class StairsHeatingSettings(
@@ -25,43 +30,19 @@ data class StairsHeatingSettings(
     val enabled: Boolean = true,
 )
 
-data class StairsHeatingDataIncomplete(
-    val temperature: Double? = null,
-    val watt: Double? = null,
-    val kWhConsumed: Double? = null,
-    val ampere: Double? = null,
-    val switchState: Boolean? = null,
-) {
-    fun hasAllData() = temperature != null
-            && watt != null
-            && kWhConsumed != null
-            && ampere != null
-            && switchState != null
-
-    fun complete(settings: StairsHeatingSettings) = StairsHeatingData(
-        temperature!!,
-        watt!!,
-        kWhConsumed!!,
-        ampere!!,
-        switchState!!,
-        settings,
-    )
-}
-
 data class StairsHeatingData(
+    val currentState: Boolean,
     val temperature: Double,
-    val watt: Double,
-    val kWhConsumed: Double,
-    val ampere: Double,
-    val switchState: Boolean,
-    val settings: StairsHeatingSettings,
-    val createdAt: Instant = Instant.now()
+    val current: Double,
+    val createdAt: Instant,
 )
 
 data class OutsideTemperature(
     val temperature: Double,
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant,
 )
+
+typealias ZWaveRpcCallback = (Any) -> Unit
 
 class StairsHeatingService(
     private val zWaveMqttClient: ZWaveMqttClient,
@@ -70,70 +51,152 @@ class StairsHeatingService(
     private val quickStatsService: QuickStatsService,
     private val configService: ConfigService,
     private val executorService: ExecutorService,
-    private val nodeId: Int = 4,
+    private val userSettingsService: UserSettingsService,
+    private val nodeId: Int = 5,
     private val mqttName: String = "zwave-js-ui",
-    private val refreshDelaySeconds: Long = 10,
+    private val refreshDelaySeconds: Long = 60,
 ) {
 
     private val logger = KotlinLogging.logger { }
     val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     private val lock = ReentrantLock()
 
-    @Volatile
-    private var currentState: StairsHeatingData? = null
-    private var currentlyReceiving: StairsHeatingDataIncomplete = StairsHeatingDataIncomplete()
     private var outsideTemperature: OutsideTemperature? = null
+    private val ongoingRequests = mutableMapOf<String, ZWaveRpcCallback>()
+    private var lastData: StairsHeatingData? = null
 
     fun init() {
         quickStatsService.listeners[UUID.randomUUID().toString()] = {
-            outsideTemperature = OutsideTemperature(it.outsideTemperature)
+            outsideTemperature = OutsideTemperature(it.outsideTemperature, clock.instant())
         }
         zWaveMqttClient.addListener(
             Listener(
                 UUID.randomUUID().toString(),
-                "$nodeId/#", // nodeId 4
+                "$nodeId/#",
                 this::onMsg
             )
         )
 
         scheduledExecutorService.scheduleAtFixedRate({
             executorService.submit(withLogging {
-                logger.info { "Calling eval()" }
                 evaluate()
-
-                // ask for a refresh
-                currentlyReceiving = StairsHeatingDataIncomplete()
-
-                logger.info { "Sending refresh request" }
-                zWaveMqttClient.sendAny(
-                    "_CLIENTS/ZWAVE_GATEWAY-$mqttName/api/refreshValues/set",
-                    mapOf(
-                        "args" to listOf(nodeId)
-                    )
-                )
             })
 
         }, 0, refreshDelaySeconds, TimeUnit.SECONDS)
     }
 
+    private fun <T> doLocked(fn: () -> T): T {
+        val r: T
+        lock.lock()
+        try {
+            r = fn()
+        } finally {
+            lock.unlock()
+        }
+        return r
+    }
+
+    private fun getSwitchState(): Boolean {
+        val cnt = CountDownLatch(1)
+        val result = AtomicReference(false)
+        doLocked {
+            ongoingRequests["/$nodeId/37/1/currentValue"] = {
+                result.set(it as Boolean)
+                cnt.countDown()
+            }
+        }
+        zWaveMqttClient.sendAny(
+            "_CLIENTS/ZWAVE_GATEWAY-$mqttName/api/refreshCCValues/set",
+            mapOf(
+                "args" to listOf(nodeId, 37) // switch is parameter 37
+            )
+        )
+
+        check(cnt.await(10, TimeUnit.SECONDS))
+        return result.get()
+    }
+
+    private fun getTemperature(): Double {
+        val cnt = CountDownLatch(1)
+        val result = AtomicReference(0.0)
+        doLocked {
+            ongoingRequests["/$nodeId/49/2/Air_temperature"] = {
+                result.set(doubleValue(it))
+                cnt.countDown()
+            }
+        }
+        zWaveMqttClient.sendAny(
+            "_CLIENTS/ZWAVE_GATEWAY-$mqttName/api/refreshCCValues/set",
+            mapOf(
+                "args" to listOf(nodeId, 49) // temp is parameter 49
+            )
+        )
+
+        check(cnt.await(10, TimeUnit.SECONDS))
+        return result.get()
+    }
+
+    private fun getCurrent(): Double {
+        val cnt = CountDownLatch(1)
+        val result = AtomicReference(0.0)
+        doLocked {
+            ongoingRequests["/$nodeId/50/1/value/66817"] = {
+                result.set(doubleValue(it))
+                cnt.countDown()
+            }
+        }
+        zWaveMqttClient.sendAny(
+            "_CLIENTS/ZWAVE_GATEWAY-$mqttName/api/refreshCCValues/set",
+            mapOf(
+                "args" to listOf(nodeId, 50) // meter is parameter 50
+            )
+        )
+
+        check(cnt.await(10, TimeUnit.SECONDS))
+        return result.get()
+    }
+
     fun evaluate() {
-        val currentState = this.currentState
+        logger.debug { "Eval()" }
+        val currentState = getSwitchState()
+        val temperature = getTemperature()
+        val current = getCurrent()
+
+
+        if (lastData != null) {
+            val range = (lastData!!.temperature - 3.0)..(lastData!!.temperature + 3.0)
+            check(temperature in range) { "Temperature $temperature changed too much. range=$range" }
+        }
+
+        lastData = StairsHeatingData(
+            currentState,
+            temperature,
+            current,
+            clock.instant()
+        )
+
+        logger.debug { "newData=$lastData" }
+
+        influxDBClient.recordSensorData(
+            listOf(
+                InfluxDBRecord(
+                    clock.instant(), "sensor", listOfNotNull(
+                        "ampere" to current.toString(),
+                        "temperature" to temperature.toString(),
+                        "on_off" to currentState.toInt().toString(),
+                    ).toMap(), mapOf("room" to "varmekabel_trapp")
+                )
+            )
+        )
+
         val outsideTemperature = this.outsideTemperature
 
-        if (currentState == null) {
-            logger.info { "No data available" }
-            return
-        }
         if (outsideTemperature == null) {
-            logger.info { "No outsideTemperature available" }
+            logger.warn { "No outsideTemperature available" }
             return
         }
 
-        if (currentState.createdAt.isBefore(Instant.now().minusSeconds(refreshDelaySeconds * 2))) {
-            logger.warn { "Data too old, is refresh not working?" }
-            return
-        }
-        if (outsideTemperature.createdAt.isBefore(Instant.now().minusSeconds(refreshDelaySeconds * 2))) {
+        if (outsideTemperature.createdAt.isBefore(clock.instant().minusSeconds(refreshDelaySeconds * 2))) {
             logger.warn { "outsideTemperature too old, is quicksettings not working?" }
             return
         }
@@ -144,27 +207,29 @@ class StairsHeatingService(
 
         val targetState = when {
             !settings.enabled -> {
-                if (currentState.switchState) {
-                    logger.info { "Switching off due to disabled" }
+                if (currentState) {
+                    logger.debug { "Switching off due to disabled" }
                 }
                 false
             }
 
             outsideTemperature.temperature !in outsideRange -> {
-                logger.debug { "Disable because outside temp $outsideTemperature is outside of range $outsideRange" }
+                if (currentState) {
+                    logger.debug { "Disable because outside temp $outsideTemperature is outside of range $outsideRange" }
+                }
                 false
             }
 
-            currentState.temperature < currentState.settings.targetTemperature -> {
-                if (!currentState.switchState) {
-                    logger.info { "Switching on" }
+            temperature < settings.targetTemperature -> {
+                if (!currentState) {
+                    logger.debug { "Switching on" }
                 }
                 true
             }
 
-            currentState.temperature > currentState.settings.targetTemperature -> {
-                if (currentState.switchState) {
-                    logger.info { "Switching off" }
+            temperature > settings.targetTemperature -> {
+                if (currentState) {
+                    logger.debug { "Switching off" }
                 }
                 false
             }
@@ -172,111 +237,86 @@ class StairsHeatingService(
             else -> error("Impossible")
         }
 
-        if (currentState.switchState != targetState) {
-            logger.info { "Sending $targetState" }
+        if (currentState != targetState) {
+            logger.debug { "Sending $targetState" }
             zWaveMqttClient.sendAny(
-                "4/37/1/targetValue/set", mapOf(
+                "$nodeId/37/1/targetValue/set", mapOf(
                     "value" to targetState
                 )
             )
         }
-
     }
 
     fun onMsg(topic: String, data: Map<String, Any>) {
-
-        var dbRecord: InfluxDBRecord? = null
-
-        lock.lock()
-        try {
-
-            when (topic) {
-                "/$nodeId/50/1/value/65537" -> {
-                    // Electric_kWh_Consumed
-                    val kwhConsumed = doubleValue(data["value"])
-                    currentlyReceiving = currentlyReceiving.copy(
-                        kWhConsumed = kwhConsumed
-                    )
-                }
-
-                "/$nodeId/50/1/value/66049" -> {
-                    // Electric_W_Consumed
-                    val watt = doubleValue(data["value"])
-                    currentlyReceiving = currentlyReceiving.copy(
-                        watt = watt
-                    )
-                }
-
-                "/$nodeId/50/1/value/66817" -> {
-                    // Electric_A_Consumed
-                    val ampere = doubleValue(data["value"])
-                    currentlyReceiving = currentlyReceiving.copy(
-                        ampere = ampere
-                    )
-                }
-
-                "/$nodeId/49/2/Air_temperature" -> {
-                    // Air temperature
-                    val temperature = doubleValue(data["value"])
-
-                    // dismiss incorrect values
-                    if (currentlyReceiving.temperature != null) {
-                        val range = (currentlyReceiving.temperature!! - 3.0)..(currentlyReceiving.temperature!! + 3.0)
-                        if (temperature !in range) {
-                            logger.warn { "Ignoring extreme value=$temperature (range=$range)" }
-                            return
-                        }
-                    }
-
-                    currentlyReceiving = currentlyReceiving.copy(
-                        temperature = temperature
-                    )
-                }
-
-                "/$nodeId/37/1/currentValue" -> {
-                    val switchState = data["value"] as Boolean
-                    currentlyReceiving = currentlyReceiving.copy(
-                        switchState = switchState
-                    )
-                }
-
-                else -> logger.info { "Ignoring message from $topic" }
-            }
-
-
-            if (currentlyReceiving.hasAllData()) {
-                logger.info { "hasAllData" }
-                val complete = currentlyReceiving.complete(
-                    configService.getStairsHeatingSettings()
-                )
-
-                currentState = complete
-                currentlyReceiving = StairsHeatingDataIncomplete()
-
-                dbRecord = InfluxDBRecord(
-                    clock.instant(), "sensor", listOfNotNull(
-                        "kWhConsumed" to complete.kWhConsumed.toString(),
-                        "watt" to complete.watt.toString(),
-                        "ampere" to complete.ampere.toString(),
-                        "temperature" to complete.temperature.toString(),
-                        "on_off" to complete.switchState.toInt().toString(),
-                    ).toMap(), mapOf("room" to "varmekabel_trapp")
-                )
-            }
-
-        } finally {
-            lock.unlock()
+        val callback = doLocked {
+            ongoingRequests.remove(topic)
         }
 
-        if (dbRecord != null) {
-            influxDBClient.recordSensorData(listOf(dbRecord))
+        if (callback != null) {
+            callback(data["value"]!!)
+        } else {
+            logger.debug { "Ignoring message from $topic" }
         }
-
     }
 
-    fun handleRequest(stairsHeatingRequest: StairsHeatingRequest): StairsHeatingResponse {
-        TODO()
+    fun handleRequest(userId: String?, stairsHeatingRequest: StairsHeatingRequest): StairsHeatingResponse {
+        when (stairsHeatingRequest.type) {
+            get -> {}
+            enableDisable -> {
+                check(userSettingsService.canUserWrite(userId, UserRole.heaterStairs))
+                configService.updateStairsHeatingSettings {
+                    it.copy(enabled = !it.enabled)
+                }
+            }
+
+            increaseTargetTemp -> {
+                check(userSettingsService.canUserWrite(userId, UserRole.heaterStairs))
+                configService.updateStairsHeatingSettings {
+                    it.copy(targetTemperature = it.targetTemperature + 1.0)
+                }
+            }
+
+            decreaseTargetTemp -> {
+                check(userSettingsService.canUserWrite(userId, UserRole.heaterStairs))
+                configService.updateStairsHeatingSettings {
+                    it.copy(targetTemperature = it.targetTemperature - 1.0)
+                }
+            }
+
+            increaseOutsideLowerTemp -> {
+                check(userSettingsService.canUserWrite(userId, UserRole.heaterStairs))
+                configService.updateStairsHeatingSettings {
+                    it.copy(outsideTemperatureRangeFrom = it.outsideTemperatureRangeFrom + 1.0)
+                }
+            }
+
+            decreaseOutsideLowerTemp -> {
+                check(userSettingsService.canUserWrite(userId, UserRole.heaterStairs))
+                configService.updateStairsHeatingSettings {
+                    it.copy(outsideTemperatureRangeFrom = it.outsideTemperatureRangeFrom - 1.0)
+                }
+            }
+
+            increaseOutsideUpperTemp -> {
+                check(userSettingsService.canUserWrite(userId, UserRole.heaterStairs))
+                configService.updateStairsHeatingSettings {
+                    it.copy(outsideTemperatureRangeTo = it.outsideTemperatureRangeTo + 1.0)
+                }
+            }
+
+            decreaseOutsideUpperTemp -> {
+                check(userSettingsService.canUserWrite(userId, UserRole.heaterStairs))
+                configService.updateStairsHeatingSettings {
+                    it.copy(outsideTemperatureRangeTo = it.outsideTemperatureRangeTo - 1.0)
+                }
+            }
+        }
+
+        check(userSettingsService.canUserRead(userId, UserRole.heaterStairs))
+        return StairsHeatingResponse(
+            lastData,
+            configService.getStairsHeatingSettings()
+        )
     }
 
 }
-

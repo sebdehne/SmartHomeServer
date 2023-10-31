@@ -84,6 +84,7 @@ enum class UserRole(
     energyStorageSystem(Level.read),
     energyPricing(Level.read),
     heaterUnderFloor(Level.read),
+    heaterStairs(Level.read),
     environmentSensors(Level.read),
     cameras(Level.read),
     recordings(Level.none),

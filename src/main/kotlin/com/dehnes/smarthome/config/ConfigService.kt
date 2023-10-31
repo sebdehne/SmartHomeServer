@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.config
 
+import com.dehnes.smarthome.zwave.StairsHeatingSettings
 import com.fasterxml.jackson.core.util.DefaultIndenter
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -44,7 +45,15 @@ class ConfigService(
     fun getLoraSerialPort() = readConfig().loraSerialPort
     fun getEnvironmentSensors() = readConfig().environmentSensors
     fun getStairsHeatingSettings() = readConfig().stairsHeatingSettings
+
+    fun updateStairsHeatingSettings(fn: (settings: StairsHeatingSettings) -> StairsHeatingSettings) {
+        update { c ->
+            c.copy(stairsHeatingSettings = fn(c.stairsHeatingSettings))
+        }
+    }
+
     fun getUserSettings(userId: String) = readConfig().userSettings[userId]
+
     fun updateUserAuthorization(user: String, a: UserSettings) {
         update { c ->
             c.copy(userSettings = c.userSettings + (user to a))

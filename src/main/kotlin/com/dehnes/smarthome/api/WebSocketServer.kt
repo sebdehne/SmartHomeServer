@@ -13,6 +13,7 @@ import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.users.UserSettingsService
+import com.dehnes.smarthome.utils.withLogging
 import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.ESSState
 import com.dehnes.smarthome.victron.VictronEssProcess
@@ -47,11 +48,15 @@ class WebSocketServer : Endpoint() {
     private val userSettingsService = configuration.getBean<UserSettingsService>()
     private val energyConsumptionService = configuration.getBean<EnergyConsumptionService>()
     private val dalyBmsDataLogger = configuration.getBean<DalyBmsDataLogger>()
-    //private val stairsHeatingService = configuration.getBean<StairsHeatingService>()
+    private val stairsHeatingService = configuration.getBean<StairsHeatingService>()
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info("$instanceId Socket connected: $sess")
-        sess.addMessageHandler(String::class.java) { msg -> onWebSocketText(sess, msg) }
+        sess.addMessageHandler(String::class.java) { msg ->
+            withLogging {
+                onWebSocketText(sess, msg)
+            }.run()
+        }
     }
 
     override fun onClose(session: Session, closeReason: CloseReason) {
@@ -74,7 +79,7 @@ class WebSocketServer : Endpoint() {
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
             stairsHeatingRequest -> {
-                RpcResponse()
+                RpcResponse(stairsHeatingResponse = stairsHeatingService.handleRequest(userEmail, rpcRequest.stairsHeatingRequest!!))
             }
 
             writeBms -> {
