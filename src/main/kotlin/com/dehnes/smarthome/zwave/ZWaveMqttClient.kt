@@ -13,6 +13,7 @@ import com.hivemq.client.internal.mqtt.message.subscribe.MqttSubscribe
 import com.hivemq.client.internal.mqtt.message.subscribe.MqttSubscription
 import com.hivemq.client.internal.util.collections.ImmutableList
 import com.hivemq.client.mqtt.MqttClient
+import com.hivemq.client.mqtt.MqttClientState
 import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5RetainHandling
@@ -62,7 +63,7 @@ class ZWaveMqttClient(
         .buildAsync()
 
     private val lock = ReentrantLock()
-    val delayInMs = 2 * 1000L
+    val delayInMs = 60 * 1000L
 
     init {
         scheduledExecutorService.scheduleAtFixedRate({
@@ -75,16 +76,17 @@ class ZWaveMqttClient(
                         )
                     ) {
                         logger.warn { "Need to re-connect. lastMessageReceivedAt=$lastMessageReceivedAt" }
-                        reconnect()
+                        reconnect(force = true)
                     }
                 } finally {
                     lock.unlock()
                 }
             })
-        }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
+        }, 0, delayInMs, TimeUnit.MILLISECONDS)
     }
 
     private fun resubscribe() {
+        logger.info { "Re-subscribing..." }
         listeners.forEach { (_, l) ->
             subscribe(l)
         }
@@ -112,12 +114,20 @@ class ZWaveMqttClient(
         subscribe(l)
     }
 
-    private fun reconnect() {
-        asyncClient.disconnect()
-        asyncClient.connect().get(20, TimeUnit.SECONDS)
+    private fun reconnect(force: Boolean = false) {
+        if (force && asyncClient.state != MqttClientState.DISCONNECTED) {
+            logger.warn { "Forced disconnect" }
+            asyncClient.disconnect().get(20, TimeUnit.SECONDS)
+        }
+        if (asyncClient.state == MqttClientState.DISCONNECTED) {
+            logger.info { "(re-)connecting..." }
+            asyncClient.connect().get(20, TimeUnit.SECONDS)
+        }
     }
 
     fun sendAny(topic: String, value: Any?) {
+        reconnect()
+
         val msg = value?.let { objectMapper.writeValueAsBytes(it) }
         asyncClient.publish(
             MqttWillPublish(
@@ -134,6 +144,8 @@ class ZWaveMqttClient(
                 0
             )
         ).get()
+
+        logger.info { "Published" }
     }
 
     private fun onMqttMessage(l: Listener) = { msg: Mqtt5Publish ->

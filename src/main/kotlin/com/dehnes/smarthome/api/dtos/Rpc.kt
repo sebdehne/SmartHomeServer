@@ -31,6 +31,8 @@ enum class RequestType {
 
     readAllUserSettings,
     writeUserSettings,
+
+    stairsHeatingRequest,
 }
 
 data class RpcRequest(
@@ -48,6 +50,7 @@ data class RpcRequest(
     val energyConsumptionQuery: EnergyConsumptionQuery?,
     val writeUserSettings: WriteUserSettings?,
     val writeBms: WriteBms? = null,
+    val stairsHeatingRequest: StairsHeatingRequest? = null,
 )
 
 data class RpcResponse(
@@ -65,4 +68,5 @@ data class RpcResponse(
     val userSettings: UserSettings? = null,
     val energyConsumptionData: EnergyConsumptionData? = null,
     val allUserSettings: Map<String, UserSettings>? = null,
+    val stairsHeatingResponse: StairsHeatingResponse? = null,
 )

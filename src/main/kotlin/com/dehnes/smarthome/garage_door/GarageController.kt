@@ -269,7 +269,7 @@ class GarageController(
     }
 
     private fun onStatusChanged() {
-        logger.info { "New status=$lastStatus firmwareUpgrade=$firmwareDataRequest" }
+        logger.debug { "New status=$lastStatus firmwareUpgrade=$firmwareDataRequest" }
 
         influxDBClient.recordSensorData(
             InfluxDBRecord(
@@ -335,7 +335,7 @@ class GarageController(
     }
 
     private fun handleNewData(dataResponse: LoRaInboundPacketDecrypted) {
-        logger.info { "Received: $dataResponse" }
+        logger.debug { "Received: $dataResponse" }
         val receivedDoorStatus =
             RecevivedDoorStatus.parse(dataResponse.payload[4].toInt() > 0, dataResponse.payload[5].toInt() > 0)
         val receivedLightIsOn = dataResponse.payload[6].toInt() == 0

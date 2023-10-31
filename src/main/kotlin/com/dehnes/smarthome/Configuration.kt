@@ -21,7 +21,7 @@ import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.VictronEssProcess
 import com.dehnes.smarthome.victron.VictronService
-import com.dehnes.smarthome.zwave.VarmeKabelTrappService
+import com.dehnes.smarthome.zwave.StairsHeatingService
 import com.dehnes.smarthome.zwave.ZWaveMqttClient
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -40,7 +40,7 @@ fun objectMapper() = jacksonObjectMapper()
     .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
 class Configuration {
-    private var beans = mutableMapOf<KClass<*>, Any>()
+    var beans = mutableMapOf<KClass<*>, Any>()
 
     fun init() {
 
@@ -168,21 +168,21 @@ class Configuration {
 
         val quickStatsService = QuickStatsService(influxDBClient, hanPortService, executorService, victronService, dalyBmsDataLogger)
 
-        val zWaveMqttClient = ZWaveMqttClient(
-            mqttBroker,
-            objectMapper,
-            executorService
-        )
-
-        val varmeKabelTrappService = VarmeKabelTrappService(
-            zWaveMqttClient,
-            clock,
-            influxDBClient,
-            quickStatsService,
-            configService
-        )
-
-        varmeKabelTrappService.init()
+//        val zWaveMqttClient = ZWaveMqttClient(
+//            mqttBroker,
+//            objectMapper,
+//            executorService
+//        )
+//
+//        val stairsHeatingService = StairsHeatingService(
+//            zWaveMqttClient,
+//            clock,
+//            influxDBClient,
+//            quickStatsService,
+//            configService,
+//            executorService
+//        )
+//        stairsHeatingService.init()
 
 
         beans[UnderFloorHeaterService::class] = heaterService
@@ -200,10 +200,12 @@ class Configuration {
         beans[UserSettingsService::class] = userSettingsService
         beans[EnergyConsumptionService::class] = energyConsumptionService
         beans[DalyBmsDataLogger::class] = dalyBmsDataLogger
+        //beans[StairsHeatingService::class] = stairsHeatingService
     }
 
-    fun <T> getBean(klass: KClass<*>): T {
-        return (beans[klass] ?: error("No such bean for $klass")) as T
+    inline fun <reified T> getBean(): T {
+        val kClass = T::class
+        return (beans[kClass] ?: error("No such bean $kClass")) as T
     }
 
 }

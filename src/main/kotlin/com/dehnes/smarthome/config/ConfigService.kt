@@ -43,7 +43,7 @@ class ConfigService(
 
     fun getLoraSerialPort() = readConfig().loraSerialPort
     fun getEnvironmentSensors() = readConfig().environmentSensors
-    fun getVarmeKabelTrappSettings() = readConfig().varmeKabelTrappSettings
+    fun getStairsHeatingSettings() = readConfig().stairsHeatingSettings
     fun getUserSettings(userId: String) = readConfig().userSettings[userId]
     fun updateUserAuthorization(user: String, a: UserSettings) {
         update { c ->

@@ -100,7 +100,7 @@ class HanPortService(
                 val consumed = hanDecoder.decode(buffer, writePos) { hdlcFrame ->
                     val dlmsMessage = DLMSDecoder.decode(hdlcFrame)
                     val hanData = mapToHanData(dlmsMessage)
-                    logger.info { "Got new msg=${hdlcFrame} hanData=$hanData" }
+                    logger.debug { "Got new msg=${hdlcFrame} hanData=$hanData" }
                     executorService.submit(withLogging {
                         val listeners = listOf(hanDataService::onNewData) + this.listeners
                         listeners.forEach { l -> l(hanData) }

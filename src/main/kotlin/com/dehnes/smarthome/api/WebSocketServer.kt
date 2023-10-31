@@ -16,6 +16,7 @@ import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.ESSState
 import com.dehnes.smarthome.victron.VictronEssProcess
+import com.dehnes.smarthome.zwave.StairsHeatingService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import jakarta.websocket.CloseReason
@@ -31,31 +32,22 @@ class WebSocketServer : Endpoint() {
 
     private val instanceId = UUID.randomUUID().toString()
 
-    private val objectMapper = configuration.getBean<ObjectMapper>(ObjectMapper::class)
+    private val objectMapper = configuration.getBean<ObjectMapper>()
     private val logger = KotlinLogging.logger { }
-    private val garageDoorService = configuration.getBean<GarageController>(GarageController::class)
-    private val underFloopHeaterService = configuration.getBean<UnderFloorHeaterService>(UnderFloorHeaterService::class)
+    private val garageDoorService = configuration.getBean<GarageController>()
+    private val underFloopHeaterService = configuration.getBean<UnderFloorHeaterService>()
     private val subscriptions = mutableMapOf<String, Subscription<*>>()
-    private val evChargingService =
-        configuration.getBean<EvChargingService>(EvChargingService::class)
-    private val firmwareUploadService =
-        configuration.getBean<FirmwareUploadService>(FirmwareUploadService::class)
-    private val loRaSensorBoardService =
-        configuration.getBean<EnvironmentSensorService>(EnvironmentSensorService::class)
-    private val videoBrowser =
-        configuration.getBean<VideoBrowser>(VideoBrowser::class)
-    private val quickStatsService =
-        configuration.getBean<QuickStatsService>(QuickStatsService::class)
-    private val victronEssProcess =
-        configuration.getBean<VictronEssProcess>(VictronEssProcess::class)
-    private val energyPriceService =
-        configuration.getBean<EnergyPriceService>(EnergyPriceService::class)
-    private val userSettingsService =
-        configuration.getBean<UserSettingsService>(UserSettingsService::class)
-    private val energyConsumptionService =
-        configuration.getBean<EnergyConsumptionService>(EnergyConsumptionService::class)
-    private val dalyBmsDataLogger =
-        configuration.getBean<DalyBmsDataLogger>(DalyBmsDataLogger::class)
+    private val evChargingService = configuration.getBean<EvChargingService>()
+    private val firmwareUploadService = configuration.getBean<FirmwareUploadService>()
+    private val loRaSensorBoardService = configuration.getBean<EnvironmentSensorService>()
+    private val videoBrowser = configuration.getBean<VideoBrowser>()
+    private val quickStatsService = configuration.getBean<QuickStatsService>()
+    private val victronEssProcess = configuration.getBean<VictronEssProcess>()
+    private val energyPriceService = configuration.getBean<EnergyPriceService>()
+    private val userSettingsService = configuration.getBean<UserSettingsService>()
+    private val energyConsumptionService = configuration.getBean<EnergyConsumptionService>()
+    private val dalyBmsDataLogger = configuration.getBean<DalyBmsDataLogger>()
+    //private val stairsHeatingService = configuration.getBean<StairsHeatingService>()
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info("$instanceId Socket connected: $sess")
@@ -81,20 +73,26 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            stairsHeatingRequest -> {
+                RpcResponse()
+            }
+
             writeBms -> {
                 dalyBmsDataLogger.write(userEmail, rpcRequest.writeBms!!)
                 RpcResponse()
             }
+
             userSettings -> RpcResponse(userSettings = userSettingsService.getUserSettings(userEmail))
             readAllUserSettings -> RpcResponse(allUserSettings = userSettingsService.getAllUserSettings(userEmail))
             writeUserSettings -> {
                 userSettingsService.handleWrite(userEmail, rpcRequest.writeUserSettings!!)
                 RpcResponse(allUserSettings = userSettingsService.getAllUserSettings(userEmail))
             }
+
             essRead -> RpcResponse(essState = victronEssProcess.current(userEmail))
             essWrite -> {
                 victronEssProcess.handleWrite(userEmail, rpcRequest.essWrite!!)
-                RpcResponse(essState = victronEssProcess.current(userEmail, ))
+                RpcResponse(essState = victronEssProcess.current(userEmail))
             }
 
             quickStats -> RpcResponse(quickStatsResponse = quickStatsService.getStats())
@@ -156,7 +154,13 @@ class WebSocketServer : Endpoint() {
             }
 
             garageRequest -> RpcResponse(garageResponse = garageRequest(rpcRequest.garageRequest!!, userEmail))
-            underFloorHeaterRequest -> RpcResponse(underFloorHeaterResponse = underFloorHeaterRequest(userEmail, rpcRequest.underFloorHeaterRequest!!))
+            underFloorHeaterRequest -> RpcResponse(
+                underFloorHeaterResponse = underFloorHeaterRequest(
+                    userEmail,
+                    rpcRequest.underFloorHeaterRequest!!
+                )
+            )
+
             evChargingStationRequest -> RpcResponse(
                 evChargingStationResponse = evChargingStationRequest(
                     userEmail,
@@ -164,8 +168,20 @@ class WebSocketServer : Endpoint() {
                 )
             )
 
-            environmentSensorRequest -> RpcResponse(environmentSensorResponse = environmentSensorRequest(userEmail, rpcRequest.environmentSensorRequest!!))
-            RequestType.videoBrowser -> RpcResponse(videoBrowserResponse = videoBrowser.rpc(userEmail, rpcRequest.videoBrowserRequest!!))
+            environmentSensorRequest -> RpcResponse(
+                environmentSensorResponse = environmentSensorRequest(
+                    userEmail,
+                    rpcRequest.environmentSensorRequest!!
+                )
+            )
+
+            RequestType.videoBrowser -> RpcResponse(
+                videoBrowserResponse = videoBrowser.rpc(
+                    userEmail,
+                    rpcRequest.videoBrowserRequest!!
+                )
+            )
+
             readEnergyPricingSettings -> RpcResponse(
                 energyPricingSettingsRead = EnergyPricingSettingsRead(
                     energyPriceService.getAllSettings(userEmail),
@@ -202,7 +218,10 @@ class WebSocketServer : Endpoint() {
     }
 
     private fun environmentSensorRequest(userEmail: String?, request: EnvironmentSensorRequest) = when (request.type) {
-        EnvironmentSensorRequestType.getAllEnvironmentSensorData -> loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
+        EnvironmentSensorRequestType.getAllEnvironmentSensorData -> loRaSensorBoardService.getEnvironmentSensorResponse(
+            userEmail
+        )
+
         EnvironmentSensorRequestType.scheduleFirmwareUpgrade -> {
             loRaSensorBoardService.firmwareUpgrade(userEmail, request.sensorId!!, true)
             loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
@@ -234,7 +253,11 @@ class WebSocketServer : Endpoint() {
         }
 
         EnvironmentSensorRequestType.adjustSleepTimeInSeconds -> {
-            loRaSensorBoardService.adjustSleepTimeInSeconds(userEmail, request.sensorId!!, request.sleepTimeInSecondsDelta!!)
+            loRaSensorBoardService.adjustSleepTimeInSeconds(
+                userEmail,
+                request.sensorId!!,
+                request.sleepTimeInSecondsDelta!!
+            )
             loRaSensorBoardService.getEnvironmentSensorResponse(userEmail)
         }
 
@@ -352,7 +375,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<GarageResponse>(subscriptionId, sess) {
         override fun onEvent(e: GarageResponse) {
-            logger.info("$instanceId onEvent GarageStatusSubscription $subscriptionId ")
+            logger.debug("$instanceId onEvent GarageStatusSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -383,7 +406,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<QuickStatsResponse>(subscriptionId, sess) {
         override fun onEvent(e: QuickStatsResponse) {
-            logger.info("$instanceId onEvent GarageStatusSubscription $subscriptionId ")
+            logger.debug("$instanceId onEvent QuickStatsSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -414,7 +437,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<ESSState>(subscriptionId, sess) {
         override fun onEvent(e: ESSState) {
-            logger.info("$instanceId onEvent EssSubscription $subscriptionId ")
+            logger.debug("$instanceId onEvent EssSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -445,7 +468,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<EnvironmentSensorEvent>(subscriptionId, sess) {
         override fun onEvent(e: EnvironmentSensorEvent) {
-            logger.info("$instanceId onEvent EnvironmentSensorSubscription $subscriptionId ")
+            logger.debug("$instanceId onEvent EnvironmentSensorSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -476,7 +499,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<EvChargingEvent>(subscriptionId, sess) {
         override fun onEvent(e: EvChargingEvent) {
-            logger.info("$instanceId onEvent EvChargingStationSubscription $subscriptionId ")
+            logger.debug("$instanceId onEvent EvChargingStationSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -507,7 +530,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<UnderFloorHeaterResponse>(subscriptionId, sess) {
         override fun onEvent(e: UnderFloorHeaterResponse) {
-            logger.info("$instanceId onEvent UnderFloorHeaterSubscription $subscriptionId ")
+            logger.debug("$instanceId onEvent UnderFloorHeaterSubscription $subscriptionId ")
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(

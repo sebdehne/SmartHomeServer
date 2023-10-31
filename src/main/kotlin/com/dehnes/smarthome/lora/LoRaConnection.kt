@@ -120,7 +120,7 @@ class LoRaConnection(
         repeat(maxItems) {
             conn.read(timeout) { false }
             if (conn.hasCompleteText) {
-                logger.info { "Sinked text: ${conn.getText()}" }
+                logger.debug { "Sinked text: ${conn.getText()}" }
             } else {
                 return
             }
@@ -159,7 +159,7 @@ class LoRaConnection(
                     if (line == "radio_err") {
                         logger.debug { "Ignoring radio_err" }
                     } else {
-                        logger.info { "Received: '$line' (${line.toByteArray().contentToString()})" }
+                        logger.debug { "Received: '$line' (${line.toByteArray().contentToString()})" }
                         val encryptedPacket = LoRaInboundPacket(
                             cmd(conn, "radio get rssi", listOf(".*".toRegex()))?.toInt()
                                 ?: error("could not read rssi"),
@@ -174,7 +174,7 @@ class LoRaConnection(
                         val inboundPacket = decrypt(encryptedPacket)
 
                         if (inboundPacket?.to != localAddr) {
-                            logger.info { "Ignoring packet not for me. $inboundPacket" }
+                            logger.debug { "Ignoring packet not for me. $inboundPacket" }
                         } else if (inboundPacket.type == LoRaPacketType.SETUP_REQUEST) {
                             onSetupRequest(inboundPacket)
                         } else if (configService.getEnvironmentSensors().validateTimestamp && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
@@ -252,13 +252,13 @@ class LoRaConnection(
     }
 
     private fun cmd(connection: Connection, cmd: String, vararg expectedResponses: List<Regex>): String? {
-        logger.info { "Sending: $cmd" }
+        logger.debug { "Sending: $cmd" }
         connection.outputStream.write("$cmd\r\n".toByteArray())
 
         var response: String? = null
 
         val allMatch = expectedResponses.all { possibleResponses ->
-            logger.info { "Trying to read one of: $possibleResponses" }
+            logger.debug { "Trying to read one of: $possibleResponses" }
             while (true) {
                 connection.read(Duration.ofSeconds(5)) { false }
                 response = if (connection.hasCompleteText) {
@@ -267,11 +267,11 @@ class LoRaConnection(
                     error("No response received while waiting for $cmd")
                 }
                 if (possibleResponses.none { response!!.matches(it) }) {
-                    logger.info { "Sinked text: $response" }
+                    logger.debug { "Sinked text: $response" }
                 } else
                     break
             }
-            logger.info { "Got: $response" }
+            logger.debug { "Got: $response" }
             possibleResponses.first().matches(response!!)
         }
 
