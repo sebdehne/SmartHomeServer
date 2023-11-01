@@ -72,7 +72,7 @@ class EvChargingStationConnection(
     fun collectData(clientId: String) = doWithClient(clientId) { socket, getResponse ->
         send(socket, CollectDataRequest())
         getResponse() as DataResponse
-    }!!
+    }
 
     fun setPwmPercent(clientId: String, pwmPercent: Int) = try {
         check(pwmPercent in 0..100) { "Invalid pwn percent $pwmPercent" }
@@ -307,7 +307,7 @@ class EvChargingStationConnection(
     fun collectDataAndDistribute(clientId: String) {
         executorService.submit(withLogging {
             val evChargingStationClient = connectedClientsById[clientId]?.evChargingStationClient ?: return@withLogging
-            val data = collectData(clientId)
+            val data = collectData(clientId) ?: error("No data could be collected at this point")
             logger.debug { "Data response for $clientId $data" }
             data.logMessages.forEach { msg -> chargerStationLogger.debug { "charger=$clientId msg=$msg" } }
             recordData(data, evChargingStationClient)
