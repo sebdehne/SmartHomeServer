@@ -20,6 +20,7 @@ Smarthome backend and frontend
 - Temperature, humidity & light sensor logging to InfluxDB
 - Read data from electricity meter (via "[HAN-port](https://www.nek.no/info-ams-han-utviklere/)") and log all data to InfluxDB 
 - Camera live viewer using WebRTC (via [RTSPtoWebRTC](https://github.com/deepch/RTSPtoWebRTC))
+- [ZWave](https://github.com/zwave-js) integration (via MQTT)
 
 ### Frontend:
 - React frontend

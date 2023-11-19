@@ -352,7 +352,12 @@ data class ESSValues(
             "/battery/1/Dc/0/Voltage" -> updated.copy(batteryVoltage = doubleValue(any)) // From Lynx Shunt
             "/vebus/276/Ac/ActiveIn/P" -> updated.copy(gridPower = doubleValue(any))
             "/vebus/276/Ac/Out/P" -> updated.copy(outputPower = doubleValue(any))
-            "/system/0/SystemState/State" -> {
+//            "/system/0/SystemState/State" -> {
+//                val v = intValue(any)
+//                val systemState1 = SystemState.values().firstOrNull { it.value == v } ?: SystemState.Unknown
+//                updated.copy(systemState = systemState1)
+//            }
+            "/vebus/276/State" -> {
                 val v = intValue(any)
                 val systemState1 = SystemState.values().firstOrNull { it.value == v } ?: SystemState.Unknown
                 updated.copy(systemState = systemState1)

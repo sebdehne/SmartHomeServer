@@ -22,7 +22,7 @@ object VictronEssCalculation {
     fun calculateAcPowerSetPoints(input: VictronEssCalculationInput): VictronEssCalculationResult {
         // we must use ESS mode 3, because ESS mode 2 does not support setting a SoC upper/lower limit, and
         // we do not want to risk draining the battery if this app loses contact with the victron-system
-        // In ESS mode 3, it automatically goes to passthrough if no updates are received
+        // In ESS mode 3, it automatically goes to pass through if no updates are received
 
         val outputPower = input.outputPowerL1 + input.outputPowerL2 + input.outputPowerL3
 
