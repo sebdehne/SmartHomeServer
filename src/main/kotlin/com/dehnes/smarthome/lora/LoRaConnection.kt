@@ -71,16 +71,18 @@ class LoRaConnection(
         timestamp: Long?,
         onResult: (Boolean) -> Unit
     ) {
-        outQueue.add(
-            LoRaOutboundPacketRequest(
-                keyId,
-                toAddr,
-                type,
-                payload,
-                timestamp,
-                onResult
-            )
+        val element = LoRaOutboundPacketRequest(
+            keyId,
+            toAddr,
+            type,
+            payload,
+            timestamp,
+            onResult
         )
+
+        logger.debug { "LoRa outbound packet scheduled: $element" }
+
+        outQueue.add(element)
         interrupted = true
     }
 
@@ -180,6 +182,8 @@ class LoRaConnection(
                         } else if (configService.getEnvironmentSensors().validateTimestamp && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
                             logger.warn { "Ignoring received packet because of invalid timestampDelta. $inboundPacket" }
                         } else {
+
+                            logger.debug { "Handling received packet $inboundPacket" }
 
                             // do not send out any scheduled packets for this sensor
                             while (outQueue.peek()?.toAddr == inboundPacket.from) {

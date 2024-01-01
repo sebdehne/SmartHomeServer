@@ -569,7 +569,7 @@ data class UnderFloorSensorData(
     fun toTemperature() = if (temperatureError > 0) "0" else (temperature.toFloat() / 100).toString()
 
     override fun toString(): String {
-        return "UnderFloorSensorData(temperature=${toTemperature()}, heaterIsOn=$heaterIsOn, receivedAt=$receivedAt, temperatureError=$temperatureError)"
+        return "UnderFloorSensorData(temperature=${toTemperature()}, heaterIsOn=$heaterIsOn, receivedAt=$receivedAt, temperatureError=$temperatureError, timestampDelta=$timestampDelta)"
     }
 
 }

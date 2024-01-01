@@ -400,7 +400,8 @@ class GarageController(
                 autoCloseAfter = autoCloseAfter,
                 lightIsOn = receivedLightIsOn,
                 utcTimestampInMs = clock.millis(),
-                firmwareVersion = dataResponse.payload[8].toInt()
+                firmwareVersion = dataResponse.payload[8].toInt(),
+                timestampDelta = dataResponse.timestampDelta
             )
         }
 
