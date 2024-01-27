@@ -8,7 +8,7 @@ import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.AbstractProcess
 import com.dehnes.smarthome.utils.DateTimeUtils
 import com.fasterxml.jackson.databind.ObjectMapper
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Instant
 import java.time.LocalDate
 import java.util.concurrent.ExecutorService

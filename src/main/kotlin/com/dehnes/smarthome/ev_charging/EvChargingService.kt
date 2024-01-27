@@ -14,7 +14,7 @@ import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.DateTimeUtils
 import com.dehnes.smarthome.utils.withLogging
 import com.dehnes.smarthome.victron.VictronService
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.lang.Integer.min
 import java.time.Clock
 import java.time.Instant

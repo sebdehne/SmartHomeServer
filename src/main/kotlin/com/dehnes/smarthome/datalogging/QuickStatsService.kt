@@ -7,7 +7,7 @@ import com.dehnes.smarthome.victron.BmsData
 import com.dehnes.smarthome.victron.DalyBmsDataLogger
 import com.dehnes.smarthome.victron.SystemState
 import com.dehnes.smarthome.victron.VictronService
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap

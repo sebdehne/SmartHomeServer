@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.utils
 
+import io.github.oshai.kotlinlogging.KLogger
 import org.slf4j.Logger
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -45,5 +46,5 @@ abstract class AbstractProcess(
     }
 
     abstract fun tickLocked(): Boolean
-    abstract fun logger(): Logger
+    abstract fun logger(): KLogger
 }

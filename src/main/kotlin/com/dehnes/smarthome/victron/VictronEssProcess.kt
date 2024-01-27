@@ -17,7 +17,7 @@ import com.dehnes.smarthome.victron.VictronEssCalculation.VictronEssCalculationI
 import com.dehnes.smarthome.victron.VictronEssCalculation.calculateAcPowerSetPoints
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.kotlinModule
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Instant
 import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap

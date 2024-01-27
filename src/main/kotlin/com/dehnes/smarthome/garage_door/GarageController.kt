@@ -16,7 +16,7 @@ import com.dehnes.smarthome.users.SystemUser
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.*
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import java.time.Instant
 import java.util.*

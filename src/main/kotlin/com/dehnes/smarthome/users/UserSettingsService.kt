@@ -4,7 +4,7 @@ import com.dehnes.smarthome.api.dtos.WriteCommand
 import com.dehnes.smarthome.api.dtos.WriteUserSettings
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.config.UserSettings
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 
 class UserSettingsService(private val configService: ConfigService) {
 

@@ -8,7 +8,7 @@ import com.dehnes.smarthome.config.EvCharger
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
 import com.dehnes.smarthome.utils.*
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.lang.Integer.max
 import java.net.ServerSocket
 import java.net.Socket

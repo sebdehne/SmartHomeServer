@@ -1,7 +1,7 @@
 package com.dehnes.smarthome.datalogging
 
 import com.dehnes.smarthome.config.ConfigService
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.http.HttpResponse
 import org.apache.http.client.fluent.Request
 import org.apache.http.client.fluent.Response

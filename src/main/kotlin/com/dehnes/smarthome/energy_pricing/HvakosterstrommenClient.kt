@@ -3,7 +3,7 @@ package com.dehnes.smarthome.energy_pricing
 import com.dehnes.smarthome.objectMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.http.HttpVersion
 import org.apache.http.client.fluent.Request
 import java.io.File

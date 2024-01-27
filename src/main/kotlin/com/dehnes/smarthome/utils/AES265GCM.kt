@@ -2,7 +2,7 @@ package com.dehnes.smarthome.utils
 
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.objectMapper
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.nio.charset.Charset
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec

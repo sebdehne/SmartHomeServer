@@ -1,6 +1,6 @@
 package com.dehnes.smarthome.utils
 
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 
 val errorLogger = KotlinLogging.logger("com.dehnes.smarthome.utils.ErrorLogger")
 

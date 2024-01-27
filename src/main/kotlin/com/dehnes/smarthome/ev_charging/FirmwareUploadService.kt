@@ -2,7 +2,7 @@ package com.dehnes.smarthome.ev_charging
 
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.*
 
 class FirmwareUploadService(

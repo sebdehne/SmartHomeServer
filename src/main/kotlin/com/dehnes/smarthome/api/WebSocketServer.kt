@@ -20,11 +20,11 @@ import com.dehnes.smarthome.victron.VictronEssProcess
 import com.dehnes.smarthome.zwave.StairsHeatingService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.websocket.CloseReason
 import jakarta.websocket.Endpoint
 import jakarta.websocket.EndpointConfig
 import jakarta.websocket.Session
-import mu.KotlinLogging
 import java.io.Closeable
 import java.util.*
 

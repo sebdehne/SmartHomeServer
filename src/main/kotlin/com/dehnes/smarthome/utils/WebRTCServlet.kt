@@ -3,7 +3,7 @@ package com.dehnes.smarthome.utils
 import jakarta.servlet.http.HttpServlet
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.http.client.fluent.Request
 
 class WebRTCServlet : HttpServlet() {

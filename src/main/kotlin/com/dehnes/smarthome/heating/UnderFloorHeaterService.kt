@@ -19,7 +19,7 @@ import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.*
 import com.dehnes.smarthome.victron.VictronService
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.nio.ByteBuffer
 import java.time.Clock
 import java.time.Instant

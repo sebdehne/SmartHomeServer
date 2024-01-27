@@ -12,7 +12,7 @@ import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.toInt
 import com.dehnes.smarthome.utils.withLogging
 import com.dehnes.smarthome.victron.doubleValue
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import java.time.Instant
 import java.util.*
@@ -52,7 +52,7 @@ class StairsHeatingService(
     private val configService: ConfigService,
     private val executorService: ExecutorService,
     private val userSettingsService: UserSettingsService,
-    private val nodeId: Int = 5,
+    private val nodeId: Int = 6,
     private val mqttName: String = "zwave-js-ui",
     private val refreshDelaySeconds: Long = 60,
 ) {
