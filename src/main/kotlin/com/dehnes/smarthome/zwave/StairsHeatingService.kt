@@ -35,7 +35,17 @@ data class StairsHeatingData(
     val temperature: Double,
     val current: Double,
     val createdAt: Instant,
-)
+) {
+    fun isReasonable(temperature: Double): Boolean {
+        val now = Instant.now()
+        return if (now.isBefore(createdAt.plusSeconds(60 * 10))) {
+            val range = (this.temperature - 3.0)..(this.temperature + 3.0)
+            temperature in range
+        } else {
+            true
+        }
+    }
+}
 
 data class OutsideTemperature(
     val temperature: Double,
@@ -162,79 +172,75 @@ class StairsHeatingService(
         val temperature = getTemperature()
         val current = getCurrent()
 
+        val targetState = if (lastData?.isReasonable(temperature) == false) {
+            logger.warn { "temperature=$temperature does not seem reasonable - wrong measurement?" }
+            false
+        } else {
+            lastData = StairsHeatingData(
+                currentState,
+                temperature,
+                current,
+                clock.instant()
+            )
 
-        if (lastData != null) {
-            val range = (lastData!!.temperature - 3.0)..(lastData!!.temperature + 3.0)
-            check(temperature in range) { "Temperature $temperature changed too much. range=$range" }
-        }
+            logger.debug { "newData=$lastData" }
 
-        lastData = StairsHeatingData(
-            currentState,
-            temperature,
-            current,
-            clock.instant()
-        )
-
-        logger.debug { "newData=$lastData" }
-
-        influxDBClient.recordSensorData(
-            listOf(
-                InfluxDBRecord(
-                    clock.instant(), "sensor", listOfNotNull(
-                        "ampere" to current.toString(),
-                        "temperature" to temperature.toString(),
-                        "on_off" to currentState.toInt().toString(),
-                    ).toMap(), mapOf("room" to "varmekabel_trapp")
+            influxDBClient.recordSensorData(
+                listOf(
+                    InfluxDBRecord(
+                        clock.instant(), "sensor", listOfNotNull(
+                            "ampere" to current.toString(),
+                            "temperature" to temperature.toString(),
+                            "on_off" to currentState.toInt().toString(),
+                        ).toMap(), mapOf("room" to "varmekabel_trapp")
+                    )
                 )
             )
-        )
 
-        val outsideTemperature = this.outsideTemperature
+            val outsideTemperature = this.outsideTemperature
 
-        if (outsideTemperature == null) {
-            logger.warn { "No outsideTemperature available" }
-            return
-        }
-
-        if (outsideTemperature.createdAt.isBefore(clock.instant().minusSeconds(refreshDelaySeconds * 2))) {
-            logger.warn { "outsideTemperature too old, is quicksettings not working?" }
-            return
-        }
-
-        val settings = configService.getStairsHeatingSettings()
-
-        val outsideRange = settings.outsideTemperatureRangeFrom..settings.outsideTemperatureRangeTo
-
-        val targetState = when {
-            !settings.enabled -> {
-                if (currentState) {
-                    logger.debug { "Switching off due to disabled" }
-                }
+            if (outsideTemperature == null) {
+                logger.warn { "No outsideTemperature available" }
                 false
-            }
-
-            outsideTemperature.temperature !in outsideRange -> {
-                if (currentState) {
-                    logger.debug { "Disable because outside temp $outsideTemperature is outside of range $outsideRange" }
-                }
+            } else if (outsideTemperature.createdAt.isBefore(clock.instant().minusSeconds(refreshDelaySeconds * 2))) {
+                logger.warn { "outsideTemperature too old, is quicksettings not working?" }
                 false
-            }
+            } else {
+                val settings = configService.getStairsHeatingSettings()
+                val outsideRange = settings.outsideTemperatureRangeFrom..settings.outsideTemperatureRangeTo
 
-            temperature < settings.targetTemperature -> {
-                if (!currentState) {
-                    logger.debug { "Switching on" }
+                when {
+                    !settings.enabled -> {
+                        if (currentState) {
+                            logger.debug { "Switching off due to disabled" }
+                        }
+                        false
+                    }
+
+                    outsideTemperature.temperature !in outsideRange -> {
+                        if (currentState) {
+                            logger.debug { "Disable because outside temp $outsideTemperature is outside of range $outsideRange" }
+                        }
+                        false
+                    }
+
+                    temperature < settings.targetTemperature -> {
+                        if (!currentState) {
+                            logger.debug { "Switching on" }
+                        }
+                        true
+                    }
+
+                    temperature >= settings.targetTemperature -> {
+                        if (currentState) {
+                            logger.debug { "Switching off" }
+                        }
+                        false
+                    }
+
+                    else -> error("Impossible")
                 }
-                true
             }
-
-            temperature >= settings.targetTemperature -> {
-                if (currentState) {
-                    logger.debug { "Switching off" }
-                }
-                false
-            }
-
-            else -> error("Impossible")
         }
 
         if (currentState != targetState) {
@@ -243,6 +249,9 @@ class StairsHeatingService(
                 "$nodeId/37/1/targetValue/set", mapOf(
                     "value" to targetState
                 )
+            )
+            lastData = lastData!!.copy(
+                currentState = targetState
             )
         }
     }
