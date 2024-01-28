@@ -58,8 +58,8 @@
 
                 </executions>
                 <configuration>
-                    <npmVersion>9.6.5</npmVersion>
-                    <nodeVersion>v16.15.1</nodeVersion>
+                    <npmVersion>10.3.0</npmVersion>
+                    <nodeVersion>v20.11.0</nodeVersion>
                     <workingDirectory>webapp</workingDirectory>
                     <installDirectory>target</installDirectory>
                 </configuration>
