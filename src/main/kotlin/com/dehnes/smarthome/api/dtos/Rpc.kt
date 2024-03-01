@@ -33,6 +33,9 @@ enum class RequestType {
     writeUserSettings,
 
     stairsHeatingRequest,
+
+    dnsBlockingSet,
+    dnsBlockingUpdateStandardLists,
 }
 
 data class RpcRequest(
@@ -51,9 +54,11 @@ data class RpcRequest(
     val writeUserSettings: WriteUserSettings?,
     val writeBms: WriteBms? = null,
     val stairsHeatingRequest: StairsHeatingRequest? = null,
+    val dnsBlockingLists: List<String>? = null,
 )
 
 data class RpcResponse(
+    val errorMsg: String? = null,
     val subscriptionCreated: Boolean? = null,
     val subscriptionRemoved: Boolean? = null,
 

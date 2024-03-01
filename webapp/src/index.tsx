@@ -2,20 +2,22 @@ import React from 'react';
 import './index.css';
 import App from './Components/App/App';
 import reportWebVitals from './reportWebVitals';
-import { CssBaseline, ThemeProvider, StyledEngineProvider } from "@mui/material";
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import {CssBaseline, ThemeProvider} from "@mui/material";
+import {BrowserRouter, Route, Routes} from 'react-router-dom';
 import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
-import { EvChargingStations } from "./Components/EvChargingStations/EvChargingStations";
+import {EvChargingStations} from "./Components/EvChargingStations/EvChargingStations";
 import Webcams from "./Components/Webcams/Webcams";
 import theme from "./theme";
-import { EnvironmentSensors } from "./Components/EnvironmentSensors/EnvironmentSensors";
-import { VideoRecordings } from "./Components/VideoRecordings/VideoRecordings";
-import { EnergyPricingSettings } from "./Components/EnergyPricingSettings/EnergyPricingSettings";
-import { EnergyStorageSystem } from "./Components/EnergyStorageSystem/EnergyStorageSystem";
-import { createRoot } from 'react-dom/client';
-import { UserSettingsAdmin } from "./Components/UserSettingsAdmin/UserSettingsAdmin";
+import {EnvironmentSensors} from "./Components/EnvironmentSensors/EnvironmentSensors";
+import {VideoRecordings} from "./Components/VideoRecordings/VideoRecordings";
+import {EnergyPricingSettings} from "./Components/EnergyPricingSettings/EnergyPricingSettings";
+import {EnergyStorageSystem} from "./Components/EnergyStorageSystem/EnergyStorageSystem";
+import {createRoot} from 'react-dom/client';
+import {UserSettingsAdmin} from "./Components/UserSettingsAdmin/UserSettingsAdmin";
 import {StairsHeater} from "./Components/StairsHeater/StairsHeater";
+import {EnergyStorageSystemV2} from "./Components/EnergyStorageSystemV2/EnergyStorageSystemV2";
+import {DnsBlocking} from "./Components/DnsBlocking/DnsBlocking";
 
 
 const container = document.getElementById('root');
@@ -25,7 +27,7 @@ const root = createRoot(container!);
 root.render(
     <React.StrictMode>
         <ThemeProvider theme={theme}>
-            <CssBaseline />
+            <CssBaseline/>
             <BrowserRouter basename={process.env.REACT_APP_BASENAME}>
                 <Routes>
                     <Route path="/" element={<App/>}/>

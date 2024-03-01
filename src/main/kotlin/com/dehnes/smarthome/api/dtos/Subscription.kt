@@ -9,7 +9,8 @@ enum class SubscriptionType {
     evChargingStationEvents,
     environmentSensorEvents,
     quickStatsEvents,
-    essState
+    essState,
+    dnsBlockingGet
 }
 
 data class Subscribe(
@@ -23,10 +24,11 @@ data class Unsubscribe(
 
 data class Notify(
     val subscriptionId: String,
-    val garageStatus: GarageResponse?,
-    val underFloorHeaterStatus: UnderFloorHeaterResponse?,
-    val evChargingStationEvent: EvChargingEvent?,
-    val environmentSensorEvent: EnvironmentSensorEvent?,
-    val quickStatsResponse: QuickStatsResponse?,
-    val essState: ESSState?,
+    val garageStatus: GarageResponse? = null,
+    val underFloorHeaterStatus: UnderFloorHeaterResponse? = null,
+    val evChargingStationEvent: EvChargingEvent? = null,
+    val environmentSensorEvent: EnvironmentSensorEvent? = null,
+    val quickStatsResponse: QuickStatsResponse? = null,
+    val essState: ESSState? = null,
+    val dnsBlockingState: DnsBlockingState? = null,
 )

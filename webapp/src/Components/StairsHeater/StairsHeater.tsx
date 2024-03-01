@@ -16,6 +16,7 @@ export const StairsHeater = () => {
     }, [currentMilliSeconds]);
 
     useEffect(() => {
+        setSending(true);
         WebsocketClient.rpc(
             {
                 type: "stairsHeatingRequest",
@@ -23,16 +24,23 @@ export const StairsHeater = () => {
                     type: "get"
                 }
             }
-        ).then(resp => setData(resp.stairsHeatingResponse))
+        ).then(resp => {
+            setData(resp.stairsHeatingResponse);
+            setSending(false);
+        })
     }, [setData]);
 
     const exec = useCallback((type: StairsHeatingType) => {
+        setSending(true);
         WebsocketClient.rpc({
             type: "stairsHeatingRequest",
             stairsHeatingRequest: {
                 type: type
             }
-        }).then(resp => setData(resp.stairsHeatingResponse))
+        }).then(resp => {
+            setSending(false);
+            setData(resp.stairsHeatingResponse);
+        })
     }, [setData]);
 
     return (

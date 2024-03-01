@@ -66,7 +66,7 @@ class UserSettingsService(private val configService: ConfigService) {
         configService.getUserSettings(u) ?: UserSettings(u)
     }.let {
         it.copy(
-            authorization = UserRole.values().associateWith {
+            authorization = UserRole.entries.associateWith {
                 it.defaultLevel
             } + it.authorization
         )
@@ -89,6 +89,7 @@ enum class UserRole(
     cameras(Level.read),
     recordings(Level.none),
     userSettings(Level.none),
+    dnsBlocking(Level.none),
 }
 
 enum class Level {

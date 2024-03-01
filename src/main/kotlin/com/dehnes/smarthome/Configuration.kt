@@ -3,6 +3,7 @@ package com.dehnes.smarthome
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
+import com.dehnes.smarthome.dns_blocking.DnsBlockingService
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
@@ -202,6 +203,7 @@ class Configuration {
         beans[EnergyConsumptionService::class] = energyConsumptionService
         beans[DalyBmsDataLogger::class] = dalyBmsDataLogger
         beans[StairsHeatingService::class] = stairsHeatingService
+        beans[DnsBlockingService::class] = DnsBlockingService(userSettingsService, configService)
     }
 
     inline fun <reified T> getBean(): T {

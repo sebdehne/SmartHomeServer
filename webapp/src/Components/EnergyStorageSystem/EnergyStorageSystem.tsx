@@ -91,7 +91,7 @@ const Bms = ({ bmsdata, setSending }: BmsProps) => {
             }
         })
             .finally(() => setSending(false))
-    }, []);
+    }, [bmsdata.bmsId.bmsId, setSending]);
 
     return <Accordion>
         <AccordionSummary

@@ -4,6 +4,7 @@ import { EvChargingEvent } from "./EVChargingStation";
 import { EnvironmentSensorEvent } from "./EnvironmentSensors";
 import { QuickStatsResponse } from "./QuickStats";
 import { ESSState } from "./EnergyStorageSystem";
+import {DnsBlockingState} from "./DnsBlockingState";
 
 export type SubscriptionType =
     "getGarageStatus"
@@ -11,6 +12,7 @@ export type SubscriptionType =
     | "evChargingStationEvents"
     | "environmentSensorEvents"
     | "quickStatsEvents"
+    | "dnsBlockingGet"
     | "essState";
 
 export type Subscribe = {
@@ -30,5 +32,6 @@ export type Notify = {
     environmentSensorEvent?: EnvironmentSensorEvent;
     quickStatsResponse?: QuickStatsResponse;
     essState?: ESSState;
+    dnsBlockingState?: DnsBlockingState;
 }
 

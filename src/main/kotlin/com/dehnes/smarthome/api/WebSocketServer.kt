@@ -5,6 +5,7 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
 import com.dehnes.smarthome.datalogging.QuickStatsService
+import com.dehnes.smarthome.dns_blocking.DnsBlockingService
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
@@ -49,9 +50,10 @@ class WebSocketServer : Endpoint() {
     private val energyConsumptionService = configuration.getBean<EnergyConsumptionService>()
     private val dalyBmsDataLogger = configuration.getBean<DalyBmsDataLogger>()
     private val stairsHeatingService = configuration.getBean<StairsHeatingService>()
+    private val dnsBlockingService = configuration.getBean<DnsBlockingService>()
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
-        logger.info("$instanceId Socket connected: $sess")
+        logger.info { "$instanceId Socket connected: $sess" }
         sess.addMessageHandler(String::class.java) { msg ->
             withLogging {
                 onWebSocketText(sess, msg)
@@ -61,14 +63,20 @@ class WebSocketServer : Endpoint() {
 
     override fun onClose(session: Session, closeReason: CloseReason) {
         subscriptions.values.toList().forEach { it.close() }
-        logger.info("$instanceId Socket Closed: $closeReason")
+        logger.info { "$instanceId Socket Closed: $closeReason" }
     }
 
     override fun onError(session: Session?, cause: Throwable?) {
-        logger.warn("$instanceId ", cause)
+        logger.warn(cause) { instanceId }
     }
 
-    fun onWebSocketText(argSession: Session, argMessage: String) {
+    private fun errorCatching(fn: () -> RpcResponse) = try {
+        fn()
+    } catch (e: Exception) {
+        RpcResponse(errorMsg = e.localizedMessage)
+    }
+
+    private fun onWebSocketText(argSession: Session, argMessage: String) {
         val userEmail = argSession.userProperties["userEmail"] as String?
         val websocketMessage: WebsocketMessage = objectMapper.readValue(argMessage)
 
@@ -78,8 +86,23 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            dnsBlockingSet -> errorCatching {
+                dnsBlockingService.set(userEmail, rpcRequest.dnsBlockingLists!!)
+                RpcResponse()
+            }
+
+            dnsBlockingUpdateStandardLists -> errorCatching {
+                dnsBlockingService.updateStandardLists()
+                RpcResponse()
+            }
+
             stairsHeatingRequest -> {
-                RpcResponse(stairsHeatingResponse = stairsHeatingService.handleRequest(userEmail, rpcRequest.stairsHeatingRequest!!))
+                RpcResponse(
+                    stairsHeatingResponse = stairsHeatingService.handleRequest(
+                        userEmail,
+                        rpcRequest.stairsHeatingRequest!!
+                    )
+                )
             }
 
             writeBms -> {
@@ -109,6 +132,38 @@ class WebSocketServer : Endpoint() {
                 val existing = subscriptions[subscriptionId]
                 if (existing == null) {
                     val sub = when (subscribe.type) {
+                        SubscriptionType.dnsBlockingGet -> {
+
+                            val state = dnsBlockingService.get(userEmail)
+
+                            val sub = object : Subscription<DnsBlockingState>(subscriptionId, argSession) {
+                                override fun onEvent(e: DnsBlockingState) {
+                                    argSession.basicRemote.sendText(
+                                        objectMapper.writeValueAsString(
+                                            WebsocketMessage(
+                                                UUID.randomUUID().toString(),
+                                                WebsocketMessageType.notify,
+                                                notify = Notify(
+                                                    subscriptionId,
+                                                    dnsBlockingState = e,
+                                                )
+                                            )
+                                        )
+                                    )
+                                }
+
+                                override fun close() {
+                                    dnsBlockingService.listeners.remove(subscriptionId)
+                                }
+
+                            }
+
+                            dnsBlockingService.listeners[subscriptionId] = sub::onEvent
+                            sub.apply {
+                                this.onEvent(state)
+                            }
+                        }
+
                         SubscriptionType.essState -> EssSubscription(subscriptionId, argSession).apply {
                             victronEssProcess.listeners[subscriptionId] = this::onEvent
                         }
@@ -380,7 +435,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<GarageResponse>(subscriptionId, sess) {
         override fun onEvent(e: GarageResponse) {
-            logger.debug("$instanceId onEvent GarageStatusSubscription $subscriptionId ")
+            logger.debug { "$instanceId onEvent GarageStatusSubscription $subscriptionId " }
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -389,11 +444,6 @@ class WebSocketServer : Endpoint() {
                         notify = Notify(
                             subscriptionId,
                             e,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
                         )
                     )
                 )
@@ -411,7 +461,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<QuickStatsResponse>(subscriptionId, sess) {
         override fun onEvent(e: QuickStatsResponse) {
-            logger.debug("$instanceId onEvent QuickStatsSubscription $subscriptionId ")
+            logger.debug { "$instanceId onEvent QuickStatsSubscription $subscriptionId " }
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -419,12 +469,7 @@ class WebSocketServer : Endpoint() {
                         WebsocketMessageType.notify,
                         notify = Notify(
                             subscriptionId,
-                            null,
-                            null,
-                            null,
-                            null,
-                            e,
-                            null,
+                            quickStatsResponse = e,
                         )
                     )
                 )
@@ -442,7 +487,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<ESSState>(subscriptionId, sess) {
         override fun onEvent(e: ESSState) {
-            logger.debug("$instanceId onEvent EssSubscription $subscriptionId ")
+            logger.debug { "$instanceId onEvent EssSubscription $subscriptionId " }
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -450,12 +495,7 @@ class WebSocketServer : Endpoint() {
                         WebsocketMessageType.notify,
                         notify = Notify(
                             subscriptionId,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            e
+                            essState = e
                         )
                     )
                 )
@@ -473,7 +513,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<EnvironmentSensorEvent>(subscriptionId, sess) {
         override fun onEvent(e: EnvironmentSensorEvent) {
-            logger.debug("$instanceId onEvent EnvironmentSensorSubscription $subscriptionId ")
+            logger.debug { "$instanceId onEvent EnvironmentSensorSubscription $subscriptionId " }
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -481,12 +521,7 @@ class WebSocketServer : Endpoint() {
                         WebsocketMessageType.notify,
                         notify = Notify(
                             subscriptionId,
-                            null,
-                            null,
-                            null,
-                            e,
-                            null,
-                            null,
+                            environmentSensorEvent = e
                         )
                     )
                 )
@@ -504,7 +539,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<EvChargingEvent>(subscriptionId, sess) {
         override fun onEvent(e: EvChargingEvent) {
-            logger.debug("$instanceId onEvent EvChargingStationSubscription $subscriptionId ")
+            logger.debug { "$instanceId onEvent EvChargingStationSubscription $subscriptionId " }
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(
@@ -535,7 +570,7 @@ class WebSocketServer : Endpoint() {
         sess: Session,
     ) : Subscription<UnderFloorHeaterResponse>(subscriptionId, sess) {
         override fun onEvent(e: UnderFloorHeaterResponse) {
-            logger.debug("$instanceId onEvent UnderFloorHeaterSubscription $subscriptionId ")
+            logger.debug { "$instanceId onEvent UnderFloorHeaterSubscription $subscriptionId " }
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(

@@ -9,6 +9,7 @@ export type UserRole =
     | "cameras"
     | "recordings"
     | "userSettings"
+    | "dnsBlocking"
     ;
 
 export type Level = "none" | "read" | "readWrite" | "readWriteAdmin";

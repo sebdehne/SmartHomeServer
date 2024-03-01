@@ -35,6 +35,8 @@ export type RequestType =
     | "writeUserSettings"
     | "writeBms"
     | "stairsHeatingRequest"
+    | "dnsBlockingSet"
+    | "dnsBlockingUpdateStandardLists"
     ;
 
 export type RpcRequest = {
@@ -53,6 +55,7 @@ export type RpcRequest = {
     writeUserSettings?: WriteUserSettings,
     writeBms?: WriteBms,
     stairsHeatingRequest?: StairsHeatingRequest;
+    dnsBlockingLists?: string[];
 }
 
 export type RpcResponse = {
