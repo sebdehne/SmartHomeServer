@@ -94,7 +94,7 @@ export const Firewall = () => {
                             <TableCell component="th" scope="row">
                                 <div style={{display: "flex", flexDirection: "column", justifyContent: "flex-start"}}>
                                     <span>{list}</span>
-                                    <span>{new Date(listState.lastUpdated).toLocaleDateString()}</span>
+                                    <span style={{color: "#5e5e5e"}}>{new Date(listState.lastUpdated).toLocaleDateString()}</span>
                                 </div>
                             </TableCell>
                             <TableCell align="right">
