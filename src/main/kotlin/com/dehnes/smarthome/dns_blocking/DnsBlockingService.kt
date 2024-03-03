@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.dns_blocking
 
+import com.dehnes.smarthome.api.dtos.DnsBlockingListState
 import com.dehnes.smarthome.api.dtos.DnsBlockingState
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.users.UserRole
@@ -8,6 +9,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 class DnsBlockingService(
@@ -59,24 +61,42 @@ class DnsBlockingService(
         ) { "User $user cannot read dns blocking state" }
 
         if (configService.isDevMode()) {
-            return DnsBlockingState(mapOf("testlist1" to false, "testlist2" to true))
+            return DnsBlockingState(
+                mapOf(
+                    "testlist1" to DnsBlockingListState(true, Instant.now()),
+                    "testlist2" to DnsBlockingListState(false, Instant.now())
+                )
+            )
         }
 
-        val respons = cmd("dns_lists_get").trim()
+        val respons = cmd("dns_lists_get").lines()
 
         return DnsBlockingState(
-            listsToEnabled = respons.split(",")
-                .map { it.trim() }
-                .associate {
-                    val (l, r) = it.split("=")
-                    l to r.toBoolean()
-                }
+            listsToEnabled = respons
+                .mapNotNull {
+                    val split = it.split(" ")
+                    if (split.size != 3) return@mapNotNull null
+
+                    split[0] to DnsBlockingListState(
+                        split[1].toBoolean(),
+                        Instant.parse(split[2]),
+                    )
+                }.toMap()
         )
     }
 
-    fun updateStandardLists() {
+    fun updateStandardLists(user: String?) {
+        check(
+            userSettingsService.canUserWrite(
+                user,
+                UserRole.dnsBlocking
+            )
+        ) { "User $user cannot write dns blocking state" }
+
         val response = cmd("dns_lists_update")
         check(!response.contains("ERROR"))
+
+        setNewState(get(user))
     }
 
     companion object {

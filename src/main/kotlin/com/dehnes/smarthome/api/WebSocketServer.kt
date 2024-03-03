@@ -92,7 +92,7 @@ class WebSocketServer : Endpoint() {
             }
 
             dnsBlockingUpdateStandardLists -> errorCatching {
-                dnsBlockingService.updateStandardLists()
+                dnsBlockingService.updateStandardLists(userEmail)
                 RpcResponse()
             }
 

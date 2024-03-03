@@ -23,8 +23,8 @@ export const DnsBlocking = () => {
     const toggle = useCallback((list: string) => {
         if (state) {
             let enabled = Object.entries(state.listsToEnabled)
-                .filter(([list, enabled]) => enabled)
-                .map(([list, enabled]) => list);
+                .filter(([list, dnsListState]) => dnsListState.enabled)
+                .map(([list, ]) => list);
 
             if (enabled.includes(list)) {
                 enabled = enabled.filter(l => l !== list);
@@ -57,9 +57,14 @@ export const DnsBlocking = () => {
         }}>
             <Table aria-label="simple table">
                 <TableBody>
-                    {Object.entries(state.listsToEnabled).map(([list, enabled]) => (
+                    {Object.entries(state.listsToEnabled).map(([list, listState]) => (
                         <TableRow key={list}>
-                            <TableCell component="th" scope="row">{list}</TableCell>
+                            <TableCell component="th" scope="row">
+                                <span>{list}</span>
+                            </TableCell>
+                            <TableCell align={"left"}>
+                                <span>{new Date(listState.lastUpdated).toLocaleString()}</span>
+                            </TableCell>
                             <TableCell align="right">
                                 <div style={{
                                     display: "flex",
@@ -67,9 +72,9 @@ export const DnsBlocking = () => {
                                     alignItems: "center",
                                     justifyContent: "flex-end"
                                 }}>
-                                    <Switch checked={!enabled} onClick={event => toggle(list)}></Switch>
+                                    <Switch checked={!listState.enabled} onClick={event => toggle(list)}></Switch>
                                     <span
-                                        style={{width: '80px', display: "inline"}}>{enabled ? 'blocked' : 'open'}</span>
+                                        style={{width: '80px', display: "inline"}}>{listState.enabled ? 'blocked' : 'open'}</span>
                                 </div>
                             </TableCell>
                         </TableRow>
