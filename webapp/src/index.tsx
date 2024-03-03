@@ -41,6 +41,7 @@ root.render(
                     <Route path="/users" element={<UserSettingsAdmin/>}/>
                     <Route path="/energy_price_settings" element={<EnergyPricingSettings/>}/>
                     <Route path="/energy" element={<EnergyStorageSystem/>}/>
+                    <Route path="/firewall" element={<Firewall/>}/>
                 </Routes>
             </BrowserRouter>
         </ThemeProvider>
