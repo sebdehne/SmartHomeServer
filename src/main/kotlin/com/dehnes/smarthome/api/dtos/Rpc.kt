@@ -36,6 +36,7 @@ enum class RequestType {
 
     dnsBlockingSet,
     dnsBlockingUpdateStandardLists,
+    blockedMacsSet,
 }
 
 data class RpcRequest(
@@ -55,6 +56,7 @@ data class RpcRequest(
     val writeBms: WriteBms? = null,
     val stairsHeatingRequest: StairsHeatingRequest? = null,
     val dnsBlockingLists: List<String>? = null,
+    val blockedMacs: List<String>? = null,
 )
 
 data class RpcResponse(

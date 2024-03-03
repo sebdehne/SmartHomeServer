@@ -24,6 +24,7 @@ data class ConfigurationRoot(
     val aes265Keys: Map<String, String> = emptyMap(),
     val victronService: VictronService = VictronService(),
     val victronEssProcess: VictronEssProcessSettings = VictronEssProcessSettings(),
+    val knownNetworkDevices: Map<String, String> = emptyMap(),
 )
 
 data class VictronEssProcessSettings(

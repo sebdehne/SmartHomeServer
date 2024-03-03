@@ -17,7 +17,7 @@ import {createRoot} from 'react-dom/client';
 import {UserSettingsAdmin} from "./Components/UserSettingsAdmin/UserSettingsAdmin";
 import {StairsHeater} from "./Components/StairsHeater/StairsHeater";
 import {EnergyStorageSystemV2} from "./Components/EnergyStorageSystemV2/EnergyStorageSystemV2";
-import {DnsBlocking} from "./Components/DnsBlocking/DnsBlocking";
+import {Firewall} from "./Components/Firewall/Firewall";
 
 
 const container = document.getElementById('root');

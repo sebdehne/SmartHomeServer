@@ -5,12 +5,12 @@ import com.dehnes.smarthome.api.dtos.*
 import com.dehnes.smarthome.api.dtos.RequestType.*
 import com.dehnes.smarthome.configuration
 import com.dehnes.smarthome.datalogging.QuickStatsService
-import com.dehnes.smarthome.dns_blocking.DnsBlockingService
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
+import com.dehnes.smarthome.firewall_router.*
 import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.users.UserSettingsService
@@ -50,7 +50,9 @@ class WebSocketServer : Endpoint() {
     private val energyConsumptionService = configuration.getBean<EnergyConsumptionService>()
     private val dalyBmsDataLogger = configuration.getBean<DalyBmsDataLogger>()
     private val stairsHeatingService = configuration.getBean<StairsHeatingService>()
+    private val firewallService = configuration.getBean<FirewallService>()
     private val dnsBlockingService = configuration.getBean<DnsBlockingService>()
+    private val blockedMacs = configuration.getBean<BlockedMacs>()
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info { "$instanceId Socket connected: $sess" }
@@ -86,6 +88,11 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            blockedMacsSet -> errorCatching {
+                blockedMacs.set(userEmail, rpcRequest.blockedMacs!!)
+                RpcResponse()
+            }
+
             dnsBlockingSet -> errorCatching {
                 dnsBlockingService.set(userEmail, rpcRequest.dnsBlockingLists!!)
                 RpcResponse()
@@ -132,12 +139,12 @@ class WebSocketServer : Endpoint() {
                 val existing = subscriptions[subscriptionId]
                 if (existing == null) {
                     val sub = when (subscribe.type) {
-                        SubscriptionType.dnsBlockingGet -> {
+                        SubscriptionType.firewall -> {
 
-                            val state = dnsBlockingService.get(userEmail)
+                            val state = firewallService.currentState
 
-                            val sub = object : Subscription<DnsBlockingState>(subscriptionId, argSession) {
-                                override fun onEvent(e: DnsBlockingState) {
+                            val sub = object : Subscription<FirewallState>(subscriptionId, argSession) {
+                                override fun onEvent(e: FirewallState) {
                                     argSession.basicRemote.sendText(
                                         objectMapper.writeValueAsString(
                                             WebsocketMessage(
@@ -145,7 +152,7 @@ class WebSocketServer : Endpoint() {
                                                 WebsocketMessageType.notify,
                                                 notify = Notify(
                                                     subscriptionId,
-                                                    dnsBlockingState = e,
+                                                    firewallState = e,
                                                 )
                                             )
                                         )
@@ -153,12 +160,12 @@ class WebSocketServer : Endpoint() {
                                 }
 
                                 override fun close() {
-                                    dnsBlockingService.listeners.remove(subscriptionId)
+                                    firewallService.listeners.remove(subscriptionId)
                                 }
 
                             }
 
-                            dnsBlockingService.listeners[subscriptionId] = sub::onEvent
+                            firewallService.listeners[subscriptionId] = sub::onEvent
                             sub.apply {
                                 this.onEvent(state)
                             }

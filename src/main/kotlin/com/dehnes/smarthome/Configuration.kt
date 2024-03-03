@@ -3,7 +3,7 @@ package com.dehnes.smarthome
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
-import com.dehnes.smarthome.dns_blocking.DnsBlockingService
+import com.dehnes.smarthome.firewall_router.DnsBlockingService
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
@@ -12,6 +12,8 @@ import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
+import com.dehnes.smarthome.firewall_router.BlockedMacs
+import com.dehnes.smarthome.firewall_router.FirewallService
 import com.dehnes.smarthome.garage_door.GarageController
 import com.dehnes.smarthome.han.HanPortService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
@@ -186,6 +188,8 @@ class Configuration {
         )
         stairsHeatingService.init()
 
+        val firewallService = FirewallService()
+
 
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageController::class] = garageDoorService
@@ -203,7 +207,9 @@ class Configuration {
         beans[EnergyConsumptionService::class] = energyConsumptionService
         beans[DalyBmsDataLogger::class] = dalyBmsDataLogger
         beans[StairsHeatingService::class] = stairsHeatingService
-        beans[DnsBlockingService::class] = DnsBlockingService(userSettingsService, configService)
+        beans[DnsBlockingService::class] = DnsBlockingService(userSettingsService, configService, firewallService).apply { start() }
+        beans[BlockedMacs::class] = BlockedMacs(userSettingsService, firewallService, configService).apply { start() }
+        beans[FirewallService::class] = firewallService
     }
 
     inline fun <reified T> getBean(): T {

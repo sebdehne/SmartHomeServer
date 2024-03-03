@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.api.dtos
 
+import com.dehnes.smarthome.firewall_router.FirewallState
 import com.dehnes.smarthome.victron.ESSState
 import com.dehnes.smarthome.victron.ESSValues
 
@@ -10,7 +11,7 @@ enum class SubscriptionType {
     environmentSensorEvents,
     quickStatsEvents,
     essState,
-    dnsBlockingGet
+    firewall
 }
 
 data class Subscribe(
@@ -30,5 +31,5 @@ data class Notify(
     val environmentSensorEvent: EnvironmentSensorEvent? = null,
     val quickStatsResponse: QuickStatsResponse? = null,
     val essState: ESSState? = null,
-    val dnsBlockingState: DnsBlockingState? = null,
+    val firewallState: FirewallState? = null,
 )

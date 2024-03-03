@@ -75,6 +75,7 @@ class ConfigService(
 
     fun getAuthorization() = readConfig().userSettings
     fun getEnergyPriceServiceSettings() = readConfig().energyPriceServiceSettings
+    fun getKnownNetworkDevices() = readConfig().knownNetworkDevices
     fun getHeaterSettings() = readConfig().heatingControllerSettings
     fun setHeaterSettings(settings: HeatingControllerSettings) {
         update { c ->

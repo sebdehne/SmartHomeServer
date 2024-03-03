@@ -89,7 +89,7 @@ enum class UserRole(
     cameras(Level.read),
     recordings(Level.none),
     userSettings(Level.none),
-    dnsBlocking(Level.none),
+    firewall(Level.none),
 }
 
 enum class Level {
