@@ -12,9 +12,11 @@ class BlockedMacs(
 ) {
 
     fun start() {
-        val blockedMacState = get(null, bypassAuth = true)
-        firewallService.updateState {
-            it.copy(blockedMacState = blockedMacState)
+        if (!configService.isDevMode()) {
+            val blockedMacState = get(null, bypassAuth = true)
+            firewallService.updateState {
+                it.copy(blockedMacState = blockedMacState)
+            }
         }
     }
 

@@ -8,7 +8,6 @@ import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
 import {EvChargingStations} from "./Components/EvChargingStations/EvChargingStations";
 import Webcams from "./Components/Webcams/Webcams";
-import theme from "./theme";
 import {EnvironmentSensors} from "./Components/EnvironmentSensors/EnvironmentSensors";
 import {VideoRecordings} from "./Components/VideoRecordings/VideoRecordings";
 import {EnergyPricingSettings} from "./Components/EnergyPricingSettings/EnergyPricingSettings";
@@ -18,6 +17,7 @@ import {UserSettingsAdmin} from "./Components/UserSettingsAdmin/UserSettingsAdmi
 import {StairsHeater} from "./Components/StairsHeater/StairsHeater";
 import {EnergyStorageSystemV2} from "./Components/EnergyStorageSystemV2/EnergyStorageSystemV2";
 import {Firewall} from "./Components/Firewall/Firewall";
+import {theme} from "./theme";
 
 
 const container = document.getElementById('root');
@@ -28,7 +28,7 @@ root.render(
     <React.StrictMode>
         <ThemeProvider theme={theme}>
             <CssBaseline/>
-            <BrowserRouter basename={process.env.REACT_APP_BASENAME}>
+            <BrowserRouter basename={import.meta.env.BASE_URL}>
                 <Routes>
                     <Route path="/" element={<App/>}/>
                     <Route path="/garage" element={<GarageDoor/>}/>
