@@ -1,0 +1,43 @@
+<svg width="625" height="625" xmlns="http://www.w3.org/2000/svg">
+
+    <path d="
+        M30,10
+        h200
+        a20,20 0 0 1 20,20
+        v200
+        h-240
+        v-200
+        a20,20 0 0 1 20,-20
+        z"
+          stroke="transparent"
+          fill="#8a3838"
+    />
+    <path d="
+        M30,10
+        h200
+        a20,20 0 0 1 20,20
+        v20
+        h-240
+        v-20
+        a20,20 0 0 1 20,-20
+        z"
+          stroke="transparent"
+          fill="#522020"
+    />
+    <text x="110" y="35"
+          fill="#ffffff"
+          font-size="larger"
+          font-weight="bolder"
+    >Grid</text>
+
+    <path
+            fill="none"
+            stroke="lightgrey"
+            d="M30,10
+            m220,120
+            h200
+            v300
+            "/>
+
+
+</svg>
