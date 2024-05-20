@@ -10,14 +10,15 @@
     <name>smarthome-server</name>
 
     <properties>
+        <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <kotlin.version>1.9.22</kotlin.version>
-        <jetty.version>12.0.5</jetty.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <kotlin.version>1.9.24</kotlin.version>
+        <jetty.version>12.0.9</jetty.version>
         <httpclient.version>4.5.14</httpclient.version>
-        <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
-        <jackson.version>2.16.1</jackson.version>
+        <kotlin.compiler.jvmTarget>${java.version}</kotlin.compiler.jvmTarget>
+        <jackson.version>2.17.1</jackson.version>
     </properties>
 
     <build>
@@ -58,8 +59,8 @@
 
                 </executions>
                 <configuration>
-                    <npmVersion>10.3.0</npmVersion>
-                    <nodeVersion>v20.11.0</nodeVersion>
+                    <npmVersion>10.8.0</npmVersion>
+                    <nodeVersion>v20.13.1</nodeVersion>
                     <workingDirectory>webapp</workingDirectory>
                     <installDirectory>target</installDirectory>
                 </configuration>
@@ -189,12 +190,12 @@
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20231013</version>
+            <version>20240303</version>
         </dependency>
         <dependency>
             <groupId>com.ghgande</groupId>
             <artifactId>j2mod</artifactId>
-            <version>3.2.0</version>
+            <version>3.2.1</version>
         </dependency>
         <dependency>
             <groupId>com.hivemq</groupId>
@@ -229,18 +230,13 @@
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-core</artifactId>
-            <version>1.4.14</version>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.14</version>
+            <version>1.5.6</version>
         </dependency>
         <dependency>
             <groupId>io.github.oshai</groupId>
             <artifactId>kotlin-logging-jvm</artifactId>
-            <version>6.0.3</version>
+            <version>6.0.9</version>
         </dependency>
         <!-- To run javax.websocket in embedded server -->
         <dependency>
@@ -268,7 +264,7 @@
         <dependency>
             <groupId>io.mockk</groupId>
             <artifactId>mockk-jvm</artifactId>
-            <version>1.13.9</version>
+            <version>1.13.11</version>
             <scope>test</scope>
         </dependency>
         <dependency>
