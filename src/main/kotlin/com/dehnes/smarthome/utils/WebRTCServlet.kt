@@ -4,7 +4,7 @@ import jakarta.servlet.http.HttpServlet
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.apache.http.client.fluent.Request
+import org.apache.hc.client5.http.fluent.Request
 
 class WebRTCServlet : HttpServlet() {
     val webrtcServer = "http://192.168.1.1:8083"
@@ -18,12 +18,12 @@ class WebRTCServlet : HttpServlet() {
         val pathParts = req.pathInfo.split("/")
         val readAllBytes = req.inputStream.readAllBytes()
 
-        Request.Post("$webrtcServer/stream/${pathParts.last()}/channel/0/webrtc")
+        Request.post("$webrtcServer/stream/${pathParts.last()}/channel/0/webrtc")
             .addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
             .bodyByteArray(readAllBytes).execute()
             .handleResponse { clientResponse ->
-                logger.info { "POST pathInfo=${req.pathInfo} proxy-response-status=${clientResponse.statusLine.statusCode}" }
-                resp.status = clientResponse.statusLine.statusCode
+                logger.info { "POST pathInfo=${req.pathInfo} proxy-response-status=${clientResponse.code}" }
+                resp.status = clientResponse.code
                 clientResponse.entity.writeTo(resp.outputStream)
                 resp.outputStream.flush()
             }

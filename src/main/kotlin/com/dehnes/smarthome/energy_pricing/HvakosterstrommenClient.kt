@@ -4,8 +4,7 @@ import com.dehnes.smarthome.objectMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.apache.http.HttpVersion
-import org.apache.http.client.fluent.Request
+import org.apache.hc.client5.http.fluent.Request
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -36,9 +35,8 @@ class HvakosterstrommenClient(
             "https://www.hvakosterstrommen.no/api/v1/prices/${day.format(DateTimeFormatter.ofPattern("yyyy/MM-dd"))}_NO1.json"
         logger.info { "URl=$url" }
         val response =
-            Request.Get(url)
+            Request.get(url)
                 .useExpectContinue()
-                .version(HttpVersion.HTTP_1_1)
                 .execute()
                 .returnContent().asString()
 

@@ -2,12 +2,13 @@ package com.dehnes.smarthome.datalogging
 
 import com.dehnes.smarthome.config.ConfigService
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.apache.http.HttpResponse
-import org.apache.http.client.fluent.Request
-import org.apache.http.client.fluent.Response
-import org.apache.http.client.utils.URIBuilder
-import org.apache.http.entity.ContentType
-import org.apache.http.entity.StringEntity
+import org.apache.hc.client5.http.fluent.Request
+import org.apache.hc.client5.http.fluent.Response
+import org.apache.hc.core5.http.ContentType
+import org.apache.hc.core5.http.HttpResponse
+import org.apache.hc.core5.http.io.entity.StringEntity
+import org.apache.hc.core5.net.URIBuilder
+
 import java.io.IOException
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
@@ -55,18 +56,17 @@ class InfluxDBClient(
         }
         try {
             val body = records.joinToString(separator = "\n") { it.toLine() }
-            logger.debug("About to send {}", body)
-            val result: Response = Request.Post("$baseUrl/api/v2/write?bucket=$bucketName&org=dehnes.com")
+            logger.debug { "${"About to send {}"} $body" }
+            val response = Request.post("$baseUrl/api/v2/write?bucket=$bucketName&org=dehnes.com")
                 .addHeader("Authorization", "Token " + configService.getInfluxDbAuthToken())
                 .bodyString(body, ContentType.TEXT_PLAIN)
                 .execute()
-            val httpResponse: HttpResponse? = result.returnResponse()
-            if (httpResponse?.statusLine != null && httpResponse.statusLine.statusCode > 299) {
+
+            val returnResponse = response.returnResponse()
+            if (returnResponse.code > 299) {
                 throw RuntimeException(
-                    "Could not write to InFluxDb $httpResponse ${
-                        httpResponse.entity.content.readAllBytes().toString(
-                            Charset.defaultCharset()
-                        )
+                    "Could not write to InFluxDb $returnResponse ${
+                        response.returnContent().asString()
                     }"
                 )
             }
@@ -80,7 +80,7 @@ class InfluxDBClient(
         query: String
     ): List<InfluxDbQueryRecord> {
         val execute: Response = Request
-            .Post(
+            .post(
                 URIBuilder("$baseUrl/api/v2/query")
                     .addParameter("orgID", "b351a5d22d7de2aa")
                     .build()
