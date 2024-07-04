@@ -13,7 +13,6 @@ import com.dehnes.smarthome.zwave.StairsHeatingSettings
 data class ConfigurationRoot(
     val devMode: Boolean = false,
     val hanDebugFile: String? = null,
-    val loraSerialPort: String = "/dev/ttyACM0",
     val userSettings: Map<String, UserSettings> = emptyMap(),
     val environmentSensors: EnvironmentSensors = EnvironmentSensors(),
     val stairsHeatingSettings: StairsHeatingSettings = StairsHeatingSettings(),

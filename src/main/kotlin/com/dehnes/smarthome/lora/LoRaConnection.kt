@@ -2,6 +2,7 @@ package com.dehnes.smarthome.lora
 
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.utils.*
+import com.dehnes.smarthome.utils.SerialPortFinder.findSerialPort
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.Closeable
 import java.io.File
@@ -88,15 +89,19 @@ class LoRaConnection(
 
     private fun connect(): Connection {
 
-        val serialDev = configService.getLoraSerialPort()
+        val serialDev = findSerialPort("Arduino_LLC_Arduino_NANO_33_IoT")
 
         // set baud
-        val process = ProcessBuilder("stty -F $serialDev 115200 raw -echo".split(" ")).start()
-        if (!process.waitFor(30, TimeUnit.SECONDS)) {
-            process.destroy()
-            error("stty did not complete in time")
-        }
-        check(process.exitValue() == 0) { "Could not set baud rate" }
+        CmdExecutor.runToString(
+            listOf(
+                "stty",
+                "-F",
+                serialDev,
+                "115200",
+                "raw",
+                "-echo",
+            )
+        )
 
         val file = File(serialDev)
 
@@ -105,7 +110,7 @@ class LoRaConnection(
             file.outputStream(),
             clock.millis()
         ).apply {
-            logger.info("Connected to LoRa serial port")
+            logger.info { "Connected to LoRa serial port" }
         }
     }
 

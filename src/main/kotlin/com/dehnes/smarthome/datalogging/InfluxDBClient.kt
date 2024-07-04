@@ -5,12 +5,10 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.hc.client5.http.fluent.Request
 import org.apache.hc.client5.http.fluent.Response
 import org.apache.hc.core5.http.ContentType
-import org.apache.hc.core5.http.HttpResponse
 import org.apache.hc.core5.http.io.entity.StringEntity
 import org.apache.hc.core5.net.URIBuilder
 
 import java.io.IOException
-import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant

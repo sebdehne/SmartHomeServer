@@ -20,6 +20,8 @@ val configuration = Configuration()
 fun main() {
     val logger = KotlinLogging.logger { }
 
+    logger.warn { "Start" }
+
     configuration.init()
 
     val server = Server()

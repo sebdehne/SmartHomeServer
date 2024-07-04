@@ -42,7 +42,6 @@ class ConfigService(
 
     fun getHanDebugFile() = readConfig().hanDebugFile
 
-    fun getLoraSerialPort() = readConfig().loraSerialPort
     fun getEnvironmentSensors() = readConfig().environmentSensors
     fun getStairsHeatingSettings() = readConfig().stairsHeatingSettings
 

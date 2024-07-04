@@ -49,7 +49,7 @@ class HanPortService(
     private var isStarted = false
 
     @Volatile
-    private var hanPortConnection: HanPortConnection? = null
+    private var hanPortConnection: IHanPortConnection? = null
 
     fun start() {
         if (isStarted) {
@@ -63,7 +63,7 @@ class HanPortService(
                 } catch (e: Exception) {
                     kotlin.runCatching { hanPortConnection?.close() }
                     hanPortConnection = null
-                    logger.error("", e)
+                    logger.error(e) { "" }
                 }
                 Thread.sleep(10 * 1000)
             }
@@ -84,7 +84,7 @@ class HanPortService(
 
         while (true) {
             if (hanPortConnection == null) {
-                hanPortConnection = HanPortConnection.open(host, port).also {
+                hanPortConnection = HanPortConnectionDev.open().also {
                     logger.info { "Connected" }
                     writePos = 0
                 }
