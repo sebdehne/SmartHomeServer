@@ -143,8 +143,7 @@ class VictronEssProcess(
 
         OperationMode.manual -> {
             val now = Instant.now()
-            val onlineBmses = bmsData
-                .filter { it.timestamp.plusSeconds(bmsAssumeDeadAfterSeconds()).isAfter(now) }
+            val onlineBmses = bmsData.filter { it.timestamp.plusSeconds(bmsAssumeDeadAfterSeconds()).isAfter(now) }
 
             if (onlineBmses.size < minNumberOfOnlineBmses()) {
                 essState = "Not enough BMSes online: ${onlineBmses.joinToString(", ") { it.bmsId.displayName }}"
