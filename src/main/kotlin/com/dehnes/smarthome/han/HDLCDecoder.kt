@@ -69,9 +69,7 @@ enum class HanDecoderState {
     readingPayload
 }
 
-class HanDecoder(
-    private val configService: ConfigService
-) {
+class HanDecoder {
 
     private val random = Random()
     private val logger = KotlinLogging.logger { }
@@ -130,7 +128,8 @@ class HanDecoder(
                     startPos + 1 + headerLength
                 } else {
                     val skip = random.nextInt(length)
-                    logger.warn { "Invalida data received, skipping $skip" }
+                    // experience shows that when stty settings are wrong, the data looks somewhat good, but is missing some bytes
+                    logger.warn { "Invalida data received - possible incorrect stty settings, skipping $skip" }
                     skip
                 }
             }
