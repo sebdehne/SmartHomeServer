@@ -62,7 +62,7 @@ class StairsHeatingService(
     private val configService: ConfigService,
     private val executorService: ExecutorService,
     private val userSettingsService: UserSettingsService,
-    private val nodeId: Int = 6,
+    private val nodeId: Int = 7,
     private val mqttName: String = "zwave-js-ui",
     private val refreshDelaySeconds: Long = 60,
 ) {

@@ -81,6 +81,7 @@ class HanPortService(
         val buffer = ByteArray(1024 * 10)
         var writePos = 0
         val hanDecoder = HanDecoder(configService)
+        var lastGoodMessageAt = Instant.now()
 
         while (true) {
             if (hanPortConnection == null) {
@@ -90,6 +91,9 @@ class HanPortService(
                 }
             }
 
+            if (lastGoodMessageAt.plusSeconds(60).isBefore(Instant.now())) {
+                error("Did not receive any data for 60 seconds")
+            }
 
             if (hanPortConnection != null) {
                 if (writePos + 1 >= buffer.size) error("Buffer full")
@@ -101,6 +105,7 @@ class HanPortService(
                     val dlmsMessage = DLMSDecoder.decode(hdlcFrame)
                     val hanData = mapToHanData(dlmsMessage)
                     logger.debug { "Got new msg=${hdlcFrame} hanData=$hanData" }
+                    lastGoodMessageAt = Instant.now()
                     executorService.submit(withLogging {
                         val listeners = listOf(hanDataService::onNewData) + this.listeners
                         listeners.forEach { l -> l(hanData) }
