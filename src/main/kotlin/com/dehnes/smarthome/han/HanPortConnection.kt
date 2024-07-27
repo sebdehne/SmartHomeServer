@@ -22,7 +22,7 @@ class HanPortConnectionDev private constructor(
         private val logger = KotlinLogging.logger { }
 
         fun open(): HanPortConnectionDev {
-            val filename = findSerialPort("Prolific_Technology_Inc._USB-Serial_Controller_ALCSt114J20")
+            val filename = findSerialPort("Prolific_Technology_Inc._USB-Serial_Controller_ALDNt114J20")
             // set baud
             CmdExecutor.runToString(
                 listOf(
