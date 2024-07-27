@@ -5,6 +5,7 @@ import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.utils.withLogging
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.io.FileOutputStream
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
@@ -51,6 +52,8 @@ class HanPortService(
     @Volatile
     private var hanPortConnection: IHanPortConnection? = null
 
+    private var fileOutputStream: FileOutputStream? = null
+
     fun start() {
         if (isStarted) {
             return
@@ -62,7 +65,9 @@ class HanPortService(
                     readLoop()
                 } catch (e: Exception) {
                     kotlin.runCatching { hanPortConnection?.close() }
+                    kotlin.runCatching { fileOutputStream?.close() }
                     hanPortConnection = null
+                    fileOutputStream = null
                     logger.error(e) { "" }
                 }
                 Thread.sleep(10 * 1000)
@@ -90,6 +95,9 @@ class HanPortService(
                     writePos = 0
                 }
             }
+            if (fileOutputStream == null && configService.getHanDebugFile() != null) {
+                fileOutputStream = FileOutputStream(configService.getHanDebugFile()!!, true)
+            }
 
             if (lastGoodMessageAt.plusSeconds(60).isBefore(Instant.now())) {
                 error("Did not receive any data for 60 seconds")
@@ -99,6 +107,13 @@ class HanPortService(
                 if (writePos + 1 >= buffer.size) error("Buffer full")
                 val read = hanPortConnection!!.read(buffer, writePos, buffer.size - writePos)
                 check(read > -1) { "EOF while reading from HAN-port" }
+
+                fileOutputStream?.write(
+                    buffer,
+                    writePos,
+                    read
+                )
+
                 writePos += read
 
                 val consumed = hanDecoder.decode(buffer, writePos) { hdlcFrame ->

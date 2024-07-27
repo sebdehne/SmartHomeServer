@@ -170,7 +170,6 @@ class HanDecoder(
                     val calculatedFcs = FCS16.calcFcs16(toBeChecked, 0, toBeChecked.size)
 
                     return if (calculatedFcs == fcs && endFlag == 0x7e) {
-                        debugData(toBeChecked)
                         onMessage(
                             HDLCFrame(
                                 header,
@@ -194,18 +193,5 @@ class HanDecoder(
             }
         }
     }
-
-    private fun debugData(data: ByteArray) {
-        try {
-            val file = configService.getHanDebugFile() ?: return
-            FileOutputStream(file, true).use { os ->
-                os.write(data)
-            }
-            logger.info { "Wrote ${data.size} to han-debug file $file" }
-        } catch (e: Exception) {
-            logger.warn(e) { "Could not log data to debug file" }
-        }
-    }
-
 
 }

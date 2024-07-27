@@ -10,27 +10,6 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.time.Duration
 
-class HanPortConnection private constructor(
-    private val socket: Socket
-) : IHanPortConnection {
-
-    companion object {
-        fun open(host: String, port: Int, connectTimeout: Int = 5000, readTimeout: Int = 60000) = HanPortConnection(
-            Socket().apply {
-                soTimeout = readTimeout
-                connect(InetSocketAddress(host, port), connectTimeout)
-            }
-        )
-    }
-
-    override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
-        socket.getInputStream().read(buffer, offset, length)
-
-    override fun close() {
-        kotlin.runCatching { socket.close() }
-    }
-}
-
 interface IHanPortConnection : Closeable {
     fun read(buffer: ByteArray, offset: Int, length: Int): Int
 }
@@ -51,14 +30,8 @@ class HanPortConnectionDev private constructor(
                     "-F",
                     filename,
                     "2400",
-                    "cs8",
-                    "-parenb",
-                    "-parodd",
-                    "-crtscts",
-                    "min",
-                    "1",
-                    "time",
-                    "0",
+                    "raw",
+                    "cs8"
                 ),
                 Duration.ofSeconds(20)
             )

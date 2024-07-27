@@ -62,7 +62,7 @@ object DLMSDecoder {
             val type = payload[pos++].toUnsignedInt()
             elements.add(
                 when (type) {
-                    0x0a -> {
+                    0x0a -> { // visible-string
                         val elementLength = payload[pos++].toUnsignedInt()
                         val data = ByteArray(elementLength)
                         System.arraycopy(
@@ -76,7 +76,7 @@ object DLMSDecoder {
                         VisibleString(String(data))
                     }
 
-                    0x09 -> {
+                    0x09 -> { // octet-string
                         val elementLength = payload[pos++].toUnsignedInt()
                         val data = ByteArray(elementLength)
                         System.arraycopy(
