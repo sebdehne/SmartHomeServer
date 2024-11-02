@@ -7,6 +7,10 @@ fun merge(low: Int, hi: Int): Int {
     return result + low
 }
 
+fun ByteArray.write(src: ByteArray, dstOffset: Int) {
+    System.arraycopy(src, 0, this, dstOffset, src.size)
+}
+
 fun Byte.toUnsignedInt(): Int = this.toInt().let {
     if (it < 0)
         it + 256
@@ -18,6 +22,12 @@ fun Long.to32Bit(): ByteArray {
     val bytes = ByteArray(8)
     ByteBuffer.wrap(bytes).putLong(this)
     return bytes.copyOfRange(4, 8)
+}
+
+fun Long.to16Bit(): ByteArray {
+    val bytes = ByteArray(8)
+    ByteBuffer.wrap(bytes).putLong(this)
+    return bytes.copyOfRange(6, 8)
 }
 
 fun Int.to32Bit(): ByteArray {

@@ -1,13 +1,13 @@
-import { GarageResponse } from "./Garage";
 import { UnderFloorHeaterResponse } from "./UnderFloorHeater";
 import { EvChargingEvent } from "./EVChargingStation";
 import { EnvironmentSensorEvent } from "./EnvironmentSensors";
 import { QuickStatsResponse } from "./QuickStats";
 import { ESSState } from "./EnergyStorageSystem";
 import {FirewallState, DnsBlockingState} from "./Firewall";
+import {GarageLightStatus} from "./Garage";
 
 export type SubscriptionType =
-    "getGarageStatus"
+    "getGarageLightStatus"
     | "getUnderFloorHeaterStatus"
     | "evChargingStationEvents"
     | "environmentSensorEvents"
@@ -26,7 +26,7 @@ export type Unsubscribe = {
 
 export type Notify = {
     subscriptionId: string;
-    garageStatus?: GarageResponse;
+    garageStatus?: GarageLightStatus;
     underFloorHeaterStatus?: UnderFloorHeaterResponse;
     evChargingStationEvent?: EvChargingEvent;
     environmentSensorEvent?: EnvironmentSensorEvent;

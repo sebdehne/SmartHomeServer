@@ -13,7 +13,7 @@ enum class RequestType {
 
     userSettings,
 
-    garageRequest,
+    garageLightRequest,
     underFloorHeaterRequest,
     evChargingStationRequest,
     environmentSensorRequest,
@@ -44,7 +44,7 @@ data class RpcRequest(
     val subscribe: Subscribe?,
     val unsubscribe: Unsubscribe?,
 
-    val garageRequest: GarageRequest?,
+    val garageLightRequest: GarageLightRequest?,
     val underFloorHeaterRequest: UnderFloorHeaterRequest?,
     val evChargingStationRequest: EvChargingStationRequest?,
     val environmentSensorRequest: EnvironmentSensorRequest?,
@@ -64,7 +64,7 @@ data class RpcResponse(
     val subscriptionCreated: Boolean? = null,
     val subscriptionRemoved: Boolean? = null,
 
-    val garageResponse: GarageResponse? = null,
+    val garageLightResponse: GarageLightResponse? = null,
     val underFloorHeaterResponse: UnderFloorHeaterResponse? = null,
     val evChargingStationResponse: EvChargingStationResponse? = null,
     val environmentSensorResponse: EnvironmentSensorResponse? = null,

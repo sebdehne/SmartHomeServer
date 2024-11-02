@@ -226,6 +226,7 @@ class LoRaConnection(
                         listOf("ok".toRegex(), "invalid_param".toRegex(), "busy".toRegex()),
                         listOf("radio_tx_ok".toRegex(), "radio_err".toRegex())
                     ) != null
+                    logger.debug { "Packet sendt result=$result" }
                     executorService.submit(withLogging {
                         nextOutPacket.onResult(result)
                     })
@@ -245,6 +246,7 @@ class LoRaConnection(
                     Thread.sleep(1000)
                     continue
                 }
+                logger.debug { "Start listening..." }
 
                 conn.read(Duration.ofMinutes(10), this::isInterrupted)
                 if (!conn.hasCompleteText && !conn.isCurrentlyReading()) {
@@ -304,15 +306,15 @@ class LoRaConnection(
         val length = readInt32Bits(it.second, 7)
         val timestampSecondsSince2000 = readLong32Bits(it.second, 3)
         LoRaInboundPacketDecrypted(
-            inboundPacket,
-            it.first,
-            it.second[0].toInt(),
-            it.second[1].toInt(),
-            LoRaPacketType.fromByte(it.second[2]),
-            timestampSecondsSince2000,
-            clock.timestampSecondsSince2000() - timestampSecondsSince2000,
-            inboundPacket.rssi,
-            it.second.copyOfRange(11, 11 + length)
+            originalPacket = inboundPacket,
+            keyId = it.first,
+            to = it.second[0].toInt(),
+            from = it.second[1].toInt(),
+            type = LoRaPacketType.fromByte(it.second[2]),
+            timestampSecondsSince2000 = timestampSecondsSince2000,
+            timestampDelta = clock.timestampSecondsSince2000() - timestampSecondsSince2000,
+            rssi = inboundPacket.rssi,
+            payload = it.second.copyOfRange(11, 11 + length)
         )
     }
 
@@ -322,11 +324,11 @@ class LoRaConnection(
             serialId[i] = packet.payload[i + 1]
         }
         val setupRequest = SetupRequest(
-            packet.payload[0].toInt(),
-            serialId.toHexString(),
-            clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
-            clock.millis(),
-            packet.rssi
+            firmwareVersion = packet.payload[0].toInt(),
+            serialIdHex = serialId.toHexString(),
+            timestampDelta = clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
+            receivedAt = clock.millis(),
+            rssi = packet.rssi
         )
 
         logger.info { "Handling setupRequest=$setupRequest" }
@@ -494,11 +496,19 @@ enum class LoRaPacketType(
 
     SENSOR_DATA_REQUEST_V3(21),
 
-    GARAGE_HEATER_DATA_REQUESTV2(22)
+    GARAGE_HEATER_DATA_REQUESTV2(22),
+
+    GARAGE_LIGHT_GET_STATUS(23),
+    GARAGE_LIGHT_STATUS_RESPONSE(24),
+    GARAGE_LIGHT_SWITCH_CEILING_LIGHT_ON(25),
+    GARAGE_LIGHT_SWITCH_CEILING_LIGHT_OFF(26),
+    GARAGE_LIGHT_SET_DAC(27),
+    GARAGE_LIGHT_NOTIFY_CEILING_LIGHT(28),
+    GARAGE_LIGHT_ACK(29),
     ;
 
     companion object {
-        fun fromByte(byte: Byte) = values().first { it.value == byte.toInt() }
+        fun fromByte(byte: Byte) = entries.first { it.value == byte.toInt() }
     }
 }
 

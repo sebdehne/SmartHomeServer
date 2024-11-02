@@ -1,25 +1,25 @@
-import { Subscribe, Unsubscribe } from "./Subscription";
-import { GarageRequest, GarageResponse } from "./Garage";
-import { UnderFloorHeaterRequest, UnderFloorHeaterResponse } from "./UnderFloorHeater";
-import { EvChargingStationRequest, EvChargingStationResponse } from "./EVChargingStation";
-import { EnvironmentSensorRequest, EnvironmentSensorResponse } from "./EnvironmentSensors";
-import { VideoBrowserRequest, VideoBrowserResponse } from "./Video";
-import { QuickStatsResponse } from "./QuickStats";
+import {Subscribe, Unsubscribe} from "./Subscription";
+import {GarageLightRequest, GarageLightResponse} from "./Garage";
+import {UnderFloorHeaterRequest, UnderFloorHeaterResponse} from "./UnderFloorHeater";
+import {EvChargingStationRequest, EvChargingStationResponse} from "./EVChargingStation";
+import {EnvironmentSensorRequest, EnvironmentSensorResponse} from "./EnvironmentSensors";
+import {VideoBrowserRequest, VideoBrowserResponse} from "./Video";
+import {QuickStatsResponse} from "./QuickStats";
 import {
     EnergyConsumptionData,
     EnergyConsumptionQuery,
     EnergyPricingSettingsRead,
     EnergyPricingSettingsWrite
 } from "./EnergyPricingSettings";
-import { ESSState, ESSWrite } from "./EnergyStorageSystem";
-import { UserSettings, WriteUserSettings } from "./UserSettings";
-import { WriteBms } from "./Bms";
+import {ESSState, ESSWrite} from "./EnergyStorageSystem";
+import {UserSettings, WriteUserSettings} from "./UserSettings";
+import {WriteBms} from "./Bms";
 import {StairsHeatingRequest, StairsHeatingResponse} from "./stairsHeating";
 
 export type RequestType =
     "subscribe"
     | "unsubscribe"
-    | "garageRequest"
+    | "garageLightRequest"
     | "underFloorHeaterRequest"
     | "evChargingStationRequest"
     | "environmentSensorRequest"
@@ -45,7 +45,7 @@ export type RpcRequest = {
     subscribe?: Subscribe;
     unsubscribe?: Unsubscribe;
 
-    garageRequest?: GarageRequest;
+    garageLightRequest?: GarageLightRequest;
     underFloorHeaterRequest?: UnderFloorHeaterRequest;
     evChargingStationRequest?: EvChargingStationRequest;
     environmentSensorRequest?: EnvironmentSensorRequest;
@@ -64,7 +64,7 @@ export type RpcResponse = {
     subscriptionCreated?: boolean;
     subscriptionRemoved?: boolean;
 
-    garageResponse?: GarageResponse;
+    garageLightResponse?: GarageLightResponse;
     underFloorHeaterResponse?: UnderFloorHeaterResponse;
     evChargingStationResponse?: EvChargingStationResponse;
     environmentSensorResponse?: EnvironmentSensorResponse;

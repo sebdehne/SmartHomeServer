@@ -2,10 +2,9 @@ package com.dehnes.smarthome.api.dtos
 
 import com.dehnes.smarthome.firewall_router.FirewallState
 import com.dehnes.smarthome.victron.ESSState
-import com.dehnes.smarthome.victron.ESSValues
 
 enum class SubscriptionType {
-    getGarageStatus,
+    getGarageLightStatus,
     getUnderFloorHeaterStatus,
     evChargingStationEvents,
     environmentSensorEvents,
@@ -25,7 +24,7 @@ data class Unsubscribe(
 
 data class Notify(
     val subscriptionId: String,
-    val garageStatus: GarageResponse? = null,
+    val garageStatus: GarageLightStatus? = null,
     val underFloorHeaterStatus: UnderFloorHeaterResponse? = null,
     val evChargingStationEvent: EvChargingEvent? = null,
     val environmentSensorEvent: EnvironmentSensorEvent? = null,

@@ -27,7 +27,7 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
-import { timeToDelta } from "../GarageDoor/GarageDoor";
+import { timeToDelta } from "../GarageDoor/GarageLight";
 import { FirmwareUpload } from "./FirmwareUpload";
 
 const stateToText = (state: ChargingState, reasonChargingUnavailable: string | null) => {

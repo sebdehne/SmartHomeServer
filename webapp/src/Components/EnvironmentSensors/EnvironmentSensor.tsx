@@ -20,7 +20,7 @@ import {
     TableRow
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { timeToDelta } from "../GarageDoor/GarageDoor";
+import { timeToDelta } from "../GarageDoor/GarageLight";
 import { useUserSettings } from "../../Websocket/websocketClient";
 
 const stateToText = (currentMilliSeconds: number, sensor: EnvironmentSensorState) => {
@@ -60,7 +60,7 @@ export const getSensorStatus = (sensor: EnvironmentSensorState, currentMilliSeco
         if (sensor.sensorData!!.timestampDelta > 10 || sensor.sensorData!!.timestampDelta < -10) {
             status = SensorStatus.yellow;
         }
-        if (sensor.sensorData!!.batteryMilliVolts < 3200) {
+        if (sensor.sensorData!!.batteryMilliVolts < 3300) {
             status = SensorStatus.yellow;
         }
         if (sensor.sensorData!!.temperatureError) {

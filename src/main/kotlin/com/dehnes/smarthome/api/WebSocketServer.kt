@@ -179,7 +179,7 @@ class WebSocketServer : Endpoint() {
                             quickStatsService.listeners[subscriptionId] = this::onEvent
                         }
 
-                        SubscriptionType.getGarageStatus -> GarageStatusSubscription(subscriptionId, argSession).apply {
+                        SubscriptionType.getGarageLightStatus -> GarageLightStatusSubscription(subscriptionId, argSession).apply {
                             garageDoorService.addListener(userEmail, subscriptionId, this::onEvent)
                         }
 
@@ -220,7 +220,7 @@ class WebSocketServer : Endpoint() {
                 RpcResponse(subscriptionRemoved = true)
             }
 
-            garageRequest -> RpcResponse(garageResponse = garageRequest(rpcRequest.garageRequest!!, userEmail))
+            garageLightRequest -> RpcResponse(garageLightResponse = garageLightRequest(rpcRequest.garageLightRequest!!, userEmail))
             underFloorHeaterRequest -> RpcResponse(
                 underFloorHeaterResponse = underFloorHeaterRequest(
                     userEmail,
@@ -403,46 +403,56 @@ class WebSocketServer : Endpoint() {
         }
     }
 
-    private fun garageRequest(request: GarageRequest, user: String?) = when (request.type) {
-        GarageRequestType.garageDoorExtendAutoClose -> {
-            garageDoorService.updateAutoCloseAfter(user, request.garageDoorChangeAutoCloseDeltaInSeconds!!)
-            garageDoorService.getCurrentState(user)
+    private fun garageLightRequest(request: GarageLightRequest, user: String?): GarageLightResponse =
+        when (request.type) {
+            GarageLightRequestType.getStatus -> {
+                GarageLightResponse(
+                    garageDoorService.getCurrentState(user),
+                )
+            }
+
+            GarageLightRequestType.switchOnCeilingLight -> {
+                GarageLightResponse(
+                    null,
+                    garageDoorService.switchOnCeilingLight(user)
+                )
+            }
+
+            GarageLightRequestType.switchOffCeilingLight -> {
+                GarageLightResponse(
+                    null,
+                    garageDoorService.switchOffCeilingLight(user)
+                )
+            }
+
+            GarageLightRequestType.switchLedStripeOff -> {
+                GarageLightResponse(
+                    null,
+                    garageDoorService.switchLedStripeOff(user)
+                )
+            }
+
+            GarageLightRequestType.switchLedStripeOnLow -> {
+                GarageLightResponse(
+                    null,
+                    garageDoorService.switchLedStripeOnLow(user)
+                )
+            }
+
+            GarageLightRequestType.switchLedStripeOnHigh -> {
+                GarageLightResponse(
+                    null,
+                    garageDoorService.switchLedStripeOnHigh(user)
+                )
+            }
         }
 
-        GarageRequestType.openGarageDoor -> {
-            val sendCommand = garageDoorService.sendCommand(user, true)
-            garageDoorService.getCurrentState(user)?.copy(
-                garageCommandSendSuccess = sendCommand
-            )
-        }
-
-        GarageRequestType.closeGarageDoor -> {
-            val sendCommand = garageDoorService.sendCommand(user, false)
-            garageDoorService.getCurrentState(user)?.copy(
-                garageCommandSendSuccess = sendCommand,
-            )
-        }
-
-        GarageRequestType.getGarageStatus -> garageDoorService.getCurrentState(user)
-        GarageRequestType.adjustTime -> {
-            garageDoorService.getCurrentState(user)?.copy(
-                garageCommandAdjustTimeSuccess = garageDoorService.adjustTime(user)
-            )
-        }
-
-        GarageRequestType.firmwareUpgrade -> {
-            garageDoorService.getCurrentState(user)?.copy(
-                firmwareUploadSuccess = garageDoorService.startFirmwareUpgrade(user, request.firmwareBased64Encoded!!),
-            )
-        }
-    }
-
-    inner class GarageStatusSubscription(
+    inner class GarageLightStatusSubscription(
         subscriptionId: String,
         sess: Session,
-    ) : Subscription<GarageResponse>(subscriptionId, sess) {
-        override fun onEvent(e: GarageResponse) {
-            logger.debug { "$instanceId onEvent GarageStatusSubscription $subscriptionId " }
+    ) : Subscription<GarageLightStatus>(subscriptionId, sess) {
+        override fun onEvent(e: GarageLightStatus) {
+            logger.debug { "$instanceId onEvent GarageLightStatusSubscription $subscriptionId " }
             sess.basicRemote.sendText(
                 objectMapper.writeValueAsString(
                     WebsocketMessage(

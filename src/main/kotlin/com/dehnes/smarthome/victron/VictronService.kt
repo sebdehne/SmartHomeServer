@@ -66,11 +66,11 @@ class VictronService(
 
     private val lock = ReentrantLock()
 
-        init {
-            scheduledExecutorService.scheduleAtFixedRate({
-                executorService.submit(withLogging {
+    init {
+        scheduledExecutorService.scheduleAtFixedRate({
+            executorService.submit(withLogging {
 
-                    lock.tryLock()
+                if (lock.tryLock()) {
                     try {
                         val oldestUpdatedField = essValues.getOldestUpdatedField()
                         if (oldestUpdatedField == null || oldestUpdatedField.second.isBefore(
@@ -90,9 +90,10 @@ class VictronService(
                     } finally {
                         lock.unlock()
                     }
-                })
-            }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
-        }
+                }
+            })
+        }, delayInMs, delayInMs, TimeUnit.MILLISECONDS)
+    }
 
     private fun reconnect() {
         asyncClient.disconnect()

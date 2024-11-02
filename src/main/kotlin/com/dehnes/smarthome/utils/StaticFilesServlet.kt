@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServlet
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.io.ByteArrayOutputStream
 
 class StaticFilesServlet : HttpServlet() {
     val logger = KotlinLogging.logger { }
@@ -16,22 +17,31 @@ class StaticFilesServlet : HttpServlet() {
         val resource = classLoader.getResource("webapp/$resourceName")
 
         if (resource == null) {
+            logger.info { "GET pathInfo=${req.pathInfo} resourceName=$resourceName status=404" }
             resp.status = 404
         } else {
+            logger.info { "GET pathInfo=${req.pathInfo} resourceName=$resourceName status=200" }
             resource.openStream().use { inputStream ->
-                inputStream.copyTo(resp.outputStream)
+                val bs = ByteArrayOutputStream().apply {
+                    inputStream.copyTo(this)
+                }
+                val toByteArray = bs.toByteArray()
+                resp.status = 200
+                if (resourceName?.endsWith(".js") == true) {
+                    resp.contentType = "application/javascript;charset=UTF-8"
+                }
+                resp.addHeader("Content-Length", toByteArray.size.toString())
+                resp.outputStream.write(toByteArray)
+                resp.outputStream.flush()
             }
         }
-
-        logger.info { "GET pathInfo=${req.pathInfo} status=${resp.status}" }
     }
 }
 
-val fileNamePattern = "^[\\w]+(\\.[\\w]+)+\$".toRegex()
+val fileNamePattern = "^[\\w-]+(\\.[\\w]+)+\$".toRegex()
 val dirNamePattern = "^[\\w-]+\$".toRegex()
 val allowedDirs = listOf(
-    "static/css".toRegex(),
-    "static/js".toRegex(),
+    "assets".toRegex(),
     "^\\d\\d\\d\\d-\\d\\d-\\d\\d".toRegex()
 )
 val defaultFile = "index.html"
@@ -41,7 +51,9 @@ fun pathToResource(path: String): String? {
 
     val pathNoFrontSlash = (if (path.startsWith("/")) {
         path.substring(1)
-    } else path).let { if (it.endsWith("/")) it.substring(0, it.length - 1) else it }
+    } else {
+        path
+    }).let { if (it.endsWith("/")) it.substring(0, it.length - 1) else it }
 
     var resultResource = mutableListOf<String>()
     if (pathNoFrontSlash.isNotEmpty()) {
@@ -51,7 +63,7 @@ fun pathToResource(path: String): String? {
                 return@forEachIndexed
             }
 
-            if (index + 1 >= pathParts.size) {
+            if (index == pathParts.size - 1) {
                 if (s.matches(fileNamePattern)) {
                     resultResource.add(s)
                 }
@@ -67,15 +79,13 @@ fun pathToResource(path: String): String? {
 
 
     while (resultResource.size > 1) {
-        val dirs = resultResource.subList(0, resultResource.size - 1)
+        val dirs = resultResource.dropLast(1)
         val dirsString = dirs.joinToString(separator = "/")
-        if (allowedDirs.any {
-                it.matches(dirsString)
-            }) {
+        if (allowedDirs.any { it.matches(dirsString) }) {
             return resultResource.joinToString("/")
         }
-        resultResource = resultResource.subList(1, resultResource.size)
+        resultResource = resultResource.drop(1).toMutableList()
     }
 
-    return resultResource.firstOrNull() ?: defaultFile
+    return defaultFile
 }

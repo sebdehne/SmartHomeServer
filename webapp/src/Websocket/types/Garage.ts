@@ -1,34 +1,25 @@
-import { FirmwareUpgradeState } from "./EnvironmentSensors";
-
-export type GarageStatus = {
-    lightIsOn: boolean;
-    doorStatus: DoorStatus;
-    autoCloseAfter?: number;
+export type GarageLightStatus = {
+    ceilingLightIsOn: boolean;
+    ledStripeStatus: LEDStripeStatus;
     timestampDelta: number;
-    firmwareVersion: number;
     utcTimestampInMs: number;
 }
 
-export type DoorStatus = "doorClosed" | "doorOpen" | "doorClosing";
+export type LEDStripeStatus = 'off' | 'onLow' | 'onHigh';
 
-export type GarageRequest = {
-    type: GarageRequestType;
-    garageDoorChangeAutoCloseDeltaInSeconds?: number;
-    firmwareBased64Encoded?: string;
+export type GarageLightRequest = {
+    type: GarageLightRequestType;
 }
 
-export type GarageResponse = {
-    garageStatus?: GarageStatus;
-    garageCommandSendSuccess?: boolean;
-    garageCommandAdjustTimeSuccess?: boolean;
-    firmwareUploadSuccess?: boolean;
-    firmwareUpgradeState?: FirmwareUpgradeState;
+export type GarageLightResponse = {
+    status?: GarageLightStatus;
+    commandSendSuccess?: boolean;
 }
 
-export type GarageRequestType =
-    "openGarageDoor"
-    | "closeGarageDoor"
-    | "getGarageStatus"
-    | "garageDoorExtendAutoClose"
-    | "adjustTime"
-    | "firmwareUpgrade";
+export type GarageLightRequestType =
+    "switchOnCeilingLight"
+    | "switchOffCeilingLight"
+    | "switchLedStripeOff"
+    | "switchLedStripeOnLow"
+    | "switchLedStripeOnHigh"
+    | "getStatus";

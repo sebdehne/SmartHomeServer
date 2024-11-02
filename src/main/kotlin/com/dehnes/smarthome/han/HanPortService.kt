@@ -85,7 +85,7 @@ class HanPortService(
     private fun readLoop() {
         val buffer = ByteArray(1024 * 10)
         var writePos = 0
-        val hanDecoder = HanDecoder(configService)
+        val hanDecoder = HanDecoder()
         var lastGoodMessageAt = Instant.now()
 
         while (true) {

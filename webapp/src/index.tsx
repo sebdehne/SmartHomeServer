@@ -3,7 +3,6 @@ import './index.css';
 import App from './Components/App/App';
 import {CssBaseline, ThemeProvider} from "@mui/material";
 import {BrowserRouter, Route, Routes} from 'react-router-dom';
-import GarageDoor from "./Components/GarageDoor/GarageDoor";
 import HeaterController from "./Components/Heater/HeaterController";
 import {EvChargingStations} from "./Components/EvChargingStations/EvChargingStations";
 import Webcams from "./Components/Webcams/Webcams";
@@ -17,6 +16,7 @@ import {StairsHeater} from "./Components/StairsHeater/StairsHeater";
 import {EnergyStorageSystemV2} from "./Components/EnergyStorageSystemV2/EnergyStorageSystemV2";
 import {Firewall} from "./Components/Firewall/Firewall";
 import {theme} from "./theme";
+import {GarageLight} from "./Components/GarageDoor/GarageLight";
 
 
 const container = document.getElementById('root');
@@ -30,7 +30,7 @@ root.render(
             <BrowserRouter basename={import.meta.env.BASE_URL}>
                 <Routes>
                     <Route path="/" element={<App/>}/>
-                    <Route path="/garage" element={<GarageDoor/>}/>
+                    <Route path="/garage" element={<GarageLight/>}/>
                     <Route path="/heater" element={<HeaterController/>}/>
                     <Route path="/stairs" element={<StairsHeater/>}/>
                     <Route path="/evChargingStations" element={<EvChargingStations/>}/>
