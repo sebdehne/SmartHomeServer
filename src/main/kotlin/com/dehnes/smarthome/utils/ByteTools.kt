@@ -60,3 +60,13 @@ fun readLong32Bits(buf: ByteArray, offset: Int): Long {
 }
 
 fun Boolean.toInt() = if (this) 1 else 0
+
+fun Pair<Byte, Byte>.parse16UInt(): Int {
+    val byteBuffer = ByteBuffer.allocate(4)
+    byteBuffer.put(0)
+    byteBuffer.put(0)
+    byteBuffer.put(this.first)
+    byteBuffer.put(this.second)
+    byteBuffer.flip()
+    return byteBuffer.getInt(0)
+}

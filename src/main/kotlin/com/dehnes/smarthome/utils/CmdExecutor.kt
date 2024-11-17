@@ -43,7 +43,7 @@ object CmdExecutor {
             err = er.toString(StandardCharsets.UTF_8)
         }
 
-        check(exit == 0 && err == "") { "Exit code was $exit error=$err out=$out" }
+        check(exit == 0) { "Exit code was $exit error=$err out=$out" }
         return out
     }
 
