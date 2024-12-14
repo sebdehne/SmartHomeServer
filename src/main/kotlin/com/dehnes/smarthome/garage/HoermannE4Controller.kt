@@ -1,6 +1,7 @@
 package com.dehnes.smarthome.garage
 
 import com.dehnes.smarthome.config.ConfigService
+import com.dehnes.smarthome.config.GarageSettings
 import com.dehnes.smarthome.users.SystemUser
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
@@ -69,11 +70,14 @@ class HoermannE4Controller(
     override fun logger() = logger
 
     override fun tickLocked(): Boolean {
+        val garageSettings = configService.getGarageSettings()
+
         val toBeSentCopy = toBeSent ?: (HoermannE4Command.Nop to { r: Boolean -> })
         toBeSent = null
 
         val resp = tx(
             cmd = if (configService.isDevMode()) HoermannE4Command.Nop else toBeSentCopy.first,
+            garageSettings = garageSettings,
             timeout = Duration.ofMillis(1000)
         )
 
@@ -88,7 +92,7 @@ class HoermannE4Controller(
                     executorService.submit(withLogging {
                         garageController.switchOffCeilingLight(SystemUser)
                     })
-                }, 60, TimeUnit.SECONDS)
+                }, garageSettings.lightOffAfterCloseDelaySeconds, TimeUnit.SECONDS)
             }
 
             current = resp.second
@@ -103,7 +107,7 @@ class HoermannE4Controller(
         return true
     }
 
-    private fun tx(cmd: HoermannE4Command, timeout: Duration): Pair<Boolean, HoermannE4Broadcast>? {
+    private fun tx(cmd: HoermannE4Command, garageSettings: GarageSettings, timeout: Duration): Pair<Boolean, HoermannE4Broadcast>? {
         if (datagramSocket == null) {
             datagramSocket = DatagramSocket(9000)
             datagramSocket!!.soTimeout = timeout.toMillis().toInt()
@@ -111,7 +115,6 @@ class HoermannE4Controller(
 
         val sendBuf = byteArrayOf(0)
         sendBuf[0] = cmd.value.toByte()
-        val garageSettings = configService.getGarageSettings()
         val req = DatagramPacket(
             sendBuf,
             0,

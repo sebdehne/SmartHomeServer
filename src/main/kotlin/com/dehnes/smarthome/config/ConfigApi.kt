@@ -30,6 +30,7 @@ data class ConfigurationRoot(
 data class GarageSettings(
     val hoermannBridgeIp: String = "192.168.1.21",
     val hoermannBridgePort: Int = 9000,
+    val lightOffAfterCloseDelaySeconds: Long = 60 * 5,
 )
 
 data class VictronEssProcessSettings(
