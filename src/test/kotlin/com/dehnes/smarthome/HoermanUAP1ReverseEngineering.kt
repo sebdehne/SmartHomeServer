@@ -1,5 +1,7 @@
 package com.dehnes.smarthome
 
+import com.dehnes.smarthome.garage.HoermannE4Broadcast
+import com.dehnes.smarthome.garage.SupramatiDoorState
 import com.dehnes.smarthome.utils.CRC16
 import com.dehnes.smarthome.utils.parse16UInt
 import com.dehnes.smarthome.utils.toUnsignedInt
@@ -15,14 +17,83 @@ class HoermanUAP1ReverseEngineering {
 
     @Test
     fun single() {
-        //parseAndReport("10.txt")
-        //parseAndReport("09.txt")
-        //parseAndReport("08.txt")
-        //parseAndReport("07.txt")
-        //parseAndReport("06_txt")
-        //parseAndReport("05.txt")
-        parseAndReport("04_closed_open_opened_close_closed")
+        parseAndReport("02_light_on_light_off.txt")
+        //parseAndReport("12_arduino_first_try_goes_error.txt")
+    }
+
+    @Test
+    fun single2() {
         //parseAndReport("02_light_on_light_off.txt")
+        parseAndReport("12_arduino_first_try_goes_error.txt")
+    }
+
+    @OptIn(ExperimentalStdlibApi::class)
+    @Test
+    fun compare() {
+        val left = parseFile("01_bus_scan_and_wait_until_light_off.txt")
+        val right = parseFile("12_arduino_02_try_goes_error.txt")
+
+        var leftIndex = 0
+        var rightIndex = 0
+        var leftCnt = -1
+        var rightCnt = -1
+
+        while (true) {
+            val l = left[leftIndex]
+            val r = right[rightIndex]
+
+            check(l.addr == r.addr) {
+                println()
+            }
+
+            if (l.hexLine == "02179CB900029C4100020402041701B84D") {
+                // skip other req + resp on left side
+                leftIndex++
+                leftIndex++
+                rightIndex--
+                leftCnt++
+                continue
+            }
+
+            if (leftCnt == -1 && l.hexLine.startsWith("02179CB900089C41000204")) {
+                // TX
+                leftCnt = l.hexLine.drop(22).substring(0,2).hexToInt()
+                rightCnt = leftCnt
+            }
+
+            val matchViaPattern = listOf(
+                "**179CB900059C410003060002210E010*****", // bus-scan
+                "00109D31000912****00004060**0000000000001000010000****", // broadcast
+            ).any {
+                if (l.macthes(it)) {
+                    r.macthes(it).apply {
+                        if (!this) {
+                            println()
+                        }
+                    }
+                } else false
+            }
+
+            val isSame = l.hexLine == r.hexLine
+
+            val tx = l.hexLine.matches("02179CB900089C41000204${leftCnt.toHexString().drop(6)}030000\\w\\w\\w\\w".toRegex())
+                    && r.hexLine.matches("02179CB900089C41000204${rightCnt.toHexString().drop(6)}030000\\w\\w\\w\\w".toRegex())
+
+            if (tx) {
+                leftCnt++
+                rightCnt++
+            }
+
+            if (!isSame && !matchViaPattern) {
+                println()
+                // 02179CB900089C4100020403030000 02171003000301000000000000000000000000A49A
+                // 02179CB900089C4100020401030000 0217100100030100000000000000000000000025FB
+
+                error("")
+            }
+            leftIndex++
+            rightIndex++
+        }
     }
 
     @Test
@@ -30,14 +101,32 @@ class HoermanUAP1ReverseEngineering {
         File(basePath).listFiles()
             .filter { it.name.endsWith(".txt") }
             .map { it.name }.forEach { f ->
-            println("======================================================")
-            println("$f:")
-            parseAndReport(f)
-            println()
-            println()
-            println()
-        }
+                println("======================================================")
+                println("$f:")
+                parseAndReport(f)
+                println()
+                println()
+                println()
+            }
     }
+
+    fun parseFile(file: String) = File("$basePath/$file").readLines()
+        .map { it.trim() }
+        .filter { it.contains("Received:") || it.contains("Sending:") }
+        .map {
+            val strings = it.split(": ")
+            strings[0].trim().toLong() to strings[2].trim()
+        }.flatMap {
+            val parts = it.second.split("0217")
+            if (false && parts.size > 2) {
+                listOf(
+                    it.first to ("0217" + parts[1]),
+                    it.first to ("0217" + parts[2]),
+                )
+            } else {
+                listOf(it)
+            }
+        }.map { (t, line) -> parse(line, t) }
 
     fun parseAndReport(file: String) {
         val ignoredRequests = LinkedList<ModBusMsg>()
@@ -45,13 +134,13 @@ class HoermanUAP1ReverseEngineering {
 
         File("$basePath/$file").readLines()
             .map { it.trim() }
-            .filter { it.contains("Received:") }
+            .filter { it.contains("Received:") || it.contains("Sending:") }
             .map {
                 val strings = it.split(": ")
                 strings[0].trim().toLong() to strings[2].trim()
             }.flatMap {
                 val parts = it.second.split("0217")
-                if (parts.size > 2) {
+                if (false && parts.size > 2) {
                     listOf(
                         it.first to ("0217" + parts[1]),
                         it.first to ("0217" + parts[2]),
@@ -114,10 +203,10 @@ class HoermanUAP1ReverseEngineering {
         println("other: ${other.size}")
 
         analizeCommandTxes(commandRequests)
-        //analizeBroadcasts(broadcasts)
-        val broadscasts = LinkedList<Broadcast>()
+        analizeBroadcasts(broadcasts)
+        val broadscasts = LinkedList<HoermannE4Broadcast>()
         broadcasts.forEach {
-            val b = Broadcast.parse(it as WriteMultiple)
+            val b = parse(it as WriteMultiple)
             if (broadscasts.isEmpty() || broadscasts.last() != b) {
                 broadscasts.add(b)
             }
@@ -164,11 +253,12 @@ class HoermanUAP1ReverseEngineering {
             val cnt = req.writeWords[0]
             val cmd = req.writeWords[1]
 
-            check(resp.readWords[0] == cnt
-                    && resp.readWords[1] == 0
-                    && resp.readWords[2] == cmd
-                    && resp.readWords[3] == 0xfd
-                    && resp.byteCount == 4
+            check(
+                resp.readWords[0] == cnt
+                        && resp.readWords[1] == 0
+                        && resp.readWords[2] == cmd
+                        && resp.readWords[3] == 0xfd
+                        && resp.byteCount == 4
             )
 
         }
@@ -269,7 +359,6 @@ class HoermanUAP1ReverseEngineering {
         println()
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     private fun analizeCommandTxes(commandRequests: List<Pair<ModBusMsg, ModBusMsg>>) {
 
         val q = LinkedList<Pair<Int, Pair<ModBusMsg, ModBusMsg>>>()
@@ -309,6 +398,15 @@ class HoermanUAP1ReverseEngineering {
         }
 
         println()
+    }
+
+    @OptIn(ExperimentalStdlibApi::class)
+    @Test
+    fun blabla() {
+        val parse = parse("021710620003010000000000000000000000004D22", 1)
+        println(
+            CRC16.crc16("02171001000301000000000000000000000000".hexToByteArray()).toHexString()
+        )
     }
 
     @OptIn(ExperimentalStdlibApi::class)
@@ -384,6 +482,8 @@ sealed class ModBusMsg {
     abstract val addr: Int
     abstract val crc: Int
     abstract val timestamp: Long
+
+    fun macthes(pattern: String): Boolean = pattern.replace("*", "\\w").toRegex().matches(hexLine)
 }
 
 data class WriteMultiple(
@@ -428,38 +528,17 @@ data class ReadWriteMultipleResponse(
     fun payloadHex() = readWords.map { it.toByte().toHexString() }.joinToString("")
 }
 
-enum class SupramatiDoorState(val value: Int) {
-    STOPPED(0x00),
 
-    OPENING(0x01),
-    CLOSING(0x02),
-    HALV_OPENING(0x05),
-    VENTING(0x09),
 
-    OPEN(0x20),
-    CLOSED(0x40),
-    HALV_OPEN(0x80),
-}
 
-data class Broadcast(
-    val targetPos: Int,
-    val currentPos: Int,
-    val doorState: SupramatiDoorState,
-    val isVented: Boolean,
-    val motorSpeed: Int,
-    val light: Boolean,
-    val motorRunning: Boolean,
-) {
-    companion object {
-        fun parse(msg: WriteMultiple): Broadcast = Broadcast(
-            targetPos = msg.writeWords[2],
-            currentPos = msg.writeWords[3],
-            doorState = SupramatiDoorState.entries.single { it.value == msg.writeWords[4] },
-            isVented = msg.writeWords[5] == 61,
-            motorSpeed = msg.writeWords[10],
-            light = msg.writeWords[13] and 0x10 > 0,
-            motorRunning = msg.writeWords[13] and 0x04 > 0,
-        )
-    }
-
-}
+fun parse(msg: WriteMultiple): HoermannE4Broadcast = HoermannE4Broadcast(
+    //count = msg.writeWords[0],
+    targetPos = msg.writeWords[2],
+    currentPos = msg.writeWords[3],
+    doorState = SupramatiDoorState.entries.single { it.value == msg.writeWords[4] },
+    isVented = msg.writeWords[5] == 61,
+    motorSpeed = msg.writeWords[10],
+    light = msg.writeWords[13] and 0x10 > 0,
+    motorRunning = msg.writeWords[13] and 0x04 > 0,
+    0L
+)

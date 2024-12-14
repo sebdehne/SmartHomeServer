@@ -11,7 +11,7 @@ import {
     TableRow
 } from "@mui/material";
 import WebsocketService, { useUserSettings } from "../../Websocket/websocketClient";
-import { timeToDelta } from "../GarageDoor/GarageLight";
+import { timeToDelta } from "../GarageDoor/GarageController";
 import Header from "../Header";
 import './HeaterController.css';
 import { UnderFloorHeaterRequest, UnderFloorHeaterResponse } from "../../Websocket/types/UnderFloorHeater";

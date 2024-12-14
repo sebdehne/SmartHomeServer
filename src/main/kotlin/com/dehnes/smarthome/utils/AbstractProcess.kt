@@ -1,18 +1,17 @@
 package com.dehnes.smarthome.utils
 
 import io.github.oshai.kotlinlogging.KLogger
-import org.slf4j.Logger
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
 abstract class AbstractProcess(
-    private val executorService: ExecutorService,
+    val executorService: ExecutorService,
     private val intervalInSeconds: Long
 ) {
 
-    private val timer = Executors.newSingleThreadScheduledExecutor()
+    protected val timer = Executors.newSingleThreadScheduledExecutor()
     private val runLock = ReentrantLock()
 
     open fun start() {
@@ -26,6 +25,9 @@ abstract class AbstractProcess(
     fun tick(): Boolean = if (runLock.tryLock()) {
         try {
             tickLocked()
+        } catch (t: Throwable) {
+            errorLogger.error(t) { "" }
+            false
         } finally {
             runLock.unlock()
         }

@@ -4,7 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 
 val errorLogger = KotlinLogging.logger("com.dehnes.smarthome.utils.ErrorLogger")
 
-fun withLogging(fn: () -> Unit) = Runnable {
+fun <T> withLogging(fn: () -> T) = Runnable {
     try {
         fn()
     } catch (t: Throwable) {

@@ -3,7 +3,7 @@ import React, {useCallback, useEffect, useState} from "react";
 import {Button, Container, Paper, Table, TableBody, TableCell, TableContainer, TableRow} from "@mui/material";
 import WebsocketClient from "../../Websocket/websocketClient";
 import {StairsHeatingResponse, StairsHeatingType} from "../../Websocket/types/stairsHeating";
-import {timeToDelta} from "../GarageDoor/GarageLight";
+import {timeToDelta} from "../GarageDoor/GarageController";
 import dayjs from "dayjs";
 
 export const StairsHeater = () => {

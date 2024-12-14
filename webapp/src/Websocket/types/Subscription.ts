@@ -5,9 +5,11 @@ import { QuickStatsResponse } from "./QuickStats";
 import { ESSState } from "./EnergyStorageSystem";
 import {FirewallState, DnsBlockingState} from "./Firewall";
 import {GarageLightStatus} from "./Garage";
+import {HoermannE4Broadcast} from "./garage.domain";
 
 export type SubscriptionType =
     "getGarageLightStatus"
+    | "getGarageDoorStatus"
     | "getUnderFloorHeaterStatus"
     | "evChargingStationEvents"
     | "environmentSensorEvents"
@@ -33,5 +35,6 @@ export type Notify = {
     quickStatsResponse?: QuickStatsResponse;
     essState?: ESSState;
     firewallState?: FirewallState;
+    hoermannE4Broadcast?: HoermannE4Broadcast;
 }
 

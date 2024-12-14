@@ -76,6 +76,7 @@ class ConfigService(
     fun getEnergyPriceServiceSettings() = readConfig().energyPriceServiceSettings
     fun getKnownNetworkDevices() = readConfig().knownNetworkDevices
     fun getHeaterSettings() = readConfig().heatingControllerSettings
+    fun getGarageSettings() = readConfig().garageSettings
     fun setHeaterSettings(settings: HeatingControllerSettings) {
         update { c ->
             c.copy(

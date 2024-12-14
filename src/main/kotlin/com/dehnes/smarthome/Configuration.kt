@@ -14,7 +14,8 @@ import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.firewall_router.BlockedMacs
 import com.dehnes.smarthome.firewall_router.FirewallService
-import com.dehnes.smarthome.garage_door.GarageController
+import com.dehnes.smarthome.garage.GarageController
+import com.dehnes.smarthome.garage.HoermannE4Controller
 import com.dehnes.smarthome.han.HanPortService
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.lora.LoRaConnection
@@ -71,32 +72,32 @@ class Configuration {
         energyPriceService.start()
 
         val hanPortService = HanPortService(
-            "192.168.1.1",
+            host = "192.168.1.1",
             23000,
-            executorService,
-            influxDBClient,
-            energyPriceService,
-            configService
+            executorService = executorService,
+            influxDBClient = influxDBClient,
+            energyPriceService = energyPriceService,
+            configService = configService
         )
         hanPortService.start()
 
         val evChargingStationConnection = EvChargingStationConnection(
-            9091,
-            executorService,
-            configService,
-            influxDBClient,
-            clock
+            port = 9091,
+            executorService = executorService,
+            configService = configService,
+            influxDBClient = influxDBClient,
+            clock = clock
         )
         evChargingStationConnection.start()
 
         val mqttBroker = "192.168.1.18"
         val victronService = VictronService(
-            mqttBroker,
-            objectMapper,
-            executorService,
-            configService,
-            influxDBClient,
-            energyConsumptionService
+            victronHost = mqttBroker,
+            objectMapper = objectMapper,
+            executorService = executorService,
+            configService = configService,
+            influxDBClient = influxDBClient,
+            energyConsumptionService = energyConsumptionService
         )
 
         val evChargingService = EvChargingService(
@@ -190,7 +191,15 @@ class Configuration {
 
         val firewallService = FirewallService()
 
+        val hoermannE4Controller = HoermannE4Controller(
+            configService,
+            userSettingsService,
+            garageDoorService,
+            executorService,
+        ).apply { this.start() }
 
+
+        beans[HoermannE4Controller::class] = hoermannE4Controller
         beans[UnderFloorHeaterService::class] = heaterService
         beans[GarageController::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper

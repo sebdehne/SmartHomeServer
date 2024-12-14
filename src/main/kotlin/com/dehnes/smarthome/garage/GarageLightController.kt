@@ -1,4 +1,4 @@
-package com.dehnes.smarthome.garage_door
+package com.dehnes.smarthome.garage
 
 import com.dehnes.smarthome.api.dtos.GarageLightStatus
 import com.dehnes.smarthome.api.dtos.LEDStripeStatus

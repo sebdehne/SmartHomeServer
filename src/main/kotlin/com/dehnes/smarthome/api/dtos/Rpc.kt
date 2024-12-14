@@ -3,6 +3,7 @@ package com.dehnes.smarthome.api.dtos
 import com.dehnes.smarthome.config.UserSettings
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionData
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionQuery
+import com.dehnes.smarthome.garage.HoermannE4Command
 import com.dehnes.smarthome.victron.ESSState
 import com.dehnes.smarthome.victron.ESSWrite
 import com.dehnes.smarthome.victron.WriteBms
@@ -37,6 +38,8 @@ enum class RequestType {
     dnsBlockingSet,
     dnsBlockingUpdateStandardLists,
     blockedMacsSet,
+
+    sendHoermannE4Command,
 }
 
 data class RpcRequest(
@@ -57,6 +60,7 @@ data class RpcRequest(
     val stairsHeatingRequest: StairsHeatingRequest? = null,
     val dnsBlockingLists: List<String>? = null,
     val blockedMacs: List<String>? = null,
+    val hoermannE4Command: HoermannE4Command? = null,
 )
 
 data class RpcResponse(
@@ -76,4 +80,5 @@ data class RpcResponse(
     val energyConsumptionData: EnergyConsumptionData? = null,
     val allUserSettings: Map<String, UserSettings>? = null,
     val stairsHeatingResponse: StairsHeatingResponse? = null,
+    val hoermannE4CommandResult: Boolean? = null,
 )

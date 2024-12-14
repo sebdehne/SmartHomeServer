@@ -1,7 +1,5 @@
 package com.dehnes.smarthome.utils
 
-import com.dehnes.smarthome.han.HanPortConnectionDev
-import com.dehnes.smarthome.han.HanPortConnectionDev.Companion
 import java.io.File
 import java.nio.file.Files
 import kotlin.io.path.name

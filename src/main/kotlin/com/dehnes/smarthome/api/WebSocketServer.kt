@@ -10,8 +10,13 @@ import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
-import com.dehnes.smarthome.firewall_router.*
-import com.dehnes.smarthome.garage_door.GarageController
+import com.dehnes.smarthome.firewall_router.BlockedMacs
+import com.dehnes.smarthome.firewall_router.DnsBlockingService
+import com.dehnes.smarthome.firewall_router.FirewallService
+import com.dehnes.smarthome.firewall_router.FirewallState
+import com.dehnes.smarthome.garage.GarageController
+import com.dehnes.smarthome.garage.HoermannE4Broadcast
+import com.dehnes.smarthome.garage.HoermannE4Controller
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.withLogging
@@ -28,6 +33,8 @@ import jakarta.websocket.EndpointConfig
 import jakarta.websocket.Session
 import java.io.Closeable
 import java.util.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 // one instance per sessions
 class WebSocketServer : Endpoint() {
@@ -38,7 +45,7 @@ class WebSocketServer : Endpoint() {
     private val logger = KotlinLogging.logger { }
     private val garageDoorService = configuration.getBean<GarageController>()
     private val underFloopHeaterService = configuration.getBean<UnderFloorHeaterService>()
-    private val subscriptions = mutableMapOf<String, Subscription<*>>()
+    private val subscriptions = mutableMapOf<String, Closeable>()
     private val evChargingService = configuration.getBean<EvChargingService>()
     private val firmwareUploadService = configuration.getBean<FirmwareUploadService>()
     private val loRaSensorBoardService = configuration.getBean<EnvironmentSensorService>()
@@ -53,6 +60,7 @@ class WebSocketServer : Endpoint() {
     private val firewallService = configuration.getBean<FirewallService>()
     private val dnsBlockingService = configuration.getBean<DnsBlockingService>()
     private val blockedMacs = configuration.getBean<BlockedMacs>()
+    private val hoermannE4Controller = configuration.getBean<HoermannE4Controller>()
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info { "$instanceId Socket connected: $sess" }
@@ -88,6 +96,22 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            sendHoermannE4Command -> errorCatching {
+
+                val cnt = CountDownLatch(1)
+                var sendResult = false
+                hoermannE4Controller.send(
+                    rpcRequest.hoermannE4Command!!
+                ) {
+                    sendResult = it
+                    cnt.countDown()
+                }
+
+                check(cnt.await(1, TimeUnit.SECONDS))
+
+                RpcResponse(hoermannE4CommandResult = sendResult)
+            }
+
             blockedMacsSet -> errorCatching {
                 blockedMacs.set(userEmail, rpcRequest.blockedMacs!!)
                 RpcResponse()
@@ -139,6 +163,32 @@ class WebSocketServer : Endpoint() {
                 val existing = subscriptions[subscriptionId]
                 if (existing == null) {
                     val sub = when (subscribe.type) {
+
+                        SubscriptionType.getGarageDoorStatus -> {
+                            val onEvent = {e: HoermannE4Broadcast ->
+                                argSession.basicRemote.sendText(
+                                    objectMapper.writeValueAsString(
+                                        WebsocketMessage(
+                                            UUID.randomUUID().toString(),
+                                            WebsocketMessageType.notify,
+                                            notify = Notify(
+                                                subscriptionId,
+                                                hoermannE4Broadcast = e
+                                            )
+                                        )
+                                    )
+                                )
+                            }
+
+                            hoermannE4Controller.addListener(userEmail, subscriptionId) { onEvent(it) }
+                            onEvent(hoermannE4Controller.getCurrent())
+                            object : Closeable {
+                                override fun close() {
+                                    hoermannE4Controller.removeListener(subscriptionId)
+                                }
+                            }
+                        }
+
                         SubscriptionType.firewall -> {
 
                             val state = firewallService.currentState

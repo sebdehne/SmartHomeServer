@@ -32,7 +32,7 @@ const userCanAdmin = (r: UserRole) => {
     return l === "readWriteAdmin";
 }
 
-function subscribe(type: SubscriptionType, onNotify: (notify: Notify) => void, onOpened: () => void) {
+function subscribe(type: SubscriptionType, onNotify: (notify: Notify) => void, onOpened: () => void = () => {}) {
     const subscriptionId = uuidv4();
 
     SubscriptionsById.set(subscriptionId, new Subscription(type, onNotify, onOpened));

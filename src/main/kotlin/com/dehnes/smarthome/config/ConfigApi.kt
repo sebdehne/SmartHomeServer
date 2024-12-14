@@ -24,6 +24,12 @@ data class ConfigurationRoot(
     val victronService: VictronService = VictronService(),
     val victronEssProcess: VictronEssProcessSettings = VictronEssProcessSettings(),
     val knownNetworkDevices: Map<String, String> = emptyMap(),
+    val garageSettings: GarageSettings = GarageSettings()
+)
+
+data class GarageSettings(
+    val hoermannBridgeIp: String = "192.168.1.21",
+    val hoermannBridgePort: Int = 9000,
 )
 
 data class VictronEssProcessSettings(

@@ -15,6 +15,7 @@ import {ESSState, ESSWrite} from "./EnergyStorageSystem";
 import {UserSettings, WriteUserSettings} from "./UserSettings";
 import {WriteBms} from "./Bms";
 import {StairsHeatingRequest, StairsHeatingResponse} from "./stairsHeating";
+import {HoermannE4Command} from "./garage.domain";
 
 export type RequestType =
     "subscribe"
@@ -38,6 +39,7 @@ export type RequestType =
     | "dnsBlockingSet"
     | "dnsBlockingUpdateStandardLists"
     | "blockedMacsSet"
+    | "sendHoermannE4Command"
     ;
 
 export type RpcRequest = {
@@ -58,6 +60,7 @@ export type RpcRequest = {
     stairsHeatingRequest?: StairsHeatingRequest;
     dnsBlockingLists?: string[];
     blockedMacs?: string[];
+    hoermannE4Command?: HoermannE4Command;
 }
 
 export type RpcResponse = {
@@ -76,4 +79,5 @@ export type RpcResponse = {
     energyConsumptionData?: EnergyConsumptionData;
     allUserSettings?: { [userId: string]: UserSettings },
     stairsHeatingResponse?: StairsHeatingResponse;
+    hoermannE4CommandResult?: boolean;
 }

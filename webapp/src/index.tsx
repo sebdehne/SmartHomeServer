@@ -16,7 +16,7 @@ import {StairsHeater} from "./Components/StairsHeater/StairsHeater";
 import {EnergyStorageSystemV2} from "./Components/EnergyStorageSystemV2/EnergyStorageSystemV2";
 import {Firewall} from "./Components/Firewall/Firewall";
 import {theme} from "./theme";
-import {GarageLight} from "./Components/GarageDoor/GarageLight";
+import {GarageController} from "./Components/GarageDoor/GarageController";
 
 
 const container = document.getElementById('root');
@@ -30,7 +30,7 @@ root.render(
             <BrowserRouter basename={import.meta.env.BASE_URL}>
                 <Routes>
                     <Route path="/" element={<App/>}/>
-                    <Route path="/garage" element={<GarageLight/>}/>
+                    <Route path="/garage" element={<GarageController/>}/>
                     <Route path="/heater" element={<HeaterController/>}/>
                     <Route path="/stairs" element={<StairsHeater/>}/>
                     <Route path="/evChargingStations" element={<EvChargingStations/>}/>

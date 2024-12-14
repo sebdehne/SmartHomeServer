@@ -20,7 +20,7 @@ import {
     TableRow
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { timeToDelta } from "../GarageDoor/GarageLight";
+import { timeToDelta } from "../GarageDoor/GarageController";
 import { useUserSettings } from "../../Websocket/websocketClient";
 
 const stateToText = (currentMilliSeconds: number, sensor: EnvironmentSensorState) => {

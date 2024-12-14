@@ -31,7 +31,7 @@ import kotlin.math.min
 
 class UnderFloorHeaterService(
     private val loRaConnection: LoRaConnection,
-    private val executorService: ExecutorService,
+    executorService: ExecutorService,
     private val configService: ConfigService,
     private val influxDBClient: InfluxDBClient,
     private val energyPriceService: EnergyPriceService,
@@ -90,7 +90,7 @@ class UnderFloorHeaterService(
     private var lastStatus = run {
         val settings = getSettings()
         UnderFloorHeaterStatus(
-            UnderFloorHeaterMode.values().first { it.mode == settings.operatingMode },
+            UnderFloorHeaterMode.entries.first { it.mode == settings.operatingMode },
             OnOff.off,
             settings.targetTemp,
             null,
@@ -209,7 +209,7 @@ class UnderFloorHeaterService(
         ct.await(2, TimeUnit.SECONDS)
 
         sent
-    } ?: false
+    } == true
 
     fun adjustTime(user: String?) = asLocked {
         check(
@@ -229,7 +229,7 @@ class UnderFloorHeaterService(
         }
         ct.await(2, TimeUnit.SECONDS)
         receiveQueue.poll(2, TimeUnit.SECONDS)?.type == LoRaPacketType.ADJUST_TIME_RESPONSE
-    } ?: false
+    } == true
 
     fun getCurrentState(user: String?) = asLocked {
         check(
@@ -341,7 +341,7 @@ class UnderFloorHeaterService(
     private fun handleNewData(packet: LoRaInboundPacketDecrypted): Boolean {
         val settings = getSettings()
         val currentMode = settings.operatingMode
-        logger.info("Current mode: $currentMode")
+        logger.info { "Current mode: $currentMode" }
 
         recordLocalValues(currentMode)
         val sensorData = parseAndRecord(packet, clock.millis())
@@ -361,11 +361,11 @@ class UnderFloorHeaterService(
 
             Mode.MANUAL -> {
                 if (sensorData.temperatureError > 0) {
-                    logger.info("Forcing heater off due to temperature error=${sensorData.temperatureError}")
+                    logger.info { "Forcing heater off due to temperature error=${sensorData.temperatureError}" }
                     setHeaterTarget(OnOff.off)
                 } else {
                     val targetTemperature = settings.targetTemp
-                    logger.info("Evaluating target temperature now: $targetTemperature")
+                    logger.info { "Evaluating target temperature now: $targetTemperature" }
 
                     val suitablePrices =
                         energyPriceService.findSuitablePrices(
@@ -379,7 +379,7 @@ class UnderFloorHeaterService(
                         waitUntilCheapHour = Instant.MAX
                     }
                     if (priceDecision?.current == PriceCategory.cheap && sensorData.temperature < targetTemperature * 100) {
-                        logger.info("Setting heater to on. priceDecision=$priceDecision")
+                        logger.info { "Setting heater to on. priceDecision=$priceDecision" }
                         setHeaterTarget(OnOff.on)
                     } else {
                         waitUntilCheapHour = priceDecision?.changesAt
@@ -422,7 +422,7 @@ class UnderFloorHeaterService(
         )
 
         lastStatus = UnderFloorHeaterStatus(
-            mode = UnderFloorHeaterMode.values().first { it.mode == currentMode },
+            mode = UnderFloorHeaterMode.entries.first { it.mode == currentMode },
             status = if (heaterStatus) OnOff.on else OnOff.off,
             targetTemperature = settings.targetTemp,
             waitUntilCheapHour = waitUntilCheapHour?.toEpochMilli(),

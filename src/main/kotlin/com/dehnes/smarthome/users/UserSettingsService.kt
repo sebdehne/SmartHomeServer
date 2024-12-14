@@ -57,7 +57,7 @@ class UserSettingsService(private val configService: ConfigService) {
     }
 
     private fun getUserAccessLevel(user: String?, userRole: UserRole) = if (user == SystemUser) {
-        Level.read
+        Level.readWrite
     } else {
         getUserSettings(user).authorization[userRole] ?: userRole.defaultLevel
     }
