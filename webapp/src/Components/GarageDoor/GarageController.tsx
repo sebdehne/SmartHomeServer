@@ -133,8 +133,7 @@ export const GarageController = () => {
                     >Close</Button>
                 </ButtonGroup>
                 <ul>
-                    <li>Position: {garageDoorStatus.currentPos} / {garageDoorStatus.targetPos}</li>
-                    <li>State: {garageDoorStatus.doorState}</li>
+                    <li>State: {garageDoorStatus.doorState} ({garageDoorStatus.currentPos} / {garageDoorStatus.targetPos})</li>
                     <li>Vented: {garageDoorStatus.isVented ? "Yes" : "No"}</li>
                     <li>MotorSpeed: {garageDoorStatus.motorSpeed}</li>
                     <li>Light: {garageDoorStatus.light ? "On" : "Off"}</li>
@@ -176,8 +175,6 @@ export const GarageController = () => {
 };
 
 export function timeToDelta(left: number, right: number): string {
-    console.log("left", left);
-    console.log("right", right);
     const deltaInSeconds = (left - right) / 1000;
     if (deltaInSeconds < 60) {
         return `${Math.round(deltaInSeconds)} seconds`;
