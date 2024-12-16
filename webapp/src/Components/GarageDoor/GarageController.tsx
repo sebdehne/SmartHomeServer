@@ -87,7 +87,7 @@ export const GarageController = () => {
         <Container maxWidth="sm" className="App">
             <Header
                 sending={sending}
-                title="Garage door controller"
+                title="Garage"
             />
 
             {!garageDoorStatus && <div>No light-status right now</div>}

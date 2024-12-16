@@ -61,6 +61,7 @@ data class RpcRequest(
     val dnsBlockingLists: List<String>? = null,
     val blockedMacs: List<String>? = null,
     val hoermannE4Command: HoermannE4Command? = null,
+    val garageVentilationCommandMilliVolts: Int? = null,
 )
 
 data class RpcResponse(

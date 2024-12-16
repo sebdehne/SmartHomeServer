@@ -14,9 +14,7 @@ import com.dehnes.smarthome.firewall_router.BlockedMacs
 import com.dehnes.smarthome.firewall_router.DnsBlockingService
 import com.dehnes.smarthome.firewall_router.FirewallService
 import com.dehnes.smarthome.firewall_router.FirewallState
-import com.dehnes.smarthome.garage.GarageController
-import com.dehnes.smarthome.garage.HoermannE4Broadcast
-import com.dehnes.smarthome.garage.HoermannE4Controller
+import com.dehnes.smarthome.garage.*
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.withLogging
@@ -61,6 +59,7 @@ class WebSocketServer : Endpoint() {
     private val dnsBlockingService = configuration.getBean<DnsBlockingService>()
     private val blockedMacs = configuration.getBean<BlockedMacs>()
     private val hoermannE4Controller = configuration.getBean<HoermannE4Controller>()
+    private val garageVentilationController = configuration.getBean<GarageVentilationController>()
 
     override fun onOpen(sess: Session, p1: EndpointConfig?) {
         logger.info { "$instanceId Socket connected: $sess" }
@@ -163,6 +162,31 @@ class WebSocketServer : Endpoint() {
                 val existing = subscriptions[subscriptionId]
                 if (existing == null) {
                     val sub = when (subscribe.type) {
+
+                        SubscriptionType.getGarageVentilationStatus -> {
+                            val onEvent = { e: GarageVentilationState ->
+                                argSession.basicRemote.sendText(
+                                    objectMapper.writeValueAsString(
+                                        WebsocketMessage(
+                                            UUID.randomUUID().toString(),
+                                            WebsocketMessageType.notify,
+                                            notify = Notify(
+                                                subscriptionId,
+                                                garageVentilationState = e
+                                            )
+                                        )
+                                    )
+                                )
+                            }
+
+                            garageVentilationController.addListener(userEmail, subscriptionId) { onEvent(it) }
+                            onEvent(garageVentilationController.getCurrent())
+                            object : Closeable {
+                                override fun close() {
+                                    garageVentilationController.removeListener(subscriptionId)
+                                }
+                            }
+                        }
 
                         SubscriptionType.getGarageDoorStatus -> {
                             val onEvent = {e: HoermannE4Broadcast ->
