@@ -7,13 +7,16 @@ import {RpcResponse} from "../../Websocket/types/Rpc";
 import {Notify} from "../../Websocket/types/Subscription";
 import {HoermannE4Broadcast, HoermannE4Command, SupramatiDoorState} from "../../Websocket/types/garage.domain";
 import dayjs from "dayjs";
+import {mdiLightbulb, mdiLightbulbOn} from "@mdi/js";
+import Icon from "@mdi/react";
+import {theme} from "../../theme";
 
 export const GarageController = () => {
     const [garageLightState, setgarageLightState] = useState<GarageLightStatus>();
     const [garageDoorStatus, setGarageDoorStatus] = useState<HoermannE4Broadcast>();
     const [sending, setSending] = useState<boolean>(false);
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
-    const [currentSeconds, setCurrentSeconds] = useState(Date.now());
+    const [currentSeconds, setCurrentSeconds] = useState<number>(Date.now().valueOf());
     const userSettings = useUserSettings();
 
     useEffect(() => {
@@ -76,6 +79,10 @@ export const GarageController = () => {
         }).finally(() => setSending(false));
     }
 
+    const lightIsOn = garageLightState?.ceilingLightIsOn ?? false;
+
+    const garageDoorStatusTimeDelta = Math.round((garageDoorStatus ? (currentSeconds - dayjs(garageDoorStatus.receivedAt).valueOf()) : 0) / 1000);
+
     return (
         <Container maxWidth="sm" className="App">
             <Header
@@ -83,63 +90,50 @@ export const GarageController = () => {
                 title="Garage door controller"
             />
 
-            <h3>Light:</h3>
-            {!garageLightState && <div>No light-status right now</div>}
-            {garageLightState &&
-                <div>
-                    <ul>
-                        <li>Ceiling light: <RadioGroup
-                            aria-labelledby="demo-radio-buttons-group-label"
-                            value={garageLightState.ceilingLightIsOn ? 'switchOnCeilingLight' : 'switchOffCeilingLight'}
-                            name="radio-buttons-group"
-                            onChange={(event, value) => sendLightCommand(value as GarageLightRequestType)}
-                        >
-                            <FormControlLabel value="switchOffCeilingLight" control={<Radio/>} label="Off"/>
-                            <FormControlLabel value="switchOnCeilingLight" control={<Radio/>} label="On"/>
-                        </RadioGroup></li>
-                        <li>Led stripe: <RadioGroup
-                            aria-labelledby="demo-radio-buttons-group-label"
-                            value={garageLightState.ledStripeStatus}
-                            name="radio-buttons-group"
-                            onChange={(event, value) => {
-                                sendLightCommand(value === 'off' ? 'switchLedStripeOff' : value === 'onLow' ? 'switchLedStripeOnLow' : 'switchLedStripeOnHigh');
-                            }}
-                        >
-                            <FormControlLabel value="off" control={<Radio/>} label="Off"/>
-                            <FormControlLabel value="onLow" control={<Radio/>} label="On Low"/>
-                            <FormControlLabel value="onHigh" control={<Radio/>} label="On High"/>
-                        </RadioGroup></li>
-                        <li>Clock slew: {garageLightState.timestampDelta} seconds</li>
-                    </ul>
-                    <p>Updated: {timeToDelta(currentSeconds, garageLightState.utcTimestampInMs)} ago</p>
-                </div>
-            }
-
-            <h3>Door:</h3>
             {!garageDoorStatus && <div>No light-status right now</div>}
-            {garageDoorStatus && <div>
-                <ButtonGroup variant="contained" style={{
-                    margin: "10px"
-                }}>
-                    <Button
-                        disabled={!userSettings.userCanWrite("garageDoor")}
-                        color={garageDoorStatus.doorState === SupramatiDoorState.CLOSED ? 'secondary' : 'primary'}
-                        onClick={() => sendDoorCommand(HoermannE4Command.Open)}
-                    >Open</Button>
-                    <Button
-                        disabled={!userSettings.userCanWrite("garageDoor")}
-                        color={garageDoorStatus.doorState === SupramatiDoorState.OPEN ? 'secondary' : 'primary'}
-                        onClick={() => sendDoorCommand(HoermannE4Command.Close)}
-                    >Close</Button>
-                </ButtonGroup>
-                <ul>
-                    <li>State: {garageDoorStatus.doorState} ({garageDoorStatus.currentPos} / {garageDoorStatus.targetPos})</li>
-                    <li>Vented: {garageDoorStatus.isVented ? "Yes" : "No"}</li>
-                    <li>MotorSpeed: {garageDoorStatus.motorSpeed}</li>
-                    <li>Light: {garageDoorStatus.light ? "On" : "Off"}</li>
-                    <li>MotorRunning: {garageDoorStatus.motorRunning ? "Yes" : "No"}</li>
-                    <li>Updated: {timeToDelta(currentSeconds, dayjs(garageDoorStatus.receivedAt).valueOf())} ago</li>
-                </ul>
+            {garageDoorStatus && <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
+                <div style={{display: "flex"}}>
+                    <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
+                        <div style={{padding: '20px'}}>
+                            <DoorDrawing currentPos={garageDoorStatus.currentPos} width={100} height={100}/>
+                        </div>
+                        <ButtonGroup variant="contained" style={{
+                            margin: "10px"
+                        }}>
+                            <Button
+                                disabled={!userSettings.userCanWrite("garageDoor")}
+                                color={garageDoorStatus.doorState === SupramatiDoorState.CLOSED ? 'secondary' : 'primary'}
+                                onClick={() => sendDoorCommand(HoermannE4Command.Open)}
+                            >Open</Button>
+                            <Button
+                                disabled={!userSettings.userCanWrite("garageDoor")}
+                                color={garageDoorStatus.doorState === SupramatiDoorState.OPEN ? 'secondary' : 'primary'}
+                                onClick={() => sendDoorCommand(HoermannE4Command.Close)}
+                            >Close</Button>
+                        </ButtonGroup>
+                        {Math.abs(garageDoorStatusTimeDelta) > 5 && <span>Last update {timeToDeltaSeconds(garageDoorStatusTimeDelta)} ago</span>}
+                    </div>
+                    <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
+                        <div style={{
+                            minHeight: '100px',
+                            padding: '34px'
+                        }}>
+                            {lightIsOn && <Icon path={mdiLightbulbOn} size={3} style={{color: 'yellow'}}/>}
+                            {!lightIsOn && <Icon path={mdiLightbulb} size={3} style={{color: 'gray'}}/>}
+                        </div>
+                        <ButtonGroup variant="contained" style={{
+                            margin: "10px"
+                        }}>
+                            <Button
+                                disabled={!userSettings.userCanWrite("garageDoor")}
+                                onClick={() => sendLightCommand(lightIsOn ? "switchOffCeilingLight" : "switchOnCeilingLight")}
+                            >Switch {lightIsOn ? 'off' : 'on'}</Button>
+                        </ButtonGroup>
+
+                    </div>
+
+                </div>
+
 
                 <ButtonGroup variant="outlined" style={{
                     margin: "10px"
@@ -167,6 +161,31 @@ export const GarageController = () => {
                 </ButtonGroup>
             </div>}
 
+
+            <h3>Light:</h3>
+            {!garageLightState && <div>No light-status right now</div>}
+            {garageLightState &&
+                <div>
+                    <ul>
+                        <li>Led stripe: <RadioGroup
+                            aria-labelledby="demo-radio-buttons-group-label"
+                            value={garageLightState.ledStripeStatus}
+                            name="radio-buttons-group"
+                            onChange={(event, value) => {
+                                sendLightCommand(value === 'off' ? 'switchLedStripeOff' : value === 'onLow' ? 'switchLedStripeOnLow' : 'switchLedStripeOnHigh');
+                            }}
+                        >
+                            <FormControlLabel value="off" control={<Radio/>} label="Off"/>
+                            <FormControlLabel value="onLow" control={<Radio/>} label="On Low"/>
+                            <FormControlLabel value="onHigh" control={<Radio/>} label="On High"/>
+                        </RadioGroup></li>
+                        <li>Clock slew: {garageLightState.timestampDelta} seconds</li>
+                    </ul>
+                    <p>Updated: {timeToDelta(currentSeconds, garageLightState.utcTimestampInMs)} ago</p>
+                </div>
+            }
+
+
             {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}
             {cmdResult != null && !cmdResult && <p>Failed &#128078;!</p>}
 
@@ -185,3 +204,43 @@ export function timeToDelta(left: number, right: number): string {
     }
 }
 
+export function timeToDeltaSeconds(deltaInSeconds: number): string {
+    if (deltaInSeconds < 60) {
+        return `${Math.round(deltaInSeconds)} seconds`;
+    } else {
+        const min = deltaInSeconds / 60;
+        const seconds = deltaInSeconds % 60;
+        return `${Math.floor(min)} minutes, ${Math.floor(seconds)} seconds`;
+    }
+}
+
+const DoorDrawing = ({
+                         currentPos,
+                         width,
+                         height,
+                     }: {
+    currentPos: number;
+    width: number;
+    height: number;
+}) => {
+    const closed = currentPos / 200;
+
+    const wallThinkness = width * 0.1;
+    const roofHeight = height * 0.2;
+    const doorHeight = height * 0.3;
+    const spacingV = height * 0.05;
+    const spacingH = width * 0.05;
+    const doorDownY = height - ((height - doorHeight- spacingH) * closed)
+
+    return <svg width={width} height={height} xmlns="http://www.w3.org/2000/svg">
+        <polygon points={`0,${height} 0,${roofHeight} ${width * 0.5},0 ${width},${roofHeight} ${width},${height} 
+        ${width - wallThinkness},${height} ${width - wallThinkness},${doorHeight} ${wallThinkness},${doorHeight} ${wallThinkness},${height}`}
+                 style={{fill: theme.palette.primary.main}}/>
+        <polygon points={`${wallThinkness + spacingH},${doorDownY} ${wallThinkness + spacingH},${doorHeight + spacingV} 
+        ${width - wallThinkness - spacingH},${doorHeight + spacingV} ${width - wallThinkness - spacingH},${doorDownY}`}
+                 style={{fill: 'white'}}/>
+        <text textAnchor="middle" x={width * 0.5} y={height * 0.24} fill="white">{
+            closed === 0 ? 'closed' : closed === 1 ? 'open' : (Math.round(closed * 100) + '%')
+        }</text>
+    </svg>
+};
