@@ -41,7 +41,7 @@ class WebSocketServer : Endpoint() {
 
     private val objectMapper = configuration.getBean<ObjectMapper>()
     private val logger = KotlinLogging.logger { }
-    private val garageDoorService = configuration.getBean<GarageController>()
+    private val garageLightController = configuration.getBean<GarageLightController>()
     private val underFloopHeaterService = configuration.getBean<UnderFloorHeaterService>()
     private val subscriptions = mutableMapOf<String, Closeable>()
     private val evChargingService = configuration.getBean<EvChargingService>()
@@ -95,6 +95,10 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            garageVentilationRequest -> {
+                garageVentilationController.send(rpcRequest.garageVentilationCommandMilliVolts!!) { }
+                RpcResponse()
+            }
             sendHoermannE4Command -> errorCatching {
 
                 val cnt = CountDownLatch(1)
@@ -180,7 +184,10 @@ class WebSocketServer : Endpoint() {
                             }
 
                             garageVentilationController.addListener(userEmail, subscriptionId) { onEvent(it) }
-                            onEvent(garageVentilationController.getCurrent())
+                            garageVentilationController.getCurrent(userEmail)?.let {
+                                onEvent(it)
+                            }
+
                             object : Closeable {
                                 override fun close() {
                                     garageVentilationController.removeListener(subscriptionId)
@@ -254,7 +261,7 @@ class WebSocketServer : Endpoint() {
                         }
 
                         SubscriptionType.getGarageLightStatus -> GarageLightStatusSubscription(subscriptionId, argSession).apply {
-                            garageDoorService.addListener(userEmail, subscriptionId, this::onEvent)
+                            garageLightController.addListener(userEmail, subscriptionId, this::onEvent)
                         }
 
                         SubscriptionType.getUnderFloorHeaterStatus -> UnderFloorHeaterSubscription(
@@ -477,49 +484,30 @@ class WebSocketServer : Endpoint() {
         }
     }
 
-    private fun garageLightRequest(request: GarageLightRequest, user: String?): GarageLightResponse =
-        when (request.type) {
-            GarageLightRequestType.getStatus -> {
-                GarageLightResponse(
-                    garageDoorService.getCurrentState(user),
-                )
+    private fun garageLightRequest(request: GarageLightRequest, user: String?): GarageLightResponse {
+        val send = { fn: (user: String?, callback: (r: Boolean) -> Unit) -> Unit ->
+            val cnt = CountDownLatch(1)
+            var sendResult = false
+            fn(user) {
+                sendResult = it
+                cnt.countDown()
             }
+            check(cnt.await(1, TimeUnit.SECONDS))
 
-            GarageLightRequestType.switchOnCeilingLight -> {
-                GarageLightResponse(
-                    null,
-                    garageDoorService.switchOnCeilingLight(user)
-                )
-            }
+            RpcResponse(hoermannE4CommandResult = sendResult)
 
-            GarageLightRequestType.switchOffCeilingLight -> {
-                GarageLightResponse(
-                    null,
-                    garageDoorService.switchOffCeilingLight(user)
-                )
-            }
-
-            GarageLightRequestType.switchLedStripeOff -> {
-                GarageLightResponse(
-                    null,
-                    garageDoorService.switchLedStripeOff(user)
-                )
-            }
-
-            GarageLightRequestType.switchLedStripeOnLow -> {
-                GarageLightResponse(
-                    null,
-                    garageDoorService.switchLedStripeOnLow(user)
-                )
-            }
-
-            GarageLightRequestType.switchLedStripeOnHigh -> {
-                GarageLightResponse(
-                    null,
-                    garageDoorService.switchLedStripeOnHigh(user)
-                )
-            }
+            GarageLightResponse(null, sendResult)
         }
+
+        return when (request.type) {
+            GarageLightRequestType.getStatus -> GarageLightResponse(garageLightController.getCurrentState(user))
+            GarageLightRequestType.switchOnCeilingLight -> send(garageLightController::switchOnCeilingLight)
+            GarageLightRequestType.switchOffCeilingLight -> send(garageLightController::switchOffCeilingLight)
+            GarageLightRequestType.switchLedStripeOff -> send(garageLightController::switchLedStripeOff)
+            GarageLightRequestType.switchLedStripeOnLow -> send(garageLightController::switchLedStripeOnLow)
+            GarageLightRequestType.switchLedStripeOnHigh -> send(garageLightController::switchLedStripeOnHigh)
+        }
+    }
 
     inner class GarageLightStatusSubscription(
         subscriptionId: String,
@@ -542,7 +530,7 @@ class WebSocketServer : Endpoint() {
         }
 
         override fun close() {
-            garageDoorService.removeListener(subscriptionId)
+            garageLightController.removeListener(subscriptionId)
             subscriptions.remove(subscriptionId)
         }
     }

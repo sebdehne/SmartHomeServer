@@ -1,7 +1,6 @@
 export type GarageLightStatus = {
     ceilingLightIsOn: boolean;
     ledStripeStatus: LEDStripeStatus;
-    timestampDelta: number;
     utcTimestampInMs: number;
 }
 
@@ -23,3 +22,8 @@ export type GarageLightRequestType =
     | "switchLedStripeOnLow"
     | "switchLedStripeOnHigh"
     | "getStatus";
+
+export type GarageVentilationState = {
+    milliVolts: number;
+    createdAt: string;
+}

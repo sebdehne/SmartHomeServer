@@ -20,6 +20,7 @@ abstract class AbstractProcess(
                 tick()
             })
         }, intervalInSeconds, intervalInSeconds, TimeUnit.SECONDS)
+        onStart()
     }
 
     fun tick(): Boolean = if (runLock.tryLock()) {
@@ -49,4 +50,5 @@ abstract class AbstractProcess(
 
     abstract fun tickLocked(): Boolean
     abstract fun logger(): KLogger
+    open fun onStart() {}
 }

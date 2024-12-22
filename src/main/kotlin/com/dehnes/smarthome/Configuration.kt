@@ -14,7 +14,7 @@ import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.firewall_router.BlockedMacs
 import com.dehnes.smarthome.firewall_router.FirewallService
-import com.dehnes.smarthome.garage.GarageController
+import com.dehnes.smarthome.garage.GarageLightController
 import com.dehnes.smarthome.garage.GarageVentilationController
 import com.dehnes.smarthome.garage.HoermannE4Controller
 import com.dehnes.smarthome.han.HanPortService
@@ -130,9 +130,8 @@ class Configuration {
             userSettingsService
         )
 
-        val garageDoorService = GarageController(
-            loRaConnection,
-            clock,
+        val garageDoorService = GarageLightController(
+            configService,
             influxDBClient,
             executorService,
             userSettingsService
@@ -208,7 +207,7 @@ class Configuration {
         beans[GarageVentilationController::class] = garageVentilationController
         beans[HoermannE4Controller::class] = hoermannE4Controller
         beans[UnderFloorHeaterService::class] = heaterService
-        beans[GarageController::class] = garageDoorService
+        beans[GarageLightController::class] = garageDoorService
         beans[ObjectMapper::class] = objectMapper
         beans[EvChargingStationConnection::class] = evChargingStationConnection
         beans[FirmwareUploadService::class] = firmwareUploadService

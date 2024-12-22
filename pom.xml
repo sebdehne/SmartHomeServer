@@ -15,7 +15,7 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <kotlin.version>2.0.20</kotlin.version>
-        <jetty.version>12.0.9</jetty.version>
+        <jetty.version>12.0.16</jetty.version>
         <httpclient.version>5.3.1</httpclient.version>
         <kotlin.compiler.jvmTarget>${java.version}</kotlin.compiler.jvmTarget>
         <jackson.version>2.17.1</jackson.version>
@@ -179,7 +179,7 @@
         <dependency>
             <groupId>com.hivemq</groupId>
             <artifactId>hivemq-mqtt-client</artifactId>
-            <version>1.3.3</version>
+            <version>1.3.4</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>

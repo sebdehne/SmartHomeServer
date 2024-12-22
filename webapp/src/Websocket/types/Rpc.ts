@@ -40,6 +40,7 @@ export type RequestType =
     | "dnsBlockingUpdateStandardLists"
     | "blockedMacsSet"
     | "sendHoermannE4Command"
+    | "garageVentilationRequest"
     ;
 
 export type RpcRequest = {
@@ -61,6 +62,7 @@ export type RpcRequest = {
     dnsBlockingLists?: string[];
     blockedMacs?: string[];
     hoermannE4Command?: HoermannE4Command;
+    garageVentilationCommandMilliVolts?: number;
 }
 
 export type RpcResponse = {

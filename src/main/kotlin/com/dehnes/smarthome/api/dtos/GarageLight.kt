@@ -3,7 +3,6 @@ package com.dehnes.smarthome.api.dtos
 data class GarageLightStatus(
     val ceilingLightIsOn: Boolean,
     val ledStripeStatus: LEDStripeStatus,
-    val timestampDelta: Long,
     val utcTimestampInMs: Long
 )
 

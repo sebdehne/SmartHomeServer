@@ -14,7 +14,6 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.SocketTimeoutException
-import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -24,7 +23,7 @@ import java.util.concurrent.TimeUnit
 class HoermannE4Controller(
     private val configService: ConfigService,
     private val userSettingsService: UserSettingsService,
-    private val garageController: GarageController,
+    private val garageLightController: GarageLightController,
     executorService: ExecutorService,
 ) : AbstractProcess(executorService, 1) {
     private val logger = KotlinLogging.logger {}
@@ -78,24 +77,22 @@ class HoermannE4Controller(
         val resp = tx(
             cmd = if (configService.isDevMode()) HoermannE4Command.Nop else toBeSentCopy.first,
             garageSettings = garageSettings,
-            timeout = Duration.ofMillis(1000)
         )
 
-        val wasSuccess = resp?.first == true
-        toBeSentCopy.second(wasSuccess)
+        toBeSentCopy.second(resp != null)
 
         if (resp != null) {
-            if (toBeSentCopy.first == HoermannE4Command.Open && wasSuccess) {
-                garageController.switchOnCeilingLight(SystemUser)
-            } else if (toBeSentCopy.first == HoermannE4Command.Close && wasSuccess) {
+            if (toBeSentCopy.first == HoermannE4Command.Open) {
+                garageLightController.switchOnCeilingLight(SystemUser) {}
+            } else if (toBeSentCopy.first == HoermannE4Command.Close) {
                 timer.schedule({
                     executorService.submit(withLogging {
-                        garageController.switchOffCeilingLight(SystemUser)
+                        garageLightController.switchOffCeilingLight(SystemUser) {}
                     })
                 }, garageSettings.lightOffAfterCloseDelaySeconds, TimeUnit.SECONDS)
             }
 
-            current = resp.second
+            current = resp
 
             executorService.submit(withLogging {
                 listeners.forEach { (_, fn) ->
@@ -107,10 +104,10 @@ class HoermannE4Controller(
         return true
     }
 
-    private fun tx(cmd: HoermannE4Command, garageSettings: GarageSettings, timeout: Duration): Pair<Boolean, HoermannE4Broadcast>? {
+    private fun tx(cmd: HoermannE4Command, garageSettings: GarageSettings): HoermannE4Broadcast? {
         if (datagramSocket == null) {
             datagramSocket = DatagramSocket(9000)
-            datagramSocket!!.soTimeout = timeout.toMillis().toInt()
+            datagramSocket!!.soTimeout = garageSettings.soTimeout
         }
 
         val sendBuf = byteArrayOf(0)
@@ -129,9 +126,7 @@ class HoermannE4Controller(
         return try {
             datagramSocket!!.receive(DatagramPacket(buf, 0, buf.size))
 
-            val sendResult = buf[0].toInt() == 1
-
-            sendResult to HoermannE4Broadcast(
+            HoermannE4Broadcast(
                 targetPos = buf[1].toUnsignedInt(),
                 currentPos = buf[2].toUnsignedInt(),
                 doorState = SupramatiDoorState.entries.first { it.value == buf[3].toInt() },

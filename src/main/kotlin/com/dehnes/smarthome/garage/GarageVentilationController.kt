@@ -13,7 +13,6 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.SocketTimeoutException
-import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -54,7 +53,11 @@ class GarageVentilationController(
         tick()
     }
 
-    fun getCurrent() = current
+    fun getCurrent(user: String?): GarageVentilationState? {
+        if (!userSettingsService.canUserRead(user, UserRole.garageDoor)) return null
+
+        return current
+    }
 
     override fun tickLocked(): Boolean {
         val garageSettings = configService.getGarageSettings()
@@ -65,7 +68,6 @@ class GarageVentilationController(
         val resp = tx(
             cmd = toBeSentCopy.first,
             garageSettings = garageSettings,
-            timeout = Duration.ofMillis(1000)
         )
 
         val wasSuccess = resp?.first == true
@@ -87,11 +89,10 @@ class GarageVentilationController(
     private fun tx(
         cmd: Int,
         garageSettings: GarageSettings,
-        timeout: Duration
     ): Pair<Boolean, GarageVentilationState>? {
         if (datagramSocket == null) {
             datagramSocket = DatagramSocket(9001)
-            datagramSocket!!.soTimeout = timeout.toMillis().toInt()
+            datagramSocket!!.soTimeout = garageSettings.soTimeout
         }
 
         val req = DatagramPacket(

@@ -179,7 +179,6 @@ export const GarageController = () => {
                             <FormControlLabel value="onLow" control={<Radio/>} label="On Low"/>
                             <FormControlLabel value="onHigh" control={<Radio/>} label="On High"/>
                         </RadioGroup></li>
-                        <li>Clock slew: {garageLightState.timestampDelta} seconds</li>
                     </ul>
                     <p>Updated: {timeToDelta(currentSeconds, garageLightState.utcTimestampInMs)} ago</p>
                 </div>

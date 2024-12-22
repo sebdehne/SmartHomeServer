@@ -32,7 +32,11 @@ data class GarageSettings(
     val hoermannBridgePort: Int = 9000,
     val ventilationBridgeIp: String = "192.168.1.22",
     val ventilationBridgePort: Int = 9000,
+    val lightsControllerIp: String = "192.168.1.23",
+    val lightsControllerPort: Int = 9000,
+    val lightsLedLowMilliVolts: Int = 5000,
     val lightOffAfterCloseDelaySeconds: Long = 60 * 5,
+    val soTimeout: Int = 1 * 1000,
 )
 
 data class VictronEssProcessSettings(

@@ -40,6 +40,7 @@ enum class RequestType {
     blockedMacsSet,
 
     sendHoermannE4Command,
+    garageVentilationRequest,
 }
 
 data class RpcRequest(

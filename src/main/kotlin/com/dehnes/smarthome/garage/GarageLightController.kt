@@ -2,263 +2,257 @@ package com.dehnes.smarthome.garage
 
 import com.dehnes.smarthome.api.dtos.GarageLightStatus
 import com.dehnes.smarthome.api.dtos.LEDStripeStatus
+import com.dehnes.smarthome.config.ConfigService
+import com.dehnes.smarthome.config.GarageSettings
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
-import com.dehnes.smarthome.lora.LoRaConnection
-import com.dehnes.smarthome.lora.LoRaInboundPacketDecrypted
-import com.dehnes.smarthome.lora.LoRaPacketType
-import com.dehnes.smarthome.users.SystemUser
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.*
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.time.Clock
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import java.time.Instant
-import java.util.concurrent.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
 
-class GarageController(
-    private val loRaConnection: LoRaConnection,
-    private val clock: Clock,
+class GarageLightController(
+    private val configService: ConfigService,
     private val influxDBClient: InfluxDBClient,
     executorService: ExecutorService,
     private val userSettingsService: UserSettingsService,
-) : AbstractProcess(executorService, 30) {
-
-    private val loRaAddr = 17
-    private val logger = KotlinLogging.logger { }
-    private val receiveQueue = LinkedBlockingQueue<LoRaInboundPacketDecrypted>()
+) : AbstractProcess(executorService, 5) {
 
     @Volatile
-    private var lastStatus: GarageLightStatus? = null
-    private val keyId: Int = 1
+    private var lastInfluxDbRecordAt: Instant = Instant.now()
+
+    @Volatile
+    private var toBeSent: Pair<GarageLightRequest, (r: Boolean) -> Unit>? = null
+
+    @Volatile
+    private var receiveHandler: ((buf: ByteArray) -> Unit)? = null
+
+    private val datagramSocket = DatagramSocket(9002)
+
+    @Volatile
+    private var current: GarageLightStatus =
+        GarageLightStatus(false, LEDStripeStatus.off, Instant.now().toEpochMilli())
+
+    private val logger = KotlinLogging.logger { }
+
+    override fun onStart() {
+        Thread {
+            try {
+                val buf = ByteArray(100)
+                while (true) {
+                    try {
+                        val datagramPacket = DatagramPacket(buf, 0, buf.size)
+                        datagramSocket.receive(datagramPacket)
+                        val dst = ByteArray(datagramPacket.length) { 0 }
+                        System.arraycopy(buf, 0, dst, 0, dst.size)
+
+                        val receiveHandlerCopy = receiveHandler
+                        receiveHandler = null
+
+                        receiveHandlerCopy?.let { h ->
+                            logger.info { "Handling with receiveHandler (response)" }
+                            h(dst)
+                        } ?: run {
+                            logger.info { "Handling as notify" }
+                            // treat as NOTIFY
+                            current = dst.parse()
+                            // send ACK
+                            logger.info { "Sending ACK" }
+                            val garageSettings = configService.getGarageSettings()
+                            datagramSocket.send(
+                                DatagramPacket(
+                                    byteArrayOf(0),
+                                    0,
+                                    1,
+                                    InetAddress.getByName(garageSettings.lightsControllerIp),
+                                    garageSettings.lightsControllerPort
+                                )
+                            )
+                        }
+                    } catch (e: Exception) {
+                        logger.warn(e) { "Exception while receiving" }
+                    }
+                }
+            } finally {
+                datagramSocket.close()
+                logger.error { "closing DatagramSocket" }
+            }
+        }.apply {
+            isDaemon = true
+            name = "garage-light-service"
+        }.start()
+    }
 
     private val listeners = ConcurrentHashMap<String, (GarageLightStatus) -> Unit>()
 
-    init {
-        loRaConnection.listeners.add { packet ->
-            if (packet.from != loRaAddr) {
-                false
-            } else {
-                if (packet.type == LoRaPacketType.GARAGE_LIGHT_NOTIFY_CEILING_LIGHT) {
-                    sendCommand(LoRaPacketType.GARAGE_LIGHT_ACK, expectResponse = null)
-
-                    asLocked {
-                        lastStatus = lastStatus?.copy(
-                            ceilingLightIsOn = packet.payload[0].toInt() != 0,
-                            timestampDelta = packet.timestampDelta,
-                            utcTimestampInMs = clock.millis(),
-                        )
-                        onStatusUpdated(true)
-                    }
-                } else {
-                    receiveQueue.offer(packet)
-                }
-                true
-            }
-        }
-    }
-
-    fun addListener(user: String?, id: String, listener: (GarageLightStatus) -> Unit) {
-        if (!userSettingsService.canUserRead(user, UserRole.garageDoor)) return
-        listeners[id] = listener
+    fun addListener(user: String?, id: String, l: (GarageLightStatus) -> Unit) {
+        check(
+            userSettingsService.canUserRead(
+                user,
+                UserRole.garageDoor
+            )
+        ) { "User $user cannot read garage door" }
+        listeners[id] = l
     }
 
     fun removeListener(id: String) {
         listeners.remove(id)
     }
 
-    fun getCurrentState(user: String?) = asLocked {
-        if (!userSettingsService.canUserRead(user, UserRole.garageDoor)) return@asLocked null
-
-        lastStatus
+    fun getCurrentState(user: String?): GarageLightStatus? {
+        if (!userSettingsService.canUserRead(user, UserRole.garageDoor)) return null
+        return current
     }
 
-    fun switchOnCeilingLight(user: String?): Boolean? = asLocked {
-        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked null
-
-        sendCommand(
-            LoRaPacketType.GARAGE_LIGHT_SWITCH_CEILING_LIGHT_ON,
-            expectResponse = { it.type == LoRaPacketType.GARAGE_LIGHT_ACK }).apply {
-            if (this) {
-                lastStatus = lastStatus?.copy(
-                    ceilingLightIsOn = true
-                )
-                onStatusUpdated(true)
-            }
+    fun switchOnCeilingLight(user: String?, callback: (r: Boolean) -> Unit) {
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) {
+            callback(false)
+            return
         }
+
+        toBeSent = GarageLightRequest(true, current.ledStripeStatus) to callback
+        tick()
     }
 
-    fun switchOffCeilingLight(user: String?): Boolean? = asLocked {
-        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked null
-
-        sendCommand(
-            LoRaPacketType.GARAGE_LIGHT_SWITCH_CEILING_LIGHT_OFF,
-            expectResponse = { it.type == LoRaPacketType.GARAGE_LIGHT_ACK }).apply {
-            if (this) {
-                lastStatus = lastStatus?.copy(
-                    ceilingLightIsOn = false
-                )
-                onStatusUpdated(true)
-            }
+    fun switchOffCeilingLight(user: String?, callback: (r: Boolean) -> Unit) {
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) {
+            callback(false)
+            return
         }
+
+        toBeSent = GarageLightRequest(false, current.ledStripeStatus) to callback
+        tick()
     }
 
-    fun switchLedStripeOff(user: String?): Boolean? = asLocked {
-        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked null
-
-        sendCommand(LoRaPacketType.GARAGE_LIGHT_SET_DAC, ByteArray(4).apply {
-            write(0L.to16Bit(), 0)
-            write(0L.to16Bit(), 2)
-        }, expectResponse = { it.type == LoRaPacketType.GARAGE_LIGHT_ACK }).apply {
-            if (this) {
-                lastStatus = lastStatus?.copy(
-                    ledStripeStatus = LEDStripeStatus.off
-                )
-                onStatusUpdated(true)
-            }
+    fun switchLedStripeOff(user: String?, callback: (r: Boolean) -> Unit) {
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) {
+            callback(false)
+            return
         }
+
+        toBeSent = GarageLightRequest(current.ceilingLightIsOn, LEDStripeStatus.off) to callback
+        tick()
     }
 
-    fun switchLedStripeOnLow(user: String?): Boolean? = asLocked {
-        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked null
-
-        sendCommand(LoRaPacketType.GARAGE_LIGHT_SET_DAC, ByteArray(4).apply {
-            write(2500L.to16Bit(), 0)
-            write(2500L.to16Bit(), 2)
-        }, expectResponse = { it.type == LoRaPacketType.GARAGE_LIGHT_ACK }).apply {
-            if (this) {
-                lastStatus = lastStatus?.copy(
-                    ledStripeStatus = LEDStripeStatus.onLow
-                )
-                onStatusUpdated(true)
-            }
+    fun switchLedStripeOnLow(user: String?, callback: (r: Boolean) -> Unit) {
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) {
+            callback(false)
+            return
         }
+
+        toBeSent = GarageLightRequest(current.ceilingLightIsOn, LEDStripeStatus.onLow) to callback
+        tick()
     }
 
-    fun switchLedStripeOnHigh(user: String?): Boolean? = asLocked {
-        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) return@asLocked null
-
-        sendCommand(LoRaPacketType.GARAGE_LIGHT_SET_DAC, ByteArray(4).apply {
-            write(10000L.to16Bit(), 0)
-            write(10000L.to16Bit(), 2)
-        }, expectResponse = { it.type == LoRaPacketType.GARAGE_LIGHT_ACK }).apply {
-            if (this) {
-                lastStatus = lastStatus?.copy(
-                    ledStripeStatus = LEDStripeStatus.onHigh
-                )
-                onStatusUpdated(true)
-            }
-        }
-    }
-
-    private fun sendCommand(
-        type: LoRaPacketType,
-        payload: ByteArray = byteArrayOf(),
-        expectResponse: ((p: LoRaInboundPacketDecrypted) -> Boolean)?
-    ): Boolean {
-        val ct = CountDownLatch(1)
-        var sent = false
-        receiveQueue.clear()
-        loRaConnection.send(
-            keyId,
-            loRaAddr,
-            type,
-            payload,
-            null
-        ) {
-            ct.countDown()
-            sent = it
-        }
-        ct.await(2, TimeUnit.SECONDS)
-
-        if (!sent) {
-            logger.warn { "Sending failed type=${type}" }
-            return false
-        }
-        logger.info { "Sent $type payload=${payload.map { it.toUnsignedInt() }}" }
-
-        return expectResponse?.let {
-            receiveQueue.poll(2, TimeUnit.SECONDS)?.let {
-                expectResponse(it)
-            } ?: run {
-                logger.info { "Got no reply - giving up" }
-                false
-            }
-        } ?: true
-    }
-
-    private fun onStatusUpdated(changed: Boolean) {
-        logger.debug { "New status=$lastStatus" }
-
-        lastStatus?.let { status ->
-            influxDBClient.recordSensorData(
-                InfluxDBRecord(
-                    Instant.ofEpochMilli(status.utcTimestampInMs),
-                    "garageLightStatus",
-                    mapOf(
-                        "ceilinglight" to status.ceilingLightIsOn.toInt().toString(),
-                        "ledStrip" to when (status.ledStripeStatus) {
-                            LEDStripeStatus.off -> 0
-                            LEDStripeStatus.onLow -> 1
-                            LEDStripeStatus.onHigh -> 2
-                        }.toString(),
-                    ),
-                    emptyMap()
-                )
-            )
+    fun switchLedStripeOnHigh(user: String?, callback: (r: Boolean) -> Unit) {
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) {
+            callback(false)
+            return
         }
 
-
-        if (changed) {
-            listeners.forEach {
-                try {
-                    it.value(getCurrentState(SystemUser)!!)
-                } catch (e: Exception) {
-                    logger.error(e) { "" }
-                }
-            }
-        }
+        toBeSent = GarageLightRequest(current.ceilingLightIsOn, LEDStripeStatus.onHigh) to callback
+        tick()
     }
 
     override fun tickLocked(): Boolean {
-        val status = lastStatus
+        val (request, callback) = toBeSent ?: (GarageLightRequest(
+            current.ceilingLightIsOn,
+            current.ledStripeStatus,
+        ) to { r: Boolean -> })
+        toBeSent = null
 
-        return if (status == null || clock.millis() - status.utcTimestampInMs > 25000) {
+        receiveHandler = {
+            logger.info { "in tickLocked() receiveHandler" }
+            val resp = it.parse()
+            callback(true)
 
-            var packet: LoRaInboundPacketDecrypted? = null
-            val success = sendCommand(LoRaPacketType.GARAGE_LIGHT_GET_STATUS, expectResponse = {
-                packet = it
-                it.type == LoRaPacketType.GARAGE_LIGHT_STATUS_RESPONSE
-            })
+            val change = resp.ceilingLightIsOn != current.ceilingLightIsOn
+            current = resp
 
-            if (success) {
-
-                val milliVolts = readInt16Bits(packet!!.payload, 0)
-                val newStatus = GarageLightStatus(
-                    ceilingLightIsOn = packet!!.payload[4].toInt() != 0,
-                    ledStripeStatus = when {
-                        milliVolts == 0 -> LEDStripeStatus.off
-                        milliVolts in (0..8000) -> LEDStripeStatus.onLow
-                        else -> LEDStripeStatus.onHigh
-                    },
-                    timestampDelta = packet!!.timestampDelta,
-                    utcTimestampInMs = clock.millis()
+            if (change || lastInfluxDbRecordAt.plusSeconds(60).isBefore(Instant.now())) {
+                lastInfluxDbRecordAt = Instant.now()
+                influxDBClient.recordSensorData(
+                    InfluxDBRecord(
+                        Instant.ofEpochMilli(current.utcTimestampInMs),
+                        "garageLightStatus",
+                        mapOf(
+                            "ceilinglight" to current.ceilingLightIsOn.toInt().toString(),
+                            "ledStrip" to when (current.ledStripeStatus) {
+                                LEDStripeStatus.off -> 0
+                                LEDStripeStatus.onLow -> 1
+                                LEDStripeStatus.onHigh -> 2
+                            }.toString(),
+                        ),
+                        emptyMap()
+                    )
                 )
-
-                val changed = newStatus != lastStatus
-                lastStatus = newStatus
-                logger.info { "New garageLight status $lastStatus" }
-                onStatusUpdated(changed)
-
-                true
-            } else {
-                logger.info { "GARAGE_LIGHT_GET_STATUS not send" }
-                false
             }
-        } else true
 
+            executorService.submit(withLogging {
+                listeners.forEach { (_, fn) ->
+                    fn(current)
+                }
+            })
+        }
+
+        tx(request, configService.getGarageSettings())
+
+        return true
     }
 
+    private fun tx(
+        cmd: GarageLightRequest,
+        garageSettings: GarageSettings,
+    ) {
+
+        val sendBuf = ByteArray(5) { 0 }
+        sendBuf[0] = cmd.ceilingLight.toInt().toByte()
+        when (cmd.ledStripeStatus) {
+            LEDStripeStatus.off -> 0
+            LEDStripeStatus.onLow -> garageSettings.lightsLedLowMilliVolts
+            LEDStripeStatus.onHigh -> 10000
+        }.toLong().to16Bit().let {
+            sendBuf[1] = it[0]
+            sendBuf[2] = it[0]
+            sendBuf[3] = it[0]
+            sendBuf[4] = it[0]
+        }
+
+        val req = DatagramPacket(
+            sendBuf,
+            0,
+            sendBuf.size,
+            InetAddress.getByName(garageSettings.lightsControllerIp),
+            garageSettings.lightsControllerPort
+        )
+        datagramSocket.send(req)
+    }
+
+    private fun ByteArray.parse(): GarageLightStatus {
+        val milliVoltsCh0 = readInt16Bits(this, 1)
+        val milliVoltsCh1 = readInt16Bits(this, 3)
+
+        return GarageLightStatus(
+            ceilingLightIsOn = this[0].toInt() != 0,
+            ledStripeStatus = when {
+                milliVoltsCh0 == 0 -> LEDStripeStatus.off
+                milliVoltsCh0 in (1..8000) -> LEDStripeStatus.onLow
+                else -> LEDStripeStatus.onHigh
+            },
+            utcTimestampInMs = Instant.now().toEpochMilli()
+        )
+    }
 
     override fun logger() = logger
+
+    data class GarageLightRequest(
+        val ceilingLight: Boolean,
+        val ledStripeStatus: LEDStripeStatus,
+    )
 }
