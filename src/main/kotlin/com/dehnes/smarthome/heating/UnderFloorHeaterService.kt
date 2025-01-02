@@ -331,16 +331,11 @@ class UnderFloorHeaterService(
 
     private fun getSettings() = configService.getHeaterSettings()
     private fun setHeaterTarget(target: OnOff) {
-        configService.setHeaterSettings(
-            getSettings().copy(
-                heaterTarget = target
-            )
-        )
+        configService.setHeaterSettings(getSettings().copy(heaterTarget = target))
     }
 
     private fun handleNewData(packet: LoRaInboundPacketDecrypted): Boolean {
-        val settings = getSettings()
-        val currentMode = settings.operatingMode
+        val currentMode = getSettings().operatingMode
         logger.info { "Current mode: $currentMode" }
 
         recordLocalValues(currentMode)
@@ -348,45 +343,41 @@ class UnderFloorHeaterService(
 
         var waitUntilCheapHour: Instant? = null
 
-        // evaluate state
-        when (currentMode) {
-            Mode.OFF -> setHeaterTarget(OnOff.off)
-            Mode.ON -> {
-                if (victronService.isGridOk()) {
-                    setHeaterTarget(OnOff.on)
-                } else {
-                    setHeaterTarget(OnOff.off)
-                }
-            }
+        if (!victronService.isGridOk()) {
+            logger.info { "Forcing heater off due to grid offline" }
+            setHeaterTarget(OnOff.off)
+        } else {
+            // evaluate state
+            when (currentMode) {
+                Mode.OFF -> setHeaterTarget(OnOff.off)
+                Mode.ON -> setHeaterTarget(OnOff.on)
 
-            Mode.MANUAL -> {
-                if (sensorData.temperatureError > 0) {
-                    logger.info { "Forcing heater off due to temperature error=${sensorData.temperatureError}" }
-                    setHeaterTarget(OnOff.off)
-                } else {
-                    val targetTemperature = settings.targetTemp
-                    logger.info { "Evaluating target temperature now: $targetTemperature" }
-
-                    val suitablePrices =
-                        energyPriceService.findSuitablePrices(
-                            SystemUser,
-                            serviceType,
-                            LocalDate.now(DateTimeUtils.zoneId)
-                        )
-                    val priceDecision = suitablePrices.priceDecision()
-
-                    if (!victronService.isGridOk()) {
-                        waitUntilCheapHour = Instant.MAX
-                    }
-                    if (priceDecision?.current == PriceCategory.cheap && sensorData.temperature < targetTemperature * 100) {
-                        logger.info { "Setting heater to on. priceDecision=$priceDecision" }
-                        setHeaterTarget(OnOff.on)
-                    } else {
-                        waitUntilCheapHour = priceDecision?.changesAt
-                        logger.info {
-                            "Setting heater to off. waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
-                        }
+                Mode.MANUAL -> {
+                    if (sensorData.temperatureError > 0) {
+                        logger.info { "Forcing heater off due to temperature error=${sensorData.temperatureError}" }
                         setHeaterTarget(OnOff.off)
+                    } else {
+                        val targetTemperature = getSettings().targetTemp
+                        logger.info { "Evaluating target temperature now: $targetTemperature" }
+
+                        val suitablePrices =
+                            energyPriceService.findSuitablePrices(
+                                SystemUser,
+                                serviceType,
+                                LocalDate.now(DateTimeUtils.zoneId)
+                            )
+                        val priceDecision = suitablePrices.priceDecision()
+
+                        if (priceDecision?.current == PriceCategory.cheap && sensorData.temperature < targetTemperature * 100) {
+                            logger.info { "Setting heater to on. priceDecision=$priceDecision" }
+                            setHeaterTarget(OnOff.on)
+                        } else {
+                            waitUntilCheapHour = priceDecision?.changesAt
+                            logger.info {
+                                "Setting heater to off. waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
+                            }
+                            setHeaterTarget(OnOff.off)
+                        }
                     }
                 }
             }
@@ -395,7 +386,9 @@ class UnderFloorHeaterService(
         var heaterStatus = sensorData.heaterIsOn
 
         // bring the heater to the desired state
-        val executionResult = if (sensorData.heaterIsOn && settings.heaterTarget == OnOff.off) {
+        val target = getSettings().heaterTarget
+
+        val executionResult = if (sensorData.heaterIsOn && target == OnOff.off) {
             if (sendCommand(LoRaPacketType.HEATER_OFF_REQUEST)) {
                 heaterStatus = false
                 true
@@ -403,7 +396,7 @@ class UnderFloorHeaterService(
                 logger.warn { "No response" }
                 false
             }
-        } else if (!sensorData.heaterIsOn && settings.heaterTarget == OnOff.on) {
+        } else if (!sensorData.heaterIsOn && target == OnOff.on) {
             if (sendCommand(LoRaPacketType.HEATER_ON_REQUEST)) {
                 heaterStatus = true
                 true
@@ -424,7 +417,7 @@ class UnderFloorHeaterService(
         lastStatus = UnderFloorHeaterStatus(
             mode = UnderFloorHeaterMode.entries.first { it.mode == currentMode },
             status = if (heaterStatus) OnOff.on else OnOff.off,
-            targetTemperature = settings.targetTemp,
+            targetTemperature = getSettings().targetTemp,
             waitUntilCheapHour = waitUntilCheapHour?.toEpochMilli(),
             timestampDelta = sensorData.timestampDelta,
             fromController = UnderFloorHeaterStatusFromController(
