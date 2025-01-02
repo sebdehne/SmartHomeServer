@@ -15,7 +15,6 @@ import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.TimeUnit
 
 class LoRaConnection(
     private val configService: ConfigService,
@@ -335,7 +334,13 @@ class LoRaConnection(
 
         val sensorId = getSensor(setupRequest.serialIdHex)?.id
         if (sensorId != null) {
-            send(packet.keyId, sensorId, LoRaPacketType.SETUP_RESPONSE, packet.payload, null) {
+            send(
+                keyId = packet.keyId,
+                toAddr = sensorId,
+                type = LoRaPacketType.SETUP_RESPONSE,
+                payload = packet.payload,
+                timestamp = null
+            ) {
                 if (!it) {
                     logger.info { "Could not send pong response" }
                 }
@@ -468,9 +473,6 @@ enum class LoRaPacketType(
     SETUP_REQUEST(0),
     SETUP_RESPONSE(1),
 
-    SENSOR_DATA_REQUEST(2),
-    SENSOR_DATA_RESPONSE(3),
-
     FIRMWARE_INFO_REQUEST(4),
     FIRMWARE_INFO_RESPONSE(5),
     FIRMWARE_DATA_REQUEST(6),
@@ -488,13 +490,10 @@ enum class LoRaPacketType(
     HEATER_RESPONSE(15),
 
     GARAGE_HEATER_DATA_RESPONSE(17),
-
-    SENSOR_DATA_REQUEST_V2(18),
-    SENSOR_DATA_RESPONSE_V2(19),
-
     GARAGE_HEATER_DATA_RESPONSEV2(20),
 
     SENSOR_DATA_REQUEST_V3(21),
+    SENSOR_DATA_RESPONSE_V3(19),
 
     GARAGE_HEATER_DATA_REQUESTV2(22),
 
