@@ -249,15 +249,15 @@ class EnvironmentSensorService(
             sensor.displayName,
             sensor.sleepTimeInSeconds,
             if (lastReceivedMessage is SensorData) EnvironmentSensorData(
-                lastReceivedMessage.temperature,
-                lastReceivedMessage.temperatureError,
-                lastReceivedMessage.humidity,
-                batteryAdcToMv(sensorId, lastReceivedMessage.adcBattery),
-                lastReceivedMessage.adcLight,
-                lastReceivedMessage.sleepTimeInSeconds,
-                lastReceivedMessage.timestampDelta,
-                lastReceivedMessage.receivedAt,
-                lastReceivedMessage.rssi
+                temperature = lastReceivedMessage.temperature,
+                temperatureError = lastReceivedMessage.temperatureError,
+                humidity = lastReceivedMessage.humidity,
+                batteryMilliVolts = batteryAdcToMv(sensorId, lastReceivedMessage.adcBattery),
+                adcLight = lastReceivedMessage.adcLight,
+                sleepTimeInSeconds = lastReceivedMessage.sleepTimeInSeconds,
+                timestampDelta = lastReceivedMessage.timestampDelta,
+                receivedAt = lastReceivedMessage.receivedAt,
+                rssi = lastReceivedMessage.rssi
             ) else null,
             firmwareUpgradeState,
             sensorState.firmwareVersion,
@@ -400,16 +400,16 @@ class EnvironmentSensorService(
             return existingState
         }
         val sensorData = SensorData(
-            readLong32Bits(packet.payload, 0),
-            packet.payload[21].toInt() > 0,
-            readLong32Bits(packet.payload, 4),
-            readLong32Bits(packet.payload, 8),
-            readLong32Bits(packet.payload, 12),
-            readLong32Bits(packet.payload, 16).toInt(),
-            packet.payload[20].toInt(),
-            clock.timestampSecondsSince2000() - packet.timestampSecondsSince2000,
-            clock.millis(),
-            packet.rssi
+            temperature = readLong32Bits(packet.payload, 0),
+            temperatureError = packet.payload[21].toInt() > 0,
+            humidity = readLong32Bits(packet.payload, 4),
+            adcBattery = readLong32Bits(packet.payload, 8),
+            adcLight = readLong32Bits(packet.payload, 12),
+            sleepTimeInSeconds = readLong32Bits(packet.payload, 16).toInt(),
+            firmwareVersion = packet.payload[20].toInt(),
+            timestampDelta = packet.timestampDelta,
+            receivedAt = clock.millis(),
+            rssi = packet.rssi
         )
         logger.info { "Handling sensorData from ${packet.from}: $sensorData" }
 
