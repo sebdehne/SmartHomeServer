@@ -131,9 +131,9 @@ class Configuration {
         )
 
         val garageDoorService = GarageLightController(
+            executorService,
             configService,
             influxDBClient,
-            executorService,
             userSettingsService
         )
         garageDoorService.start()
