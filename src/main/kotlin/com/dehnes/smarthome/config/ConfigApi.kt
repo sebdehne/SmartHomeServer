@@ -24,7 +24,13 @@ data class ConfigurationRoot(
     val victronService: VictronService = VictronService(),
     val victronEssProcess: VictronEssProcessSettings = VictronEssProcessSettings(),
     val knownNetworkDevices: Map<String, String> = emptyMap(),
-    val garageSettings: GarageSettings = GarageSettings()
+    val garageSettings: GarageSettings = GarageSettings(),
+    val coordinates: Coordinates? = null,
+)
+
+data class Coordinates(
+    val latitude: String,
+    val longitude: String,
 )
 
 data class GarageSettings(
@@ -37,7 +43,20 @@ data class GarageSettings(
     val lightsLedLowMilliVolts: Int = 5000,
     val lightOffAfterCloseDelaySeconds: Long = 60 * 5,
     val soTimeout: Int = 1 * 1000,
+    val currentLEDStripeMode: LightLedMode = LightLedMode.manual,
+    val currentLEDStripeStatus: LEDStripeStatus = LEDStripeStatus.off,
 )
+
+enum class LEDStripeStatus {
+    off,
+    onLow,
+    onHigh
+}
+
+enum class LightLedMode {
+    auto,
+    manual,
+}
 
 data class VictronEssProcessSettings(
     val currentOperationMode: VictronEssProcess.OperationMode = VictronEssProcess.OperationMode.passthrough,

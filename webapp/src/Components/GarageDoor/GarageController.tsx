@@ -1,8 +1,8 @@
 import React, {useEffect, useState} from 'react';
-import {Button, ButtonGroup, Container, FormControlLabel, Radio, RadioGroup} from "@mui/material";
+import {Button, ButtonGroup, Container, FormControlLabel, Radio, RadioGroup, TextField} from "@mui/material";
 import WebsocketService, {useUserSettings} from "../../Websocket/websocketClient";
 import Header from "../Header";
-import {GarageLightRequestType, GarageLightStatus} from "../../Websocket/types/Garage";
+import {GarageLightRequestType, GarageLightStatus, LightLedMode} from "../../Websocket/types/Garage";
 import {RpcResponse} from "../../Websocket/types/Rpc";
 import {Notify} from "../../Websocket/types/Subscription";
 import {HoermannE4Broadcast, HoermannE4Command, SupramatiDoorState} from "../../Websocket/types/garage.domain";
@@ -18,6 +18,8 @@ export const GarageController = () => {
     const [cmdResult, setCmdResult] = useState<boolean | null>(null);
     const [currentSeconds, setCurrentSeconds] = useState<number>(Date.now().valueOf());
     const userSettings = useUserSettings();
+    const [updateLowMilliVolts, setUpdateLowMilliVolts] = useState(false);
+    const [milliVolts, setMilliVolts] = useState('0');
 
     useEffect(() => {
         setTimeout(() => setCurrentSeconds(Date.now()), 1000)
@@ -45,6 +47,42 @@ export const GarageController = () => {
 
         return () => WebsocketService.unsubscribe(subId);
     }, []);
+
+    const sendLedStripeMode = (mode: LightLedMode) => {
+        setSending(true);
+        WebsocketService.rpc({
+            type: "garageLightRequest",
+            garageLightRequest: {
+                type: "setLedStripeMode",
+                setLedStripeMode: mode,
+            }
+        }).then((response: RpcResponse) => {
+            const garageLightResponse = response.garageLightResponse!.commandSendSuccess!;
+            setCmdResult(garageLightResponse);
+            setgarageLightState(response.garageLightResponse!.status);
+            setTimeout(() => {
+                setCmdResult(null);
+            }, 2000);
+        }).finally(() => setSending(false));
+    };
+
+    const sendSetMilliVolts = (milliVolts: number) => {
+        setSending(true);
+        WebsocketService.rpc({
+            type: "garageLightRequest",
+            garageLightRequest: {
+                type: "setLedStripeLowMillivolts",
+                ledStripeLowMillivolts: milliVolts,
+            }
+        }).then((response: RpcResponse) => {
+            const garageLightResponse = response.garageLightResponse!.commandSendSuccess!;
+            setCmdResult(garageLightResponse);
+            setgarageLightState(response.garageLightResponse!.status);
+            setTimeout(() => {
+                setCmdResult(null);
+            }, 2000);
+        }).finally(() => setSending(false));
+    };
 
     const sendDoorCommand = (cmd: HoermannE4Command) => {
         setSending(true);
@@ -162,11 +200,26 @@ export const GarageController = () => {
             </div>}
 
 
-            <h3>Light:</h3>
+            <h3>LED Light Outside:</h3>
             {!garageLightState && <div>No light-status right now</div>}
             {garageLightState &&
                 <div>
-                    <ul>
+                    <div>Status: {garageLightState.ledStripeStatus}</div>
+                    <ButtonGroup variant="contained" style={{
+                        margin: "10px"
+                    }}>
+                        <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
+                            color={garageLightState.ledStripeCurrentMode === LightLedMode.manual ? 'secondary' : 'primary'}
+                            onClick={() => sendLedStripeMode(LightLedMode.manual)}
+                        >Manual</Button>
+                        <Button
+                            disabled={!userSettings.userCanWrite("garageDoor")}
+                            color={garageLightState.ledStripeCurrentMode === LightLedMode.auto ? 'secondary' : 'primary'}
+                            onClick={() => sendLedStripeMode(LightLedMode.auto)}
+                        >Auto</Button>
+                    </ButtonGroup>
+                    {garageLightState.ledStripeCurrentMode === LightLedMode.manual && <ul>
                         <li>Led stripe: <RadioGroup
                             aria-labelledby="demo-radio-buttons-group-label"
                             value={garageLightState.ledStripeStatus}
@@ -179,8 +232,25 @@ export const GarageController = () => {
                             <FormControlLabel value="onLow" control={<Radio/>} label="On Low"/>
                             <FormControlLabel value="onHigh" control={<Radio/>} label="On High"/>
                         </RadioGroup></li>
-                    </ul>
+                    </ul>}
+
                     <p>Updated: {timeToDelta(currentSeconds, garageLightState.utcTimestampInMs)} ago</p>
+                    <p onClick={() => {
+                        setMilliVolts(String(garageLightState.ledStripeLowMillivolts));
+                        setUpdateLowMilliVolts(true)
+                    }}>low milliVolts: {garageLightState.ledStripeLowMillivolts}</p>
+
+                    {updateLowMilliVolts && <div>
+                        <h4>Set milliVolts</h4>
+                        <TextField
+                            value={milliVolts}
+                            onChange={event => setMilliVolts(event.target.value)}
+                        />
+                        <Button onClick={() => {
+                            sendSetMilliVolts(parseInt(milliVolts));
+                            setUpdateLowMilliVolts(false);
+                        }}>Submit</Button>
+                    </div>}
                 </div>
             }
 

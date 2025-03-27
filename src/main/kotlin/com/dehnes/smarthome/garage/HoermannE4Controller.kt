@@ -2,7 +2,6 @@ package com.dehnes.smarthome.garage
 
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.config.GarageSettings
-import com.dehnes.smarthome.users.SystemUser
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.AbstractProcess
@@ -17,13 +16,11 @@ import java.net.SocketTimeoutException
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.TimeUnit
 
 
 class HoermannE4Controller(
     private val configService: ConfigService,
     private val userSettingsService: UserSettingsService,
-    private val garageLightController: GarageLightController,
     executorService: ExecutorService,
 ) : AbstractProcess(executorService, 1) {
     private val logger = KotlinLogging.logger {}
@@ -82,16 +79,6 @@ class HoermannE4Controller(
         toBeSentCopy.second(resp != null)
 
         if (resp != null) {
-            if (toBeSentCopy.first == HoermannE4Command.Open) {
-                garageLightController.switchOnCeilingLight(SystemUser) {}
-            } else if (toBeSentCopy.first == HoermannE4Command.Close) {
-                timer.schedule({
-                    executorService.submit(withLogging {
-                        garageLightController.switchOffCeilingLight(SystemUser) {}
-                    })
-                }, garageSettings.lightOffAfterCloseDelaySeconds, TimeUnit.SECONDS)
-            }
-
             current = resp
 
             executorService.submit(withLogging {
@@ -105,6 +92,8 @@ class HoermannE4Controller(
     }
 
     private fun tx(cmd: HoermannE4Command, garageSettings: GarageSettings): HoermannE4Broadcast? {
+        if (configService.isDevMode()) return null
+
         if (datagramSocket == null) {
             datagramSocket = DatagramSocket(9000)
             datagramSocket!!.soTimeout = garageSettings.soTimeout

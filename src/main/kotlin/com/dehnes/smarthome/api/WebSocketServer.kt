@@ -492,7 +492,7 @@ class WebSocketServer : Endpoint() {
                 sendResult = it
                 cnt.countDown()
             }
-            check(cnt.await(1, TimeUnit.SECONDS))
+            check(cnt.await(1, TimeUnit.SECONDS)) { "garageLightRequest failed/timed out" }
 
             RpcResponse(hoermannE4CommandResult = sendResult)
 
@@ -501,6 +501,15 @@ class WebSocketServer : Endpoint() {
 
         return when (request.type) {
             GarageLightRequestType.getStatus -> GarageLightResponse(garageLightController.getCurrentState(user))
+            GarageLightRequestType.setLedStripeMode -> garageLightController.setLedStripeMode(
+                user,
+                request.setLedStripeMode!!
+            )
+
+            GarageLightRequestType.setLedStripeLowMillivolts -> garageLightController.setLedStripeLowMillivolts(
+                user,
+                request.ledStripeLowMillivolts!!
+            )
             GarageLightRequestType.switchOnCeilingLight -> send(garageLightController::switchOnCeilingLight)
             GarageLightRequestType.switchOffCeilingLight -> send(garageLightController::switchOffCeilingLight)
             GarageLightRequestType.switchLedStripeOff -> send(garageLightController::switchLedStripeOff)

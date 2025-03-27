@@ -20,16 +20,20 @@ class ConfigService(
         }
     }
 
-    private fun readConfig() = File(filenameJson).readText(StandardCharsets.UTF_8).let { s: String ->
-        objectMapper.readValue<ConfigurationRoot>(s)
+    private fun readConfig() = synchronized(this) {
+        File(filenameJson).readText(StandardCharsets.UTF_8).let { s: String ->
+            objectMapper.readValue<ConfigurationRoot>(s)
+        }
     }
 
     private fun writeConfig(configurationRoot: ConfigurationRoot) {
-        File(filenameJson).writeText(
-            objectMapper
-                .writer(DefaultPrettyPrinter().withArrayIndenter(DefaultIndenter.SYSTEM_LINEFEED_INSTANCE))
-                .writeValueAsString(configurationRoot)
-        )
+        synchronized(this) {
+            File(filenameJson).writeText(
+                objectMapper
+                    .writer(DefaultPrettyPrinter().withArrayIndenter(DefaultIndenter.SYSTEM_LINEFEED_INSTANCE))
+                    .writeValueAsString(configurationRoot)
+            )
+        }
     }
 
     private fun update(fn: (ConfigurationRoot) -> ConfigurationRoot) {
@@ -77,6 +81,12 @@ class ConfigService(
     fun getKnownNetworkDevices() = readConfig().knownNetworkDevices
     fun getHeaterSettings() = readConfig().heatingControllerSettings
     fun getGarageSettings() = readConfig().garageSettings
+    fun getCoordinates() = readConfig().coordinates
+    fun setGarageSettings(fn: (settings: GarageSettings) -> GarageSettings) {
+        update { c ->
+            c.copy(garageSettings = fn(c.garageSettings))
+        }
+    }
     fun setHeaterSettings(settings: HeatingControllerSettings) {
         update { c ->
             c.copy(

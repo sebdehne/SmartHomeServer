@@ -3,7 +3,7 @@ package com.dehnes.smarthome
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.QuickStatsService
-import com.dehnes.smarthome.firewall_router.DnsBlockingService
+import com.dehnes.smarthome.daylight.DayLightService
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionService
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.energy_pricing.HvakosterstrommenClient
@@ -13,6 +13,7 @@ import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.firewall_router.BlockedMacs
+import com.dehnes.smarthome.firewall_router.DnsBlockingService
 import com.dehnes.smarthome.firewall_router.FirewallService
 import com.dehnes.smarthome.garage.GarageLightController
 import com.dehnes.smarthome.garage.GarageVentilationController
@@ -130,13 +131,11 @@ class Configuration {
             userSettingsService
         )
 
-        val garageDoorService = GarageLightController(
-            executorService,
+        val dayLightService = DayLightService(
             configService,
-            influxDBClient,
-            userSettingsService
-        )
-        garageDoorService.start()
+            objectMapper,
+            executorService
+        ).apply { this.start() }
 
         val heaterService = UnderFloorHeaterService(
             loRaConnection,
@@ -194,9 +193,18 @@ class Configuration {
         val hoermannE4Controller = HoermannE4Controller(
             configService,
             userSettingsService,
-            garageDoorService,
             executorService,
         ).apply { this.start() }
+
+        val garageDoorService = GarageLightController(
+            executorService,
+            configService,
+            influxDBClient,
+            userSettingsService,
+            dayLightService,
+            hoermannE4Controller
+        ).apply { this.start() }
+
 
         val garageVentilationController = GarageVentilationController(
             configService,

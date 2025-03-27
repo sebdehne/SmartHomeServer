@@ -1,19 +1,20 @@
 package com.dehnes.smarthome.api.dtos
 
+import com.dehnes.smarthome.config.LEDStripeStatus
+import com.dehnes.smarthome.config.LightLedMode
+
 data class GarageLightStatus(
     val ceilingLightIsOn: Boolean,
     val ledStripeStatus: LEDStripeStatus,
-    val utcTimestampInMs: Long
+    val utcTimestampInMs: Long,
+    val ledStripeLowMillivolts: Int,
+    val ledStripeCurrentMode: LightLedMode,
 )
-
-enum class LEDStripeStatus {
-    off,
-    onLow,
-    onHigh
-}
 
 data class GarageLightRequest(
     val type: GarageLightRequestType,
+    val ledStripeLowMillivolts: Int? = null,
+    val setLedStripeMode: LightLedMode? = null,
 )
 
 data class GarageLightResponse(
@@ -24,6 +25,10 @@ data class GarageLightResponse(
 enum class GarageLightRequestType {
     switchOnCeilingLight,
     switchOffCeilingLight,
+
+    setLedStripeLowMillivolts,
+    setLedStripeMode,
+
     switchLedStripeOff,
     switchLedStripeOnLow,
     switchLedStripeOnHigh,
