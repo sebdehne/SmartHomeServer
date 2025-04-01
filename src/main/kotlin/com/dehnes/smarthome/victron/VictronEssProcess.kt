@@ -64,7 +64,7 @@ class VictronEssProcess(
             getCurrentOperationMode(),
             currentProfile?.profileType,
             getSoCLimit(),
-            ProfileType.values().map { t -> getProfile(t) },
+            ProfileType.entries.map { t -> getProfile(t) },
             essState,
             bmsData,
         )
@@ -97,7 +97,44 @@ class VictronEssProcess(
         )
     }
 
+    private fun batteryTooLow(): Boolean {
+        val lowBatteryVoltage = 2.8 * 16
+        return victronService.essValues.batteryVoltage < lowBatteryVoltage || victronService.essValues.inverterAlarms.contains(
+            InverterAlarms.LowBattery
+        ) || bmsData.any { it.voltage < lowBatteryVoltage }
+    }
+
     override fun tickLocked(): Boolean {
+
+        if (batteryTooLow()) {
+            logger.error { "Battery too low - forcing charging" }
+            essState = "Battery too low - forcing charging using built in profile"
+
+            val profileSettings = ProfileSettings(
+                ProfileType.manual,
+                40000,
+                4000,
+                0
+            )
+
+            val essValues = victronService.essValues
+            victronService.essMode3_setAcPowerSetPointMode(
+                calculateAcPowerSetPoints(
+                    VictronEssCalculationInput(
+                        outputPowerL1 = essValues.outputL1.power.toLong(),
+                        outputPowerL2 = essValues.outputL2.power.toLong(),
+                        outputPowerL3 = essValues.outputL3.power.toLong(),
+                        acPowerSetPoint = profileSettings.acPowerSetPoint,
+                        maxChargePower = profileSettings.maxChargePower,
+                        maxDischargePower = profileSettings.maxDischargePower,
+                    )
+                )
+            )
+            currentProfile = profileSettings
+
+            return true
+        }
+
         val targetProfile = calculateProfile()
 
         if (targetProfile == null) {
