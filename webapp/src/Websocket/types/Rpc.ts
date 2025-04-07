@@ -1,5 +1,5 @@
 import {Subscribe, Unsubscribe} from "./Subscription";
-import {GarageLightRequest, GarageLightResponse} from "./Garage";
+import {GarageLightRequest, GarageLightResponse, GarageVentilationState} from "./Garage";
 import {UnderFloorHeaterRequest, UnderFloorHeaterResponse} from "./UnderFloorHeater";
 import {EvChargingStationRequest, EvChargingStationResponse} from "./EVChargingStation";
 import {EnvironmentSensorRequest, EnvironmentSensorResponse} from "./EnvironmentSensors";
@@ -82,4 +82,5 @@ export type RpcResponse = {
     allUserSettings?: { [userId: string]: UserSettings },
     stairsHeatingResponse?: StairsHeatingResponse;
     hoermannE4CommandResult?: boolean;
+    garageVentilationState?: GarageVentilationState;
 }

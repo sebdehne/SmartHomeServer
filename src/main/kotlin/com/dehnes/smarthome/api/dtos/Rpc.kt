@@ -3,6 +3,7 @@ package com.dehnes.smarthome.api.dtos
 import com.dehnes.smarthome.config.UserSettings
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionData
 import com.dehnes.smarthome.energy_consumption.EnergyConsumptionQuery
+import com.dehnes.smarthome.garage.GarageVentilationState
 import com.dehnes.smarthome.garage.HoermannE4Command
 import com.dehnes.smarthome.victron.ESSState
 import com.dehnes.smarthome.victron.ESSWrite
@@ -83,4 +84,5 @@ data class RpcResponse(
     val allUserSettings: Map<String, UserSettings>? = null,
     val stairsHeatingResponse: StairsHeatingResponse? = null,
     val hoermannE4CommandResult: Boolean? = null,
+    val garageVentilationState: GarageVentilationState? = null,
 )

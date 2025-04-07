@@ -10,7 +10,7 @@ import {HoermannE4Broadcast} from "./garage.domain";
 export type SubscriptionType =
     "getGarageLightStatus"
     | "getGarageDoorStatus"
-    | "getGarageVentilationStatus,"
+    | "getGarageVentilationStatus"
     | "getUnderFloorHeaterStatus"
     | "evChargingStationEvents"
     | "environmentSensorEvents"

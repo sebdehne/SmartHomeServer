@@ -21,12 +21,9 @@ class GarageVentilationController(
     private val configService: ConfigService,
     private val userSettingsService: UserSettingsService,
     executorService: ExecutorService,
-) : AbstractProcess(executorService, 5) {
+) : AbstractProcess(executorService, 10) {
     private val logger = KotlinLogging.logger {}
     private var datagramSocket: DatagramSocket? = null
-
-    @Volatile
-    private var toBeSent: Pair<Int, (r: Boolean) -> Unit>? = null
 
     @Volatile
     private var current: GarageVentilationState = GarageVentilationState(0)
@@ -48,8 +45,17 @@ class GarageVentilationController(
         listeners.remove(id)
     }
 
-    fun send(milliVolts: Int, callback: (r: Boolean) -> Unit) {
-        toBeSent = milliVolts to callback
+    fun setMilliVolts(user: String?, milliVolts: Int) {
+        if (!userSettingsService.canUserWrite(user, UserRole.garageDoor)) {
+            return
+        }
+
+        check(milliVolts in 0..10000)
+
+        configService.setGarageSettings {
+            it.copy(ventilationMilliVolts = milliVolts)
+        }
+
         tick()
     }
 
@@ -62,16 +68,10 @@ class GarageVentilationController(
     override fun tickLocked(): Boolean {
         val garageSettings = configService.getGarageSettings()
 
-        val toBeSentCopy = toBeSent ?: (current.milliVolts to { r: Boolean -> })
-        toBeSent = null
-
         val resp = tx(
-            cmd = toBeSentCopy.first,
+            cmd = garageSettings.ventilationMilliVolts,
             garageSettings = garageSettings,
         )
-
-        val wasSuccess = resp?.first == true
-        toBeSentCopy.second(wasSuccess)
 
         if (resp != null) {
             current = resp.second
@@ -103,13 +103,16 @@ class GarageVentilationController(
             garageSettings.ventilationBridgePort
         )
         datagramSocket!!.send(req)
+        logger.warn { "Sendt request to ventilation milliVolts=$cmd" }
 
         // receive response
         val buf = ByteArray(2) { 0 }
         return try {
             datagramSocket!!.receive(DatagramPacket(buf, 0, buf.size))
 
-            true to GarageVentilationState(readInt16Bits(buf, 0))
+            val milliVolts = readInt16Bits(buf, 0)
+            logger.warn { "Received response from ventilation milliVolts=$milliVolts" }
+            true to GarageVentilationState(milliVolts)
         } catch (_: SocketTimeoutException) {
             null
         }

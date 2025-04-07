@@ -2,7 +2,12 @@ import React, {useEffect, useState} from 'react';
 import {Button, ButtonGroup, Container, FormControlLabel, Radio, RadioGroup, TextField} from "@mui/material";
 import WebsocketService, {useUserSettings} from "../../Websocket/websocketClient";
 import Header from "../Header";
-import {GarageLightRequestType, GarageLightStatus, LightLedMode} from "../../Websocket/types/Garage";
+import {
+    GarageLightRequestType,
+    GarageLightStatus,
+    GarageVentilationState,
+    LightLedMode
+} from "../../Websocket/types/Garage";
 import {RpcResponse} from "../../Websocket/types/Rpc";
 import {Notify} from "../../Websocket/types/Subscription";
 import {HoermannE4Broadcast, HoermannE4Command, SupramatiDoorState} from "../../Websocket/types/garage.domain";
@@ -21,6 +26,10 @@ export const GarageController = () => {
     const [updateLowMilliVolts, setUpdateLowMilliVolts] = useState(false);
     const [milliVolts, setMilliVolts] = useState('0');
 
+    const [ventilationStatus, setVentilationStatus] = useState<GarageVentilationState>()
+    const [updateVentilationMilliVolts, setUpdateVentilationMilliVolts] = useState(false);
+    const [editVentilationMilliVolts, setEditVentilationMilliVolts] = useState('');
+
     useEffect(() => {
         setTimeout(() => setCurrentSeconds(Date.now()), 1000)
     }, [currentSeconds])
@@ -33,7 +42,7 @@ export const GarageController = () => {
                 WebsocketService.rpc({
                     type: "garageLightRequest",
                     garageLightRequest: {type: "getStatus"}
-                }).then(response => setgarageLightState(response.garageLightResponse!!.status));
+                }).then(response => setgarageLightState(response.garageLightResponse!.status));
             }
         )
 
@@ -42,7 +51,15 @@ export const GarageController = () => {
     useEffect(() => {
         const subId = WebsocketService.subscribe(
             "getGarageDoorStatus",
-            (notify: Notify) => setGarageDoorStatus(notify.hoermannE4Broadcast!!),
+            (notify: Notify) => setGarageDoorStatus(notify.hoermannE4Broadcast!),
+        )
+
+        return () => WebsocketService.unsubscribe(subId);
+    }, []);
+    useEffect(() => {
+        const subId = WebsocketService.subscribe(
+            "getGarageVentilationStatus",
+            (notify: Notify) => setVentilationStatus(notify.garageVentilationState!),
         )
 
         return () => WebsocketService.unsubscribe(subId);
@@ -113,6 +130,22 @@ export const GarageController = () => {
             }, 2000);
             if (garageLightResponse.status) {
                 setgarageLightState(garageLightResponse.status);
+            }
+        }).finally(() => setSending(false));
+    }
+
+    const setVentilationMilliVolts = (milliVolts: number) => {
+        setSending(true);
+        WebsocketService.rpc({
+            type: "garageVentilationRequest",
+            garageVentilationCommandMilliVolts: milliVolts,
+        }).then((response: RpcResponse) => {
+            setCmdResult(true);
+            setTimeout(() => {
+                setCmdResult(null);
+            }, 2000);
+            if (response.garageVentilationState) {
+                setVentilationStatus(response.garageVentilationState);
             }
         }).finally(() => setSending(false));
     }
@@ -253,6 +286,28 @@ export const GarageController = () => {
                     </div>}
                 </div>
             }
+
+            <h3>Ventilation:</h3>
+            {ventilationStatus && !updateVentilationMilliVolts &&
+                <div>
+                    <div onClick={() => {
+                        setUpdateVentilationMilliVolts(true);
+                        setEditVentilationMilliVolts(String(ventilationStatus.milliVolts));
+                    }}>Ventilation status: {ventilationStatus.milliVolts} mV</div>
+                    <div>Updated: {timeToDelta(currentSeconds, dayjs(ventilationStatus.createdAt).valueOf())} ago</div>
+                </div>
+            }
+            {updateVentilationMilliVolts && <div>
+                <TextField
+                    value={editVentilationMilliVolts}
+                    onChange={event => setEditVentilationMilliVolts(event.target.value)}
+                />
+                <Button onClick={() => {
+                    setVentilationMilliVolts(parseInt(editVentilationMilliVolts));
+                    setEditVentilationMilliVolts('');
+                    setUpdateVentilationMilliVolts(false);
+                }}>Submit</Button>
+            </div>}
 
 
             {cmdResult != null && cmdResult && <p>Sent &#128077;!</p>}

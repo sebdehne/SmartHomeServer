@@ -96,8 +96,10 @@ class WebSocketServer : Endpoint() {
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
             garageVentilationRequest -> {
-                garageVentilationController.send(rpcRequest.garageVentilationCommandMilliVolts!!) { }
-                RpcResponse()
+                garageVentilationController.setMilliVolts(userEmail, rpcRequest.garageVentilationCommandMilliVolts!!)
+                RpcResponse(
+                    garageVentilationState = garageVentilationController.getCurrent(userEmail)
+                )
             }
             sendHoermannE4Command -> errorCatching {
 

@@ -45,6 +45,7 @@ data class GarageSettings(
     val soTimeout: Int = 1 * 1000,
     val currentLEDStripeMode: LightLedMode = LightLedMode.manual,
     val currentLEDStripeStatus: LEDStripeStatus = LEDStripeStatus.off,
+    val ventilationMilliVolts: Int = 0,
 )
 
 enum class LEDStripeStatus {
