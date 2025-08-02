@@ -103,7 +103,7 @@ class GarageVentilationController(
             garageSettings.ventilationBridgePort
         )
         datagramSocket!!.send(req)
-        logger.warn { "Sendt request to ventilation milliVolts=$cmd" }
+        logger.info { "Sendt request to ventilation milliVolts=$cmd" }
 
         // receive response
         val buf = ByteArray(2) { 0 }
@@ -111,7 +111,7 @@ class GarageVentilationController(
             datagramSocket!!.receive(DatagramPacket(buf, 0, buf.size))
 
             val milliVolts = readInt16Bits(buf, 0)
-            logger.warn { "Received response from ventilation milliVolts=$milliVolts" }
+            logger.info { "Received response from ventilation milliVolts=$milliVolts" }
             true to GarageVentilationState(milliVolts)
         } catch (_: SocketTimeoutException) {
             null

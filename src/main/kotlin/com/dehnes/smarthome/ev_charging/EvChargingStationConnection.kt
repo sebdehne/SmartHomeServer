@@ -37,10 +37,9 @@ class EvChargingStationConnection(
     val listeners = ConcurrentHashMap<String, (Event) -> Unit>()
 
     fun start() {
-        serverSocket = ServerSocket(port)
-
-        val thread = Thread {
+        val thread = Thread(withLogging {
             while (true) {
+                serverSocket = ServerSocket(port)
                 try {
                     while (true) {
                         val clientSocket = serverSocket!!.accept()
@@ -48,11 +47,14 @@ class EvChargingStationConnection(
                         onNewClient(clientSocket)
                     }
                 } catch (t: Throwable) {
-                    logger.error("", t)
+                    logger.error(t) { "Listening for EvCharging stations failed, retrying..." }
                 }
                 Thread.sleep(5000)
+                runCatching {
+                    serverSocket?.close()
+                }
             }
-        }
+        }, "EvChargerServerThread")
         thread.isDaemon = true
         thread.start()
     }
