@@ -59,8 +59,8 @@
 
                 </executions>
                 <configuration>
-                    <npmVersion>10.8.0</npmVersion>
-                    <nodeVersion>v20.13.1</nodeVersion>
+                    <npmVersion>11.5.2</npmVersion>
+                    <nodeVersion>v22.18.0</nodeVersion>
                     <workingDirectory>webapp</workingDirectory>
                     <installDirectory>target</installDirectory>
                 </configuration>

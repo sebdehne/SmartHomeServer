@@ -136,7 +136,7 @@ export const EnvironmentSensor = ({
             <AccordionDetails>
 
                 <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                         <Grid container justifyContent="space-between" spacing={2}>
                             <ButtonGroup variant="contained" style={{
                                 margin: "10px"
@@ -173,14 +173,14 @@ export const EnvironmentSensor = ({
                     </Grid>
                     {sensor.sensorData &&
                         <>
-                            <Grid item xs={12}>
+                            <Grid size={12}>
                                 <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
 
-                                    <Grid item xs={8}>
+                                    <Grid size={8}>
                                         <span>Set sleep time: </span>
                                         <span>{sensor.sleepTimeInSeconds} seconds</span>
                                     </Grid>
-                                    <Grid item xs={4}>
+                                    <Grid size={4}>
                                         <ButtonGroup variant="contained" aria-label="contained primary button group"
                                                      style={{
                                                          margin: "10px"
@@ -196,7 +196,7 @@ export const EnvironmentSensor = ({
                                 </Grid>
                             </Grid>
 
-                            <Grid item xs={12}>
+                            <Grid size={12}>
                                 <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
                                     <TableContainer component={Paper} style={{
                                         marginTop: "20px"
@@ -260,7 +260,7 @@ export const EnvironmentSensor = ({
                     }
 
                     {sensor.firmwareUpgradeState &&
-                        <Grid item xs={12}>
+                        <Grid size={12}>
                             <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
                                 <TableContainer component={Paper} style={{
                                     marginTop: "20px"

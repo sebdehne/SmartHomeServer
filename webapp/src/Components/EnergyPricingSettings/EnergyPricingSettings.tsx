@@ -125,7 +125,7 @@ export const EnergyPricingSettings = () => {
                 <AccordionDetails>
                     <Grid container spacing={2} direction={"column"}>
                         <Grid container spacing={2} direction={"row"}>
-                            <Grid item xs={12}>
+                            <Grid size={12}>
                                 <Bar data={
                                     {
                                         labels: s.categorizedPrices.filter(dayFilter(selectedDay)).map(toHours),
@@ -157,7 +157,7 @@ export const EnergyPricingSettings = () => {
                             </Grid>
                         </Grid>
                         <Grid container spacing={2} direction={"row"}>
-                            <Grid item xs={3}>
+                            <Grid size={3}>
                                 <TextField
                                     placeholder={"neutralSpan"}
                                     value={textfields["neutralSpan." + s.service] || ""}
@@ -170,7 +170,7 @@ export const EnergyPricingSettings = () => {
                                     }}
                                 />
                             </Grid>
-                            <Grid item xs={3}>
+                            <Grid size={3}>
                                 <TextField
                                     placeholder={"avgMultiplier"}
                                     value={textfields["avgMultiplier." + s.service] || ""}
@@ -183,7 +183,7 @@ export const EnergyPricingSettings = () => {
                                     }}
                                 />
                             </Grid>
-                            <Grid item xs={3}>
+                            <Grid size={3}>
                                 <Button
                                     disabled={!userSettings.userCanWrite("energyPricing")}
                                     onClick={() => {
@@ -230,7 +230,7 @@ const dayFilter = (now: Date) => (p: CategorizedPrice): boolean => {
 const toHours = (p: CategorizedPrice): string => {
     const d = new Date(p.price.from);
     let h = d.getHours();
-    let hStr = "";
+    let hStr: string;
     if (h < 10) {
         hStr = "0" + h;
     } else {

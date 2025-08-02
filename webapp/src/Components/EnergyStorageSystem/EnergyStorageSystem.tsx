@@ -54,8 +54,8 @@ export const EnergyStorageSystem = () => {
                 <Visualization essValues={essState.measurements} essState={essState.essState}/>
 
                 <Grid container spacing={1} direction={"column"}>
-                    <Grid item xs={12}><h3>BMSes:</h3></Grid>
-                    <Grid item xs={12}>
+                    <Grid size={12}><h3>BMSes:</h3></Grid>
+                    <Grid size={12}>
                         {essState.bmsData
                             .sort((a, b) => a.bmsId.displayName.localeCompare(b.bmsId.displayName))
                             .map((bmsData) => (<Bms bmsdata={bmsData} setSending={setSending}/>))}

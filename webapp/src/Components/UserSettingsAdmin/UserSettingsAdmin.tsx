@@ -143,7 +143,7 @@ export const UserSettingsAdmin = () => {
                     }}>
                         <div>
                             <Checkbox checked={deleteConfirmation}
-                                      onChange={(event, checked) => setDeleteConfirmation(!!checked)}></Checkbox>
+                                      onChange={(event, checked) => setDeleteConfirmation(checked)}></Checkbox>
                             Confirmation
                         </div>
                         <Button

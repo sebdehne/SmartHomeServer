@@ -114,7 +114,7 @@ export const EvChargingStation = ({
             <AccordionDetails>
 
                 <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                         <Grid container justifyContent="space-between" spacing={2}>
                             <ButtonGroup variant="contained" style={{
                                 margin: "10px"
@@ -141,7 +141,7 @@ export const EvChargingStation = ({
                             </Link>
                         </Grid>
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                         <Grid container justifyContent="flex-start" spacing={2}>
 
                             <ButtonGroup variant="contained" style={{
@@ -164,14 +164,14 @@ export const EvChargingStation = ({
                         </Grid>
                     </Grid>
 
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                         <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
 
-                            <Grid item xs={4}>
+                            <Grid size={4}>
                                 <span>Charge limit in Amps: </span>
                                 <span>{station.config.chargeRateLimit}</span>
                             </Grid>
-                            <Grid item xs={8}>
+                            <Grid size={8}>
                                 <ButtonGroup variant="contained" aria-label="contained primary button group" style={{
                                     margin: "10px"
                                 }}>
@@ -186,7 +186,7 @@ export const EvChargingStation = ({
                         </Grid>
                     </Grid>
 
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                         <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
                             <Switch
                                 checked={showData}
@@ -201,7 +201,7 @@ export const EvChargingStation = ({
 
                     {showData &&
                         <>
-                            <Grid item xs={12}>
+                            <Grid size={12}>
                                 <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
                                     <PowerComponent
                                         phase1volts={station.data.phase1Millivolts / 1000}
@@ -214,7 +214,7 @@ export const EvChargingStation = ({
                                 </Grid>
                             </Grid>
 
-                            <Grid item xs={12}>
+                            <Grid size={12}>
                                 <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
                                     <StationsDetails
                                         maxChargingRate={station.data.maxChargingRate}

@@ -62,7 +62,7 @@ export const AdminTools = ({
     });
 
     return (
-        <Grid item xs={12}>
+        <Grid size={12}>
             <Grid container justifyContent="flex-start" spacing={2} alignItems={"center"}>
                 <TableContainer component={Paper} style={{
                     marginTop: "20px"

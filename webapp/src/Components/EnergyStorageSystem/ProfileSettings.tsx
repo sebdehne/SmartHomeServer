@@ -12,8 +12,8 @@ export type ProfileSettingsProps = {
 
 export const ProfileSettingsComponent = ({ profileSettings, setSending, onNewData }: ProfileSettingsProps) => {
     return <Grid container spacing={1} direction={"column"}>
-        <Grid item xs={12}><h3>Profiles:</h3></Grid>
-        {profileSettings.map(ps => <Grid item xs={12} key={ps.profileType}>
+        <Grid size={12}><h3>Profiles:</h3></Grid>
+        {profileSettings.map(ps => <Grid size={12} key={ps.profileType}>
             <ProfileSetting
                 settings={ps}
                 setSending={setSending}
