@@ -29,6 +29,8 @@ import java.util.concurrent.*
 import java.util.zip.CRC32
 import kotlin.math.min
 
+val relayProtectionDelaySeconds = 300L
+
 class UnderFloorHeaterService(
     private val loRaConnection: LoRaConnection,
     executorService: ExecutorService,
@@ -39,7 +41,7 @@ class UnderFloorHeaterService(
     private val victronService: VictronService,
     private val energyConsumptionService: EnergyConsumptionService,
     private val userSettingsService: UserSettingsService,
-) : AbstractProcess(executorService, 300) {
+) : AbstractProcess(executorService, 42) {
 
     private val loRaAddr = 18
     private val serviceType = "HeaterUnderFloor"
@@ -52,6 +54,8 @@ class UnderFloorHeaterService(
 
     @Volatile
     private var firmwareDataRequest: FirmwareDataRequest? = null
+
+    private var statusChangedAt = Instant.ofEpochMilli(0)
 
     private val receiveQueue = LinkedBlockingQueue<LoRaInboundPacketDecrypted>()
 
@@ -343,6 +347,8 @@ class UnderFloorHeaterService(
 
         var waitUntilCheapHour: Instant? = null
 
+        val changeStatusAllowed = statusChangedAt.plusSeconds(relayProtectionDelaySeconds).isBefore(Instant.now())
+
         if (!victronService.isGridOk()) {
             logger.info { "Forcing heater off due to grid offline" }
             setHeaterTarget(OnOff.off)
@@ -356,6 +362,8 @@ class UnderFloorHeaterService(
                     if (sensorData.temperatureError > 0) {
                         logger.info { "Forcing heater off due to temperature error=${sensorData.temperatureError}" }
                         setHeaterTarget(OnOff.off)
+                    } else if (!changeStatusAllowed) {
+                        logger.info { "Backing off statusChangedAt=$statusChangedAt" }
                     } else {
                         val targetTemperature = getSettings().targetTemp
                         logger.info { "Evaluating target temperature now: $targetTemperature" }
@@ -392,8 +400,8 @@ class UnderFloorHeaterService(
 
         // bring the heater to the desired state
         val target = getSettings().heaterTarget
-
         val executionResult = if (sensorData.heaterIsOn && target == OnOff.off) {
+            statusChangedAt = Instant.now()
             if (sendCommand(LoRaPacketType.HEATER_OFF_REQUEST)) {
                 heaterStatus = false
                 true
@@ -402,6 +410,7 @@ class UnderFloorHeaterService(
                 false
             }
         } else if (!sensorData.heaterIsOn && target == OnOff.on) {
+            statusChangedAt = Instant.now()
             if (sendCommand(LoRaPacketType.HEATER_ON_REQUEST)) {
                 heaterStatus = true
                 true
@@ -410,7 +419,7 @@ class UnderFloorHeaterService(
                 false
             }
         } else {
-            logger.info { "Nothing to do, heater already in desired state" }
+            logger.info { "Nothing to do, heater already in desired state changeStatusAllowed=$changeStatusAllowed" }
             true
         }
 

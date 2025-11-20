@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.energy_pricing
 
+import com.dehnes.smarthome.energy_pricing.PowerDistributionPrices.tax
 import com.dehnes.smarthome.objectMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -52,7 +53,7 @@ class HvakosterstrommenClient(
             Price(
                 Instant.parse(price["time_start"] as String),
                 Instant.parse(price["time_end"] as String),
-                any * 1.25,
+                any * tax,
             )
         }
     } catch (e: Exception) {

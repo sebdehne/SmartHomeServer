@@ -3,6 +3,7 @@ package com.dehnes.smarthome.energy_pricing
 import com.dehnes.smarthome.config.ConfigService
 import com.dehnes.smarthome.config.EnergyPriceServiceSettings
 import com.dehnes.smarthome.datalogging.InfluxDBClient
+import com.dehnes.smarthome.energy_pricing.PowerDistributionPrices.tax
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.AbstractProcess
@@ -158,7 +159,7 @@ class EnergyPriceService(
     private fun transformPrices(original: List<Price>): List<Price> = original.map {
         val price = it.price
         // https://www.regjeringen.no/no/tema/energi/regjeringens-stromtiltak/id2900232/?expand=factbox2900261
-        val threshold = 0.75 * 1.25
+        val threshold = 0.75 * tax
 
         val finalPrice = if (price > threshold) {
             val topPart = price - threshold
