@@ -368,6 +368,22 @@ class UnderFloorHeaterService(
                             )
                         val priceDecision = suitablePrices.priceDecision()
 
+                        if (priceDecision?.current == PriceCategory.cheap) {
+                            if (sensorData.temperature < targetTemperature * 100) {
+                                logger.info { "Setting heater to on. priceDecision=$priceDecision - temp below target" }
+                                setHeaterTarget(OnOff.on)
+                            } else {
+                                logger.info { "Setting heater to off. priceDecision=$priceDecision - temp above target" }
+                                setHeaterTarget(OnOff.off)
+                            }
+                        } else {
+                            waitUntilCheapHour = priceDecision?.changesAt
+                            logger.info {
+                                "Setting heater to off. priceDecision=${priceDecision?.current} waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
+                            }
+                            setHeaterTarget(OnOff.off)
+                        }
+
                         if (priceDecision?.current == PriceCategory.cheap && sensorData.temperature < targetTemperature * 100) {
                             logger.info { "Setting heater to on. priceDecision=$priceDecision" }
                             setHeaterTarget(OnOff.on)
