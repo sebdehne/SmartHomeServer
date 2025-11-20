@@ -166,7 +166,7 @@ class EnergyPriceService(
             threshold + tenPercent
         } else price
 
-        it.copy(price = finalPrice + PowerDistributionPrices.getPowerDistributionPriceInCents(it.from))
+        it.copy(price = finalPrice + PowerDistributionPrices.getPowerDistributionPriceNok(it.from))
     }
 
     private fun reloadCacheNow() {

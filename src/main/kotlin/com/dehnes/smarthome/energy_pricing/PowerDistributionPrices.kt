@@ -8,11 +8,11 @@ object PowerDistributionPrices {
     val highPrice = 42.24
     val lowPrice = 33.52
 
-    fun getPowerDistributionPriceInCents(time: Instant): Double =
+    fun getPowerDistributionPriceNok(time: Instant): Double =
         if (time.atZone(DateTimeUtils.zoneId).hour in 6 until 22) {
-            highPrice
+            highPrice / 100
         } else {
-            lowPrice
+            lowPrice / 100
         }
 
 }
