@@ -39,7 +39,7 @@ class UnderFloorHeaterService(
     private val victronService: VictronService,
     private val energyConsumptionService: EnergyConsumptionService,
     private val userSettingsService: UserSettingsService,
-) : AbstractProcess(executorService, 42) {
+) : AbstractProcess(executorService, 300) {
 
     private val loRaAddr = 18
     private val serviceType = "HeaterUnderFloor"
@@ -380,17 +380,6 @@ class UnderFloorHeaterService(
                             waitUntilCheapHour = priceDecision?.changesAt
                             logger.info {
                                 "Setting heater to off. priceDecision=${priceDecision?.current} waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
-                            }
-                            setHeaterTarget(OnOff.off)
-                        }
-
-                        if (priceDecision?.current == PriceCategory.cheap && sensorData.temperature < targetTemperature * 100) {
-                            logger.info { "Setting heater to on. priceDecision=$priceDecision" }
-                            setHeaterTarget(OnOff.on)
-                        } else {
-                            waitUntilCheapHour = priceDecision?.changesAt
-                            logger.info {
-                                "Setting heater to off. waitUntil=${waitUntilCheapHour?.atZone(clock.zone)}"
                             }
                             setHeaterTarget(OnOff.off)
                         }
