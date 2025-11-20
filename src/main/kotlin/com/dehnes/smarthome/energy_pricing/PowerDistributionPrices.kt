@@ -5,8 +5,8 @@ import java.time.Instant
 
 object PowerDistributionPrices {
 
-    val highPrice = 47.74
-    val lowPrice = 39.02
+    val highPrice = 42.24
+    val lowPrice = 33.52
 
     fun getPowerDistributionPriceInCents(time: Instant): Double =
         if (time.atZone(DateTimeUtils.zoneId).hour in 6 until 22) {

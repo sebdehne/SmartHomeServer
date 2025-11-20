@@ -2,7 +2,6 @@ package com.dehnes.smarthome.han
 
 import com.dehnes.smarthome.datalogging.InfluxDBClient
 import com.dehnes.smarthome.datalogging.InfluxDBRecord
-import com.dehnes.smarthome.energy_pricing.PowerDistributionPrices
 import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.utils.DateTimeUtils.roundToNearestFullHour
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -79,13 +78,8 @@ class HanDataService(
 
                     val prices = energyPriceService.getCachedPrices()
 
-                    val energyPriceInCents = prices.firstOrNull { it.isValidFor(startHour) }?.let { it.price * 100 }
-
-                    if (energyPriceInCents != null) {
-                        val priceInCents = energyPriceInCents +
-                                PowerDistributionPrices.getPowerDistributionPriceInCents(startHour)
-                        val costInCents = (deltaInWh.toDouble() / 1000) * priceInCents
-                        val costInNOK = costInCents / 100
+                    prices.firstOrNull { it.isValidFor(startHour) }?.let {
+                        val costInNOK = (deltaInWh.toDouble() / 1000) * it.price
                         influxDbData.add("energyImportCostLastHour" to costInNOK)
                     }
                 }
@@ -122,7 +116,11 @@ class HanDataService(
         return influxDbData
     }
 
-    private fun getLatestValueFor(measurement: String, fieldName: String, tags: Map<String, String>): Pair<Instant, Long>? {
+    private fun getLatestValueFor(
+        measurement: String,
+        fieldName: String,
+        tags: Map<String, String>
+    ): Pair<Instant, Long>? {
         val tagQueries = tags.entries.fold("") { acc, entry ->
             acc + "|> filter(fn: (r) => r[\"${entry.key}\"] == \"${entry.value}\")\r\n"
         }
