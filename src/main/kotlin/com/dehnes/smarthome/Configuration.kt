@@ -188,7 +188,7 @@ class Configuration {
         )
         stairsHeatingService.init()
 
-        val firewallService = FirewallService()
+        val firewallService = FirewallService("/run/firewall/firewall.socket")
 
         val hoermannE4Controller = HoermannE4Controller(
             configService,

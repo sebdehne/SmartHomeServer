@@ -1,7 +1,6 @@
 package com.dehnes.smarthome.firewall_router
 
 import com.dehnes.smarthome.config.ConfigService
-import com.dehnes.smarthome.firewall_router.FirewallService.Companion.cmd
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 
@@ -28,7 +27,7 @@ class BlockedMacs(
             )
         ) { "User $user cannot read blockedMacs state" }
 
-        val blockedMacs = cmd("getServiceStatus BlockMac")
+        val blockedMacs = firewallService.cmd("getServiceStatus BlockMac")
             .split(",")
             .map { it.lowercase() }
 
@@ -59,7 +58,7 @@ class BlockedMacs(
             mac
         }.joinToString(",")
 
-        cmd("updateServices BlockMac $macs")
+        firewallService.cmd("updateServices BlockMac $macs")
 
         val status = get(user)
         firewallService.updateState {

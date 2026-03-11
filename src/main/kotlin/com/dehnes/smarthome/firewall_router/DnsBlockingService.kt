@@ -3,7 +3,6 @@ package com.dehnes.smarthome.firewall_router
 import com.dehnes.smarthome.api.dtos.DnsBlockingListState
 import com.dehnes.smarthome.api.dtos.DnsBlockingState
 import com.dehnes.smarthome.config.ConfigService
-import com.dehnes.smarthome.firewall_router.FirewallService.Companion.cmd
 import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 import java.time.Instant
@@ -33,7 +32,7 @@ class DnsBlockingService(
             return
         }
 
-        val response = cmd("dns_lists_set_and_reload " + lists.joinToString(",")).trim()
+        val response = firewallService.cmd("dns_lists_set_and_reload " + lists.joinToString(",")).trim()
         check(!response.contains("ERROR"))
 
         val dnsBlockingState = get(user)
@@ -59,7 +58,7 @@ class DnsBlockingService(
             )
         }
 
-        val respons = cmd("dns_lists_get").lines()
+        val respons = firewallService.cmd("dns_lists_get").lines()
 
         return DnsBlockingState(
             listsToEnabled = respons
@@ -83,7 +82,7 @@ class DnsBlockingService(
             )
         ) { "User $user cannot write dns blocking state" }
 
-        val response = cmd("dns_lists_update")
+        val response = firewallService.cmd("dns_lists_update")
         check(!response.contains("ERROR"))
 
         val dnsBlockingState = get(user)

@@ -2,15 +2,20 @@ package com.dehnes.smarthome.firewall_router
 
 import com.dehnes.smarthome.api.dtos.DnsBlockingState
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.net.InetSocketAddress
-import java.net.Socket
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.UnixDomainSocketAddress
+import java.nio.ByteBuffer
+import java.nio.channels.Channels
+import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
+import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 
-class FirewallService {
+
+class FirewallService(private val socketFile: String) {
 
     private val logger = KotlinLogging.logger { }
-
 
     var currentState: FirewallState = FirewallState()
     val listeners: MutableMap<String, (FirewallState) -> Unit> =
@@ -29,18 +34,17 @@ class FirewallService {
         }
     }
 
-    companion object {
-        fun cmd(request: String): String {
-            return synchronized(this) {
-                val socket = Socket()
-                socket.soTimeout = 30000
-                socket.use { s ->
-                    s.connect(InetSocketAddress("127.0.0.1", 1000))
-                    s.getOutputStream().write((request + "\r\n").toByteArray(StandardCharsets.UTF_8))
-                    s.getInputStream().use {
-                        it.readAllBytes().toString(StandardCharsets.UTF_8)
-                    }.trim()
+    fun cmd(request: String): String {
+        return synchronized(this) {
+            SocketChannel.open(UnixDomainSocketAddress.of(Path.of(socketFile))).use { client ->
+                val reader = BufferedReader(InputStreamReader(Channels.newInputStream(client), "UTF-8"))
+                client.write(ByteBuffer.wrap("$request\r\n".toByteArray(StandardCharsets.UTF_8)))
+                val lines = mutableListOf<String>()
+                while(true) {
+                    val l = reader.readLine() ?: break
+                    lines.add(l)
                 }
+                lines.joinToString("\r\n")
             }
         }
     }
