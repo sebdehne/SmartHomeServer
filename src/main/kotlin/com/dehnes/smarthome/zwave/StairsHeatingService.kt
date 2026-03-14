@@ -82,7 +82,7 @@ class StairsHeatingService(
         zWaveMqttClient.addListener(
             Listener(
                 UUID.randomUUID().toString(),
-                "$nodeId/#",
+                "nodeID_$nodeId/#",
                 this::onMsg
             )
         )
@@ -110,7 +110,7 @@ class StairsHeatingService(
         val cnt = CountDownLatch(1)
         val result = AtomicReference(false)
         doLocked {
-            ongoingRequests["/$nodeId/37/1/currentValue"] = {
+            ongoingRequests["/nodeID_$nodeId/switch_binary/endpoint_1/currentValue"] = {
                 result.set(it as Boolean)
                 cnt.countDown()
             }
@@ -130,7 +130,7 @@ class StairsHeatingService(
         val cnt = CountDownLatch(1)
         val result = AtomicReference(0.0)
         doLocked {
-            ongoingRequests["/$nodeId/49/2/Air_temperature"] = {
+            ongoingRequests["/nodeID_$nodeId/sensor_multilevel/endpoint_2/Air_temperature"] = {
                 result.set(doubleValue(it))
                 cnt.countDown()
             }
@@ -150,7 +150,7 @@ class StairsHeatingService(
         val cnt = CountDownLatch(1)
         val result = AtomicReference(0.0)
         doLocked {
-            ongoingRequests["/$nodeId/50/1/value/66817"] = {
+            ongoingRequests["/nodeID_$nodeId/meter/endpoint_1/value/66817"] = {
                 result.set(doubleValue(it))
                 cnt.countDown()
             }

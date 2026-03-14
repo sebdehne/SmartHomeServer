@@ -14,6 +14,9 @@ class DnsBlockingService(
 ) {
 
     fun start() {
+        if (true) {
+            return
+        }
         val dnsBlockingState = get(null, bypassAuth = true)
         firewallService.updateState {
             it.copy(dnsBlockingState = dnsBlockingState)

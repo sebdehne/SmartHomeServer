@@ -24,6 +24,8 @@ fun main() {
 
     configuration.init()
 
+    logger.warn { "Config done, starting Jetty..." }
+
     val server = Server()
     val connector = ServerConnector(server)
     connector.port = 9090
@@ -65,6 +67,7 @@ fun main() {
 
     try {
         server.start()
+        logger.warn { "Jetty running" }
         server.join()
     } catch (t: Throwable) {
         logger.error("", t)

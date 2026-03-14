@@ -35,7 +35,7 @@ data class InfluxDBRecord(
 
 class InfluxDBClient(
     private val configService: ConfigService,
-    host: String = "192.168.1.1",
+    host: String = "10.1.0.3",
     port: Int = 8086
 ) {
     private val logger = KotlinLogging.logger { }

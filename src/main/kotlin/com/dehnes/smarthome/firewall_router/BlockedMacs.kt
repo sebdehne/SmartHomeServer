@@ -11,6 +11,9 @@ class BlockedMacs(
 ) {
 
     fun start() {
+        if (true) {
+            return
+        }
         if (!configService.isDevMode()) {
             val blockedMacState = get(null, bypassAuth = true)
             firewallService.updateState {
