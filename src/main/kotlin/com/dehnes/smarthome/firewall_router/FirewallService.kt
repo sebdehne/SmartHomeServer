@@ -1,25 +1,30 @@
 package com.dehnes.smarthome.firewall_router
 
-import com.dehnes.smarthome.api.dtos.DnsBlockingState
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.UnixDomainSocketAddress
-import java.nio.ByteBuffer
-import java.nio.channels.Channels
-import java.nio.channels.SocketChannel
-import java.nio.charset.StandardCharsets
-import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
 
 
-class FirewallService(private val socketFile: String) {
+class FirewallService(
+    private val firewallClient: FirewallClient,
+    private val executorService: ExecutorService,
+) {
 
     private val logger = KotlinLogging.logger { }
 
     var currentState: FirewallState = FirewallState()
     val listeners: MutableMap<String, (FirewallState) -> Unit> =
         ConcurrentHashMap<String, (FirewallState) -> Unit>()
+
+    fun start() {
+        executorService.submit {
+            try {
+                refreshCachedState()
+            } catch (e: Exception) {
+                logger.error(e) { "" }
+            }
+        }
+    }
 
     fun updateState(fn: (currentState: FirewallState) -> FirewallState) {
         synchronized(this) {
@@ -34,32 +39,47 @@ class FirewallService(private val socketFile: String) {
         }
     }
 
-    fun cmd(request: String): String {
-        return synchronized(this) {
-            SocketChannel.open(UnixDomainSocketAddress.of(Path.of(socketFile))).use { client ->
-                val reader = BufferedReader(InputStreamReader(Channels.newInputStream(client), "UTF-8"))
-                client.write(ByteBuffer.wrap("$request\r\n".toByteArray(StandardCharsets.UTF_8)))
-                val lines = mutableListOf<String>()
-                while(true) {
-                    val l = reader.readLine() ?: break
-                    lines.add(l)
-                }
-                lines.joinToString("\r\n")
+    fun refreshCachedState() {
+        val resp = firewallClient.rpc(Request(type = "getServicesStatus"))
+
+        updateState {
+            var updated = it
+
+            if (resp.serviceStates != null) {
+                updated = updated.copy(serviceStates = resp.serviceStates)
             }
+            if (resp.dnsBlockLists != null) {
+                updated = updated.copy(dnsBlockLists = resp.dnsBlockLists)
+            }
+
+            updated
         }
     }
+
+    fun firewallWrite(service: String, state: Map<String, Any>) {
+        val resp = firewallClient.rpc(Request(type = "updateService", service = service, serviceInput = state))
+        check(resp.error == null) { "Error updating firewall service state: ${resp.error}" }
+
+        refreshCachedState()
+    }
+
+    fun dnsListSet(enabledDnsBlockLists: List<String>) {
+        val resp = firewallClient.rpc(Request(type = "dns_lists_set_and_reload", enabledDnsBlockLists = enabledDnsBlockLists))
+        check(resp.error == null) { "Error updating firewall dns list state: ${resp.error}" }
+
+        refreshCachedState()
+    }
+
+    fun dnsRefetchLists() {
+        val resp = firewallClient.rpc(Request(type = "dns_lists_update"))
+        check(resp.error == null) { "Error updating dns lists: ${resp.error}" }
+
+        refreshCachedState()
+    }
+
 }
 
 data class FirewallState(
-    val dnsBlockingState: DnsBlockingState = DnsBlockingState(emptyMap()),
-    val blockedMacState: BlockedMacState = BlockedMacState(emptyList()),
-)
-
-data class BlockedMacState(
-    val blockedMacs: List<BlockedMac>,
-)
-
-data class BlockedMac(
-    val name: String,
-    val blocked: Boolean,
+    val serviceStates: Map<String, Map<String, Any>>? = null,
+    val dnsBlockLists: List<Map<String, Any>>? = null,
 )

@@ -63,7 +63,6 @@ class HvakosterstrommenClient(
 }
 
 fun main() {
-    val objectMapper = objectMapper()
     val client = HvakosterstrommenClient(objectMapper)
     val f = File("prices.csv")
     f.outputStream().writer(Charsets.UTF_8).use { os ->

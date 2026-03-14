@@ -18,7 +18,6 @@ class StairsHeatingServiceTest {
     @Disabled
     @Test
     fun test() {
-        val objectMapper = objectMapper()
         val executorService = Executors.newCachedThreadPool()
         val zWaveMqttClient = ZWaveMqttClient(
             "192.168.1.18",
@@ -27,7 +26,7 @@ class StairsHeatingServiceTest {
             Duration.ofSeconds(120)
         )
 
-        val configService = ConfigService(objectMapper)
+        val configService = ConfigService()
         val influxDBClient = InfluxDBClient(configService)
         val quickStatsService = mockk<QuickStatsService>()
         every {

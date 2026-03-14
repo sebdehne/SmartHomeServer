@@ -10,8 +10,6 @@ import com.dehnes.smarthome.energy_pricing.EnergyPriceService
 import com.dehnes.smarthome.environment_sensors.EnvironmentSensorService
 import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
-import com.dehnes.smarthome.firewall_router.BlockedMacs
-import com.dehnes.smarthome.firewall_router.DnsBlockingService
 import com.dehnes.smarthome.firewall_router.FirewallService
 import com.dehnes.smarthome.firewall_router.FirewallState
 import com.dehnes.smarthome.garage.*
@@ -56,8 +54,6 @@ class WebSocketServer : Endpoint() {
     private val dalyBmsDataLogger = configuration.getBean<DalyBmsDataLogger>()
     private val stairsHeatingService = configuration.getBean<StairsHeatingService>()
     private val firewallService = configuration.getBean<FirewallService>()
-    private val dnsBlockingService = configuration.getBean<DnsBlockingService>()
-    private val blockedMacs = configuration.getBean<BlockedMacs>()
     private val hoermannE4Controller = configuration.getBean<HoermannE4Controller>()
     private val garageVentilationController = configuration.getBean<GarageVentilationController>()
 
@@ -95,12 +91,36 @@ class WebSocketServer : Endpoint() {
 
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
+            firewallRefreshCachedState -> {
+                firewallService.refreshCachedState()
+                RpcResponse()
+            }
+
+            firewallUpdateServiceState -> {
+                firewallService.firewallWrite(
+                    rpcRequest.firewallRequestData!!.serviceState!!.service,
+                    rpcRequest.firewallRequestData.serviceState.state,
+                )
+                RpcResponse()
+            }
+
+            firewallRefetchKnownLists -> {
+                firewallService.dnsRefetchLists()
+                RpcResponse()
+            }
+
+            firewallSetDnsEnabledBlockLists -> {
+                firewallService.dnsListSet(rpcRequest.firewallRequestData!!.enabledDnsBlockLists!!)
+                RpcResponse()
+            }
+
             garageVentilationRequest -> {
                 garageVentilationController.setMilliVolts(userEmail, rpcRequest.garageVentilationCommandMilliVolts!!)
                 RpcResponse(
                     garageVentilationState = garageVentilationController.getCurrent(userEmail)
                 )
             }
+
             sendHoermannE4Command -> errorCatching {
 
                 val cnt = CountDownLatch(1)
@@ -115,21 +135,6 @@ class WebSocketServer : Endpoint() {
                 check(cnt.await(1, TimeUnit.SECONDS))
 
                 RpcResponse(hoermannE4CommandResult = sendResult)
-            }
-
-            blockedMacsSet -> errorCatching {
-                blockedMacs.set(userEmail, rpcRequest.blockedMacs!!)
-                RpcResponse()
-            }
-
-            dnsBlockingSet -> errorCatching {
-                dnsBlockingService.set(userEmail, rpcRequest.dnsBlockingLists!!)
-                RpcResponse()
-            }
-
-            dnsBlockingUpdateStandardLists -> errorCatching {
-                dnsBlockingService.updateStandardLists(userEmail)
-                RpcResponse()
             }
 
             stairsHeatingRequest -> {
@@ -198,7 +203,7 @@ class WebSocketServer : Endpoint() {
                         }
 
                         SubscriptionType.getGarageDoorStatus -> {
-                            val onEvent = {e: HoermannE4Broadcast ->
+                            val onEvent = { e: HoermannE4Broadcast ->
                                 argSession.basicRemote.sendText(
                                     objectMapper.writeValueAsString(
                                         WebsocketMessage(
@@ -262,7 +267,10 @@ class WebSocketServer : Endpoint() {
                             quickStatsService.listeners[subscriptionId] = this::onEvent
                         }
 
-                        SubscriptionType.getGarageLightStatus -> GarageLightStatusSubscription(subscriptionId, argSession).apply {
+                        SubscriptionType.getGarageLightStatus -> GarageLightStatusSubscription(
+                            subscriptionId,
+                            argSession
+                        ).apply {
                             garageLightController.addListener(userEmail, subscriptionId, this::onEvent)
                         }
 
@@ -303,7 +311,13 @@ class WebSocketServer : Endpoint() {
                 RpcResponse(subscriptionRemoved = true)
             }
 
-            garageLightRequest -> RpcResponse(garageLightResponse = garageLightRequest(rpcRequest.garageLightRequest!!, userEmail))
+            garageLightRequest -> RpcResponse(
+                garageLightResponse = garageLightRequest(
+                    rpcRequest.garageLightRequest!!,
+                    userEmail
+                )
+            )
+
             underFloorHeaterRequest -> RpcResponse(
                 underFloorHeaterResponse = underFloorHeaterRequest(
                     userEmail,
@@ -512,6 +526,7 @@ class WebSocketServer : Endpoint() {
                 user,
                 request.ledStripeLowMillivolts!!
             )
+
             GarageLightRequestType.switchOnCeilingLight -> send(garageLightController::switchOnCeilingLight)
             GarageLightRequestType.switchOffCeilingLight -> send(garageLightController::switchOffCeilingLight)
             GarageLightRequestType.switchLedStripeOff -> send(garageLightController::switchLedStripeOff)

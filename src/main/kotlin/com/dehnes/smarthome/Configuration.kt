@@ -12,8 +12,7 @@ import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
-import com.dehnes.smarthome.firewall_router.BlockedMacs
-import com.dehnes.smarthome.firewall_router.DnsBlockingService
+import com.dehnes.smarthome.firewall_router.FirewallClient
 import com.dehnes.smarthome.firewall_router.FirewallService
 import com.dehnes.smarthome.garage.GarageLightController
 import com.dehnes.smarthome.garage.GarageVentilationController
@@ -39,7 +38,7 @@ import java.time.Clock
 import java.util.concurrent.Executors
 import kotlin.reflect.KClass
 
-fun objectMapper() = jacksonObjectMapper()
+val objectMapper = jacksonObjectMapper()
     .registerModule(JavaTimeModule())
     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
     .setSerializationInclusion(JsonInclude.Include.NON_NULL)
@@ -51,8 +50,7 @@ class Configuration {
     fun init() {
 
         val executorService = Executors.newCachedThreadPool()
-        val objectMapper = objectMapper()
-        val configService = ConfigService(objectMapper)
+        val configService = ConfigService()
 
         val userSettingsService = UserSettingsService(configService)
 
@@ -152,7 +150,8 @@ class Configuration {
 
         val videoBrowser = VideoBrowser(userSettingsService)
 
-        val dalyBmsDataLogger = DalyBmsDataLogger(influxDBClient, objectMapper, mqttBroker, executorService, userSettingsService)
+        val dalyBmsDataLogger =
+            DalyBmsDataLogger(influxDBClient, objectMapper, mqttBroker, executorService, userSettingsService)
         dalyBmsDataLogger.apply {
             reconnect()
             resubscribe()
@@ -169,7 +168,8 @@ class Configuration {
         )
         victronEssProcess.start()
 
-        val quickStatsService = QuickStatsService(influxDBClient, hanPortService, executorService, victronService, dalyBmsDataLogger)
+        val quickStatsService =
+            QuickStatsService(influxDBClient, hanPortService, executorService, victronService, dalyBmsDataLogger)
 
         val zWaveMqttClient = ZWaveMqttClient(
             mqttBroker,
@@ -188,7 +188,13 @@ class Configuration {
         )
         stairsHeatingService.init()
 
-        val firewallService = FirewallService("/run/firewall/firewall.socket")
+        val firewallService = FirewallService(
+            FirewallClient(
+                "127.0.0.1",
+                1000
+            ),
+            executorService
+        ).apply { this.start() }
 
         val hoermannE4Controller = HoermannE4Controller(
             configService,
@@ -230,8 +236,6 @@ class Configuration {
         beans[EnergyConsumptionService::class] = energyConsumptionService
         beans[DalyBmsDataLogger::class] = dalyBmsDataLogger
         beans[StairsHeatingService::class] = stairsHeatingService
-        beans[DnsBlockingService::class] = DnsBlockingService(userSettingsService, configService, firewallService).apply { start() }
-        beans[BlockedMacs::class] = BlockedMacs(userSettingsService, firewallService, configService).apply { start() }
         beans[FirewallService::class] = firewallService
     }
 

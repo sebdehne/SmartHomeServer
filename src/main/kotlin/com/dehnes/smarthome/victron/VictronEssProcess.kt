@@ -339,12 +339,12 @@ data class SoCLimit(
 fun main() {
     val executorService = Executors.newCachedThreadPool()
     val objectMapper = jacksonObjectMapper().registerModule(kotlinModule())
-    val influxDBClient = InfluxDBClient(ConfigService(objectMapper))
+    val influxDBClient = InfluxDBClient(ConfigService())
     val victronService = VictronService(
         "192.168.1.18",
         objectMapper,
         executorService,
-        ConfigService(objectMapper),
+        ConfigService(),
         influxDBClient,
         EnergyConsumptionService(influxDBClient)
     )

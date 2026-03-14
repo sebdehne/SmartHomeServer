@@ -112,8 +112,7 @@ data class EnergyConsumptionData(
 
 
 fun main() {
-    val objectMapper = objectMapper()
-    val influxDBClient = InfluxDBClient(ConfigService(objectMapper))
+    val influxDBClient = InfluxDBClient(ConfigService())
     val energyConsumptionService = EnergyConsumptionService(influxDBClient)
     val report = energyConsumptionService.report(
         EnergyConsumptionQuery(

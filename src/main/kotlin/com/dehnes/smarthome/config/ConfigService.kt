@@ -1,5 +1,6 @@
 package com.dehnes.smarthome.config
 
+import com.dehnes.smarthome.objectMapper
 import com.dehnes.smarthome.zwave.StairsHeatingSettings
 import com.fasterxml.jackson.core.util.DefaultIndenter
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
@@ -8,9 +9,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import java.io.File
 import java.nio.charset.StandardCharsets
 
-class ConfigService(
-    private val objectMapper: ObjectMapper,
-) {
+class ConfigService {
 
     private val filenameJson = System.getProperty("STORAGE_FILE_NAME", "properties.json")
 

@@ -36,9 +36,10 @@ enum class RequestType {
 
     stairsHeatingRequest,
 
-    dnsBlockingSet,
-    dnsBlockingUpdateStandardLists,
-    blockedMacsSet,
+    firewallRefreshCachedState,
+    firewallUpdateServiceState,
+    firewallSetDnsEnabledBlockLists,
+    firewallRefetchKnownLists,
 
     sendHoermannE4Command,
     garageVentilationRequest,
@@ -64,6 +65,7 @@ data class RpcRequest(
     val blockedMacs: List<String>? = null,
     val hoermannE4Command: HoermannE4Command? = null,
     val garageVentilationCommandMilliVolts: Int? = null,
+    val firewallRequestData: FirewallRequestData? = null,
 )
 
 data class RpcResponse(
