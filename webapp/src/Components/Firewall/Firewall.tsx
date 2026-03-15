@@ -3,7 +3,6 @@ import React, {useCallback, useEffect, useState} from "react";
 import {
     Button,
     Container,
-    Divider,
     Paper,
     Switch,
     Table,
@@ -14,6 +13,7 @@ import {
 } from "@mui/material";
 import WebsocketClient from "../../Websocket/websocketClient";
 import {FirewallState} from "../../Websocket/types/Firewall";
+import {FirewallService} from "./FirewallService";
 
 export const Firewall = () => {
     const [sending, setSending] = useState<boolean>(false);
@@ -33,7 +33,7 @@ export const Firewall = () => {
 
     const toggleDnsList = useCallback((list: string) => {
         if (state) {
-            let enabled = Object.entries(state.dnsBlockingState.listsToEnabled)
+            let enabled = Object.entries(state.dnsBlockLists ?? [])
                 .filter(([, dnsListState]) => dnsListState.enabled)
                 .map(([list,]) => list);
 
@@ -44,28 +44,10 @@ export const Firewall = () => {
             }
             setSending(true);
             WebsocketClient.rpc({
-                type: 'dnsBlockingSet',
-                dnsBlockingLists: enabled
-            }).then(() => setSending(false));
-        }
-    }, [state]);
-
-
-    const toggleBlockedMac = useCallback((name: string) => {
-        if (state) {
-            let blockedNames = state.blockedMacState.blockedMacs
-                .filter((d) => d.blocked)
-                .map(d => d.name);
-
-            if (blockedNames.includes(name)) {
-                blockedNames = blockedNames.filter(l => l !== name);
-            } else {
-                blockedNames.push(name);
-            }
-            setSending(true);
-            WebsocketClient.rpc({
-                type: 'blockedMacsSet',
-                blockedMacs: blockedNames
+                type: 'firewallSetDnsEnabledBlockLists',
+                firewallRequestData: {
+                    enabledDnsBlockLists: enabled,
+                }
             }).then(() => setSending(false));
         }
     }, [state]);
@@ -73,28 +55,31 @@ export const Firewall = () => {
 
     return <Container maxWidth="sm" className="App">
         <Header
-            title="DNS Blocking"
+            title="Firewall"
             sending={sending}
         />
 
         <Button variant={"contained"} onClick={() => {
             setSending(true);
             WebsocketClient.rpc({
-                type: "dnsBlockingUpdateStandardLists"
+                type: "firewallRefreshCachedState"
             }).then(() => setSending(false))
         }}>Update standard lists</Button>
 
+        <h3>Dns block</h3>
+
         {state && <TableContainer component={Paper} style={{
             marginTop: "20px"
         }}>
             <Table aria-label="simple table">
                 <TableBody>
-                    {Object.entries(state.dnsBlockingState.listsToEnabled).map(([list, listState]) => (
-                        <TableRow key={list}>
+                    {(state.dnsBlockLists ?? []).map((list) => (
+                        <TableRow key={list.name}>
                             <TableCell component="th" scope="row">
                                 <div style={{display: "flex", flexDirection: "column", justifyContent: "flex-start"}}>
-                                    <span>{list}</span>
-                                    <span style={{color: "#5e5e5e"}}>{new Date(listState.lastUpdated).toLocaleDateString()}</span>
+                                    <span>{list.name}</span>
+                                    <span
+                                        style={{color: "#5e5e5e"}}>{new Date(list.changedAt).toLocaleDateString()}</span>
                                 </div>
                             </TableCell>
                             <TableCell align="right">
@@ -104,13 +89,13 @@ export const Firewall = () => {
                                     alignItems: "center",
                                     justifyContent: "flex-end"
                                 }}>
-                                    <Switch disabled={sending} checked={!listState.enabled}
-                                            onClick={() => toggleDnsList(list)}></Switch>
+                                    <Switch disabled={sending} checked={!list.enabled}
+                                            onClick={() => toggleDnsList(list.name)}></Switch>
                                     <span
                                         style={{
                                             width: '80px',
                                             display: "inline"
-                                        }}>{listState.enabled ? 'blocked' : 'open'}</span>
+                                        }}>{list.enabled ? 'blocked' : 'open'}</span>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -119,42 +104,11 @@ export const Firewall = () => {
             </Table>
         </TableContainer>}
 
-        <Divider/>
+        <h3>Services:</h3>
 
-        <h2 style={{textAlign: "center"}}>Device blocking</h2>
-
-        {state && <TableContainer component={Paper} style={{
-            marginTop: "20px"
-        }}>
-            <Table aria-label="simple table">
-                <TableBody>
-                    {state.blockedMacState.blockedMacs.map((d) => (
-                        <TableRow key={d.name}>
-                            <TableCell component="th" scope="row">
-                                <span>{d.name}</span>
-                            </TableCell>
-                            <TableCell align="right">
-                                <div style={{
-                                    display: "flex",
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    justifyContent: "flex-end"
-                                }}>
-                                    <Switch disabled={sending} checked={!d.blocked}
-                                            onClick={() => toggleBlockedMac(d.name)}></Switch>
-                                    <span
-                                        style={{
-                                            width: '80px',
-                                            display: "inline"
-                                        }}>{d.blocked ? 'blocked' : 'unblocked'}</span>
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </TableContainer>}
-
+        {state?.serviceStates && Object.entries(state.serviceStates).map(([serviceName, serviceState]) => (
+            <FirewallService key={serviceName} name={serviceName} state={serviceState}/>
+        ))}
 
     </Container>
 }

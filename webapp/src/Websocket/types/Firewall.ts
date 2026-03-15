@@ -1,24 +1,42 @@
+export type FirewallRequestData = {
+    serviceState?: ServiceStateUpdate;
+    enabledDnsBlockLists?: string[];
+}
+
+export type ServiceStateUpdate = {
+    service: string;
+    state: any;
+}
 
 export type FirewallState = {
-    dnsBlockingState: DnsBlockingState;
-    blockedMacState: BlockedMacState;
+    serviceStates?: { [key: string]: ServiceState };
+    dnsBlockLists?: DnsBlockList[];
 }
 
-export type BlockedMacState = {
-    blockedMacs: BlockedMac[];
+export type ServiceState = {
+    elements: FirewallElement[],
 }
 
-export type BlockedMac = {
+export type FirewallElement = {
+    name?: string;
+    description?: string;
+    value?: any;
+    type: FirewallElementType;
+    writeable: boolean;
+    templateElement?: FirewallElement;
+}
+
+export type FirewallElementType =
+    'string'
+    | 'stringList'
+    | 'stringNullable'
+    | 'number'
+    | 'boolean'
+    | 'elementList'
+
+
+export type DnsBlockList = {
     name: string;
-    blocked: boolean;
-}
-
-
-export type DnsBlockingState = {
-    listsToEnabled: { [key: string]: DnsBlockingListState };
-}
-
-export type DnsBlockingListState = {
     enabled: boolean;
-    lastUpdated: string;
+    changedAt: string;
 }

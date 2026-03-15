@@ -14,6 +14,7 @@ import com.dehnes.smarthome.firewall_router.FirewallService
 import com.dehnes.smarthome.firewall_router.FirewallState
 import com.dehnes.smarthome.garage.*
 import com.dehnes.smarthome.heating.UnderFloorHeaterService
+import com.dehnes.smarthome.users.UserRole
 import com.dehnes.smarthome.users.UserSettingsService
 import com.dehnes.smarthome.utils.withLogging
 import com.dehnes.smarthome.victron.DalyBmsDataLogger
@@ -92,12 +93,13 @@ class WebSocketServer : Endpoint() {
         val rpcRequest = websocketMessage.rpcRequest!!
         val response: RpcResponse = when (rpcRequest.type) {
             firewallRefreshCachedState -> {
-                firewallService.refreshCachedState()
+                firewallService.refreshCachedState(userEmail)
                 RpcResponse()
             }
 
             firewallUpdateServiceState -> {
                 firewallService.firewallWrite(
+                    userEmail,
                     rpcRequest.firewallRequestData!!.serviceState!!.service,
                     rpcRequest.firewallRequestData.serviceState.state,
                 )
@@ -105,12 +107,12 @@ class WebSocketServer : Endpoint() {
             }
 
             firewallRefetchKnownLists -> {
-                firewallService.dnsRefetchLists()
+                firewallService.dnsRefetchLists(userEmail)
                 RpcResponse()
             }
 
             firewallSetDnsEnabledBlockLists -> {
-                firewallService.dnsListSet(rpcRequest.firewallRequestData!!.enabledDnsBlockLists!!)
+                firewallService.dnsListSet(userEmail, rpcRequest.firewallRequestData!!.enabledDnsBlockLists!!)
                 RpcResponse()
             }
 
@@ -195,11 +197,7 @@ class WebSocketServer : Endpoint() {
                                 onEvent(it)
                             }
 
-                            object : Closeable {
-                                override fun close() {
-                                    garageVentilationController.removeListener(subscriptionId)
-                                }
-                            }
+                            Closeable { garageVentilationController.removeListener(subscriptionId) }
                         }
 
                         SubscriptionType.getGarageDoorStatus -> {
@@ -230,6 +228,7 @@ class WebSocketServer : Endpoint() {
                         SubscriptionType.firewall -> {
 
                             val state = firewallService.currentState
+                            check(userSettingsService.canUserRead(userEmail, UserRole.firewall))
 
                             val sub = object : Subscription<FirewallState>(subscriptionId, argSession) {
                                 override fun onEvent(e: FirewallState) {

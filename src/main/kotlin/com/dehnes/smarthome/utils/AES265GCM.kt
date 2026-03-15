@@ -1,7 +1,6 @@
 package com.dehnes.smarthome.utils
 
 import com.dehnes.smarthome.config.ConfigService
-import com.dehnes.smarthome.objectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.nio.charset.Charset
 import javax.crypto.Cipher
@@ -10,9 +9,7 @@ import javax.crypto.spec.SecretKeySpec
 import kotlin.random.Random
 
 
-class AES265GCM(
-    configService: ConfigService
-) {
+class AES265GCM(configService: ConfigService) {
 
     companion object {
         const val IV_SIZE = 12

@@ -16,6 +16,7 @@ import {UserSettings, WriteUserSettings} from "./UserSettings";
 import {WriteBms} from "./Bms";
 import {StairsHeatingRequest, StairsHeatingResponse} from "./stairsHeating";
 import {HoermannE4Command} from "./garage.domain";
+import {FirewallRequestData} from "./Firewall";
 
 export type RequestType =
     "subscribe"
@@ -36,9 +37,12 @@ export type RequestType =
     | "writeUserSettings"
     | "writeBms"
     | "stairsHeatingRequest"
-    | "dnsBlockingSet"
-    | "dnsBlockingUpdateStandardLists"
-    | "blockedMacsSet"
+
+    | "firewallRefreshCachedState"
+    | "firewallUpdateServiceState"
+    | "firewallSetDnsEnabledBlockLists"
+    | "firewallRefetchKnownLists"
+
     | "sendHoermannE4Command"
     | "garageVentilationRequest"
     ;
@@ -63,6 +67,7 @@ export type RpcRequest = {
     blockedMacs?: string[];
     hoermannE4Command?: HoermannE4Command;
     garageVentilationCommandMilliVolts?: number;
+    firewallRequestData?: FirewallRequestData;
 }
 
 export type RpcResponse = {

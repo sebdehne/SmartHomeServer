@@ -14,6 +14,8 @@ import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
 import com.dehnes.smarthome.firewall_router.FirewallClient
 import com.dehnes.smarthome.firewall_router.FirewallService
+import com.dehnes.smarthome.firewall_router.FirewallServiceImpl
+import com.dehnes.smarthome.firewall_router.FirewallServiceMock
 import com.dehnes.smarthome.garage.GarageLightController
 import com.dehnes.smarthome.garage.GarageVentilationController
 import com.dehnes.smarthome.garage.HoermannE4Controller
@@ -188,13 +190,18 @@ class Configuration {
         )
         stairsHeatingService.init()
 
-        val firewallService = FirewallService(
-            FirewallClient(
-                "127.0.0.1",
-                1000
-            ),
-            executorService
-        ).apply { this.start() }
+        val firewallService: FirewallService = if (configService.isDevMode()) {
+            FirewallServiceMock(executorService)
+        } else {
+            FirewallServiceImpl(
+                FirewallClient(
+                    "127.0.0.1",
+                    1000
+                ),
+                executorService,
+                userSettingsService,
+            )
+        }.apply { this.start() }
 
         val hoermannE4Controller = HoermannE4Controller(
             configService,
