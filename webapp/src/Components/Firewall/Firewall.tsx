@@ -1,7 +1,7 @@
 import Header from "../Header";
 import React, {useCallback, useEffect, useState} from "react";
 import {
-    Button,
+    Button, ButtonGroup,
     Container,
     Paper,
     Switch,
@@ -59,12 +59,21 @@ export const Firewall = () => {
             sending={sending}
         />
 
-        <Button variant={"contained"} onClick={() => {
-            setSending(true);
-            WebsocketClient.rpc({
-                type: "firewallRefreshCachedState"
-            }).then(() => setSending(false))
-        }}>Update standard lists</Button>
+        <ButtonGroup>
+            <Button variant={"contained"} onClick={() => {
+                setSending(true);
+                WebsocketClient.rpc({
+                    type: "firewallRefetchKnownLists"
+                }).then(() => setSending(false))
+            }}>Update standard DNS lists</Button>
+            <Button variant={"contained"} onClick={() => {
+                setSending(true);
+                WebsocketClient.rpc({
+                    type: "firewallRefreshCachedState"
+                }).then(() => setSending(false))
+            }}>Reload</Button>
+
+        </ButtonGroup>
 
         <h3>Dns block</h3>
 
