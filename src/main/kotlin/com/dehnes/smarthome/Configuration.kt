@@ -92,7 +92,7 @@ class Configuration {
         )
         evChargingStationConnection.start()
 
-        val mqttBroker = "192.168.1.18"
+        val mqttBroker = "10.2.0.18"
         val victronService = VictronService(
             victronHost = mqttBroker,
             objectMapper = objectMapper,

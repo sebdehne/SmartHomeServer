@@ -341,7 +341,7 @@ fun main() {
     val objectMapper = jacksonObjectMapper().registerModule(kotlinModule())
     val influxDBClient = InfluxDBClient(ConfigService())
     val victronService = VictronService(
-        "192.168.1.18",
+        "10.2.0.18",
         objectMapper,
         executorService,
         ConfigService(),

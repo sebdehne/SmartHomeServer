@@ -34,11 +34,11 @@ data class Coordinates(
 )
 
 data class GarageSettings(
-    val hoermannBridgeIp: String = "192.168.1.21",
+    val hoermannBridgeIp: String = "10.2.0.21",
     val hoermannBridgePort: Int = 9000,
-    val ventilationBridgeIp: String = "192.168.1.22",
+    val ventilationBridgeIp: String = "10.2.0.22",
     val ventilationBridgePort: Int = 9000,
-    val lightsControllerIp: String = "192.168.1.23",
+    val lightsControllerIp: String = "10.2.0.23",
     val lightsControllerPort: Int = 9000,
     val lightsLedLowMilliVolts: Int = 5000,
     val lightOffAfterCloseDelaySeconds: Long = 60 * 5,

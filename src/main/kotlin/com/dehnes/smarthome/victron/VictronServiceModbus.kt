@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 
 class VictronServiceModbus {
 
-    val modbusTCPMaster = ModbusTCPMaster("192.168.1.18")
+    val modbusTCPMaster = ModbusTCPMaster("10.2.0.18")
 
     init {
         modbusTCPMaster.connect()
