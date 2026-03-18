@@ -33,9 +33,9 @@ export const Firewall = () => {
 
     const toggleDnsList = useCallback((list: string) => {
         if (state) {
-            let enabled = Object.entries(state.dnsBlockLists ?? [])
-                .filter(([, dnsListState]) => dnsListState.enabled)
-                .map(([list,]) => list);
+            let enabled = (state.dnsBlockLists ?? [])
+                .filter((dnsListState) => dnsListState.enabled)
+                .map((dnsListState) => dnsListState.name);
 
             if (enabled.includes(list)) {
                 enabled = enabled.filter(l => l !== list);
