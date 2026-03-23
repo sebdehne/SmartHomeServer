@@ -19,7 +19,8 @@ class FirewallClient(
             "${objectMapper.writeValueAsString(req)}\n\n".toByteArray(StandardCharsets.UTF_8)
         )
 
-        val resp = socket.getInputStream().readAllBytes()
+        val resp = socket.getInputStream().readAllBytes().toString(StandardCharsets.UTF_8)
+        if (resp.startsWith("ERROR: ")) error("For response: $resp")
         objectMapper.readValue(resp)
     }
 
