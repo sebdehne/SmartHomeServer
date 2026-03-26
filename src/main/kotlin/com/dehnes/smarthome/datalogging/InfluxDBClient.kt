@@ -7,12 +7,11 @@ import org.apache.hc.client5.http.fluent.Response
 import org.apache.hc.core5.http.ContentType
 import org.apache.hc.core5.http.io.entity.StringEntity
 import org.apache.hc.core5.net.URIBuilder
-
-import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.TimeUnit
+
 
 data class InfluxDBRecord(
     val timestamp: Instant,
@@ -55,22 +54,19 @@ class InfluxDBClient(
         try {
             val body = records.joinToString(separator = "\n") { it.toLine() }
             logger.debug { "${"About to send {}"} $body" }
-            val response = Request.post("$baseUrl/api/v2/write?bucket=$bucketName&org=dehnes.com")
+            Request.post("$baseUrl/api/v2/write?bucket=$bucketName&org=dehnes.com")
                 .addHeader("Authorization", "Token " + configService.getInfluxDbAuthToken())
                 .bodyString(body, ContentType.TEXT_PLAIN)
                 .execute()
+                .handleResponse {
+                    if (it.code > 299) {
+                        val body = it.entity.content.readAllBytes().toString(StandardCharsets.UTF_8)
+                        error("Could not write to InFluxDb ${it.code} $body")
+                    }
+                }
 
-            val returnResponse = response.returnResponse()
-            if (returnResponse.code > 299) {
-                throw RuntimeException(
-                    "Could not write to InFluxDb $returnResponse ${
-                        response.returnContent().asString()
-                    }"
-                )
-            }
-
-        } catch (e: IOException) {
-            throw RuntimeException(e)
+        } catch (e: Throwable) {
+            logger.error(e) { "" }
         }
     }
 
