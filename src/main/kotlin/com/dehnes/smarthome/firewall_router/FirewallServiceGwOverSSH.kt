@@ -71,8 +71,11 @@ class FirewallServiceGwOverSSH(
             .forEach { line ->
                 val split = line.split(" ")
                 val name = split.first()
-                val type = split[1]
-                val timestamp = split[2]
+                val timestamp = if (split.size < 3) {
+                    Instant.ofEpochMilli(0).toString()
+                } else {
+                    split[2]
+                }
                 unboundLists.computeIfPresent(name) { _, v ->
                     v.copy(
                         changedAt = Instant.parse(timestamp),
