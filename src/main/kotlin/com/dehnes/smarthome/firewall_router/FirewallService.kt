@@ -1,5 +1,7 @@
 package com.dehnes.smarthome.firewall_router
 
+import java.time.Instant
+
 interface FirewallService {
     fun start()
     fun refreshCachedState(user: String?)
@@ -13,5 +15,11 @@ interface FirewallService {
 
 data class FirewallState(
     val serviceStates: Map<String, Map<String, Any>>? = null,
-    val dnsBlockLists: List<Map<String, Any>>? = null,
+    val dnsBlockLists: List<DnsBlockList>? = null,
+)
+
+data class DnsBlockList(
+    val name: String,
+    val enabled: Boolean,
+    val changedAt: Instant,
 )

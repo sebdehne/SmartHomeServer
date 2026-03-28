@@ -30,8 +30,6 @@ data class HanData(
 )
 
 class HanPortService(
-    private val host: String,
-    private val port: Int,
     private val executorService: ExecutorService,
     influxDBClient: InfluxDBClient,
     energyPriceService: EnergyPriceService,

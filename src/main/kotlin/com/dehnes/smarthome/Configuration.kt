@@ -12,9 +12,8 @@ import com.dehnes.smarthome.ev_charging.EvChargingService
 import com.dehnes.smarthome.ev_charging.EvChargingStationConnection
 import com.dehnes.smarthome.ev_charging.FirmwareUploadService
 import com.dehnes.smarthome.ev_charging.PriorityLoadSharing
-import com.dehnes.smarthome.firewall_router.FirewallClient
 import com.dehnes.smarthome.firewall_router.FirewallService
-import com.dehnes.smarthome.firewall_router.FirewallServiceImpl
+import com.dehnes.smarthome.firewall_router.FirewallServiceGwOverSSH
 import com.dehnes.smarthome.firewall_router.FirewallServiceMock
 import com.dehnes.smarthome.garage.GarageLightController
 import com.dehnes.smarthome.garage.GarageVentilationController
@@ -74,8 +73,6 @@ class Configuration {
         energyPriceService.start()
 
         val hanPortService = HanPortService(
-            host = "192.168.1.1",
-            23000,
             executorService = executorService,
             influxDBClient = influxDBClient,
             energyPriceService = energyPriceService,
@@ -193,11 +190,7 @@ class Configuration {
         val firewallService: FirewallService = if (configService.isDevMode()) {
             FirewallServiceMock(executorService)
         } else {
-            FirewallServiceImpl(
-                FirewallClient(
-                    "127.0.0.1",
-                    1000
-                ),
+            FirewallServiceGwOverSSH(
                 executorService,
                 userSettingsService,
             )
