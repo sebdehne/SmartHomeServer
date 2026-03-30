@@ -7,7 +7,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.hc.client5.http.fluent.Request
 
 class WebRTCServlet : HttpServlet() {
-    val webrtcServer = "http://10.2.0.2:8083"
+    val webrtcServer = "http://10.2.0.2:8889"
     val logger = KotlinLogging.logger { }
 
     override fun doPost(req: HttpServletRequest, resp: HttpServletResponse) {
@@ -18,8 +18,8 @@ class WebRTCServlet : HttpServlet() {
         val pathParts = req.pathInfo.split("/")
         val readAllBytes = req.inputStream.readAllBytes()
 
-        Request.post("$webrtcServer/stream/${pathParts.last()}/channel/0/webrtc")
-            .addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+        Request.post("$webrtcServer/${pathParts.last()}/whep")
+            .addHeader("Content-Type", "application/sdp")
             .bodyByteArray(readAllBytes).execute()
             .handleResponse { clientResponse ->
                 logger.info { "POST pathInfo=${req.pathInfo} proxy-response-status=${clientResponse.code}" }

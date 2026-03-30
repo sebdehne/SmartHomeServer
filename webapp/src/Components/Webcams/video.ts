@@ -33,21 +33,18 @@ const start = (streamId: string, onStream: (stream: MediaStream) => void, addLog
             .then(() => {
                 const localSdpOffer = pc.localDescription!!.sdp;
                 addLog('Sending offer: ' + localSdpOffer);
-                const data = new URLSearchParams();
-                data.append("data", btoa(localSdpOffer));
                 return fetch('webrtc/receiver/' + streamId, {
                     method: "POST",
-                    body: data
+                    body: localSdpOffer
                 });
             })
             .then(response => response.text())
             .then(text => {
                 addLog('Raw remote answer: ' + text);
-                const sdp = atob(text);
-                addLog('Remote SDP: ' + sdp);
+                addLog('Remote SDP: ' + text);
                 pc.setRemoteDescription(new RTCSessionDescription({
                     type: 'answer',
-                    sdp: sdp
+                    sdp: text
                 }));
                 addLog('Done setting sdp');
             })

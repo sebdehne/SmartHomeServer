@@ -6,7 +6,6 @@ import Header from "../Header";
 
 const streams = [
     "parking1",
-    "parking2"
 ]
 
 const Webcams = () => {
