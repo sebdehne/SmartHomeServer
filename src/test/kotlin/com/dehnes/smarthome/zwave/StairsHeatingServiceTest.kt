@@ -20,7 +20,7 @@ class StairsHeatingServiceTest {
     fun test() {
         val executorService = Executors.newCachedThreadPool()
         val zWaveMqttClient = ZWaveMqttClient(
-            "10.2.0.18",
+            "10.4.0.18",
             objectMapper,
             executorService,
             Duration.ofSeconds(120)

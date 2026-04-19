@@ -7,7 +7,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.hc.client5.http.fluent.Request
 
 class WebRTCServlet : HttpServlet() {
-    val webrtcServer = "http://10.2.0.2:8889"
+    val webrtcServer = "http://10.4.0.2:8889"
     val logger = KotlinLogging.logger { }
 
     override fun doPost(req: HttpServletRequest, resp: HttpServletResponse) {

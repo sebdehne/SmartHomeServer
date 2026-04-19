@@ -33,7 +33,7 @@ class FirewallServiceGwOverSSH(
         listOf(
             "/bin/sh",
             "-c",
-            "ssh smarthome@10.2.0.1 \"cd blocklists && doas /home/smarthome/blocklists/blocklists $arg\""
+            "ssh smarthome@10.4.0.1 \"cd blocklists && doas /home/smarthome/blocklists/blocklists $arg\""
         )
     )
 
@@ -41,7 +41,7 @@ class FirewallServiceGwOverSSH(
         listOf(
             "/bin/sh",
             "-c",
-            "ssh smarthome@10.2.0.1 \"doas /usr/sbin/unbound-control reload\""
+            "ssh smarthome@10.4.0.1 \"doas /usr/sbin/unbound-control reload\""
         )
     )
 
