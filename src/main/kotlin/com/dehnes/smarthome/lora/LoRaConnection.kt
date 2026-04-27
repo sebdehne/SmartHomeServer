@@ -183,7 +183,7 @@ class LoRaConnection(
                             logger.debug { "Ignoring packet not for me. $inboundPacket" }
                         } else if (inboundPacket.type == LoRaPacketType.SETUP_REQUEST) {
                             onSetupRequest(inboundPacket)
-                        } else if (configService.getEnvironmentSensors().validateTimestamp && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
+                        } else if (configService.getEnvironmentSensors().validateTimestampOnReceive && (inboundPacket.timestampDelta < -30 || inboundPacket.timestampDelta > 30)) {
                             logger.warn { "Ignoring received packet because of invalid timestampDelta. $inboundPacket" }
                         } else {
 

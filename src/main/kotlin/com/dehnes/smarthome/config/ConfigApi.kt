@@ -112,7 +112,8 @@ data class EnergyPriceServiceSettings(
 
 data class EnvironmentSensors(
     val sensors: Map<String, EnvironmentSensor> = emptyMap(),
-    val validateTimestamp: Boolean = true,
+    val validateTimestampOnReceive: Boolean = true,
+    val useRemoteTimeWhenResponding: Boolean = false,
 )
 
 data class EnvironmentSensor(

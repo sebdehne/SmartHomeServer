@@ -327,7 +327,11 @@ class EnvironmentSensorService(
                     packet.from,
                     FIRMWARE_DATA_RESPONSE,
                     data,
-                    if (configService.getEnvironmentSensors().validateTimestamp) null else packet.timestampSecondsSince2000
+                    if (configService.getEnvironmentSensors().useRemoteTimeWhenResponding) {
+                        packet.timestampSecondsSince2000
+                    } else {
+                        null
+                    }
                 ) { }
 
                 bytesSent += nextChunkSize
@@ -372,7 +376,11 @@ class EnvironmentSensorService(
             packet.from,
             FIRMWARE_INFO_RESPONSE,
             byteArray,
-            if (configService.getEnvironmentSensors().validateTimestamp) null else packet.timestampSecondsSince2000
+            if (configService.getEnvironmentSensors().useRemoteTimeWhenResponding) {
+                packet.timestampSecondsSince2000
+            } else {
+                null
+            }
         ) {
             if (!it) {
                 logger.info { "Could not send firmware-info-response" }
@@ -427,19 +435,21 @@ class EnvironmentSensorService(
                 3,
                 4
             )
-            sensorData.copy(
-                sleepTimeInSeconds = sleepTimeInSeconds
-            )
+            sensorData.copy(sleepTimeInSeconds = sleepTimeInSeconds)
         } else {
             sensorData
         }
 
         loRaConnection.send(
-            packet.keyId,
-            packet.from,
-            SENSOR_DATA_RESPONSE_V3,
-            responsePayload,
-            if (configService.getEnvironmentSensors().validateTimestamp) null else packet.timestampSecondsSince2000
+            keyId = packet.keyId,
+            toAddr = packet.from,
+            type = SENSOR_DATA_RESPONSE_V3,
+            payload = responsePayload,
+            timestamp = if (configService.getEnvironmentSensors().useRemoteTimeWhenResponding) {
+                packet.timestampSecondsSince2000
+            } else {
+                null
+            }
         ) {
             if (!it) {
                 logger.info { "Could not send sensor-data response" }
